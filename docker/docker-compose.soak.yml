@@ -31,11 +31,11 @@ services:
       - VALLEY_TEST_INSTANCE=farmhand
       - VALLEY_WATCHDOG_MS=5000
     volumes:
-      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
-      - D:\Source\ValleyTalk\docker\mods-cache-farmhand2:/mods-src:ro
-      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
-      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
-      - D:\Source\ValleyTalk\docker\data-farmhand2:/data
+      - ./linux-game:/game:ro
+      - ./mods-cache-farmhand2:/mods-src:ro
+      - ./saves:/saves-src:ro
+      - ./smapi-cache:/smapi-cache:ro
+      - ./data-farmhand2:/data
     networks:
       - valley-e2e
 
@@ -49,10 +49,10 @@ services:
       - VALLEY_TEST_INSTANCE=farmhand
       - VALLEY_WATCHDOG_MS=5000
     volumes:
-      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
-      - D:\Source\ValleyTalk\docker\mods-cache-farmhand3:/mods-src:ro
-      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
-      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
-      - D:\Source\ValleyTalk\docker\data-farmhand3:/data
+      - ./linux-game:/game:ro
+      - ./mods-cache-farmhand3:/mods-src:ro
+      - ./saves:/saves-src:ro
+      - ./smapi-cache:/smapi-cache:ro
+      - ./data-farmhand3:/data
     networks:
       - valley-e2e

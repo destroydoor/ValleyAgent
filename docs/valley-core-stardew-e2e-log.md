@@ -5,7 +5,7 @@
 > 本文档是 2026-07-09 早期 E2E 测试报告，记录了从 `valley_agent_server` Python
 > 代码移植到 `@valley/core` TypeScript 框架的过程。文中提到的
 > `valley_agent_server/server/agent_memory.py` / `agent_tools.py` / `npc_tools.py`
-> 等 Python 源文件已全部删除，TS 实现在 `D:\Source\ValleyAI\packages\core` +
+> 等 Python 源文件已全部删除，TS 实现在 `<VALLEYAI_ROOT>\packages\core` +
 > `packages/stardew`。
 >
 > **当前权威文档**：[`../AGENTS.md`](../AGENTS.md)。

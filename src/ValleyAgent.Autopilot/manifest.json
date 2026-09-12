@@ -1,6 +1,6 @@
 {
     "Name": "ValleyAgent Autopilot",
-    "Author": "dandm1",
+    "Author": "destroydoor (based on ValleyTalk by dandm1)",
     "Version": "1.0.0",
     "Description": "AI-driven autopilot for Stardew Valley — lets external LLMs control the game via MCP protocol for testing.",
     "UniqueID": "dandm1.ValleyAgent.Autopilot",

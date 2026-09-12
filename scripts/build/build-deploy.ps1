@@ -34,7 +34,8 @@ $ErrorActionPreference = "Stop"
 
 # ── Paths ───────────────────────────────────────────────────────────
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$GamePath    = "F:\SteamLibrary\steamapps\common\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath    = Get-GamePath
 $SMAPIExe    = Join-Path $GamePath "StardewModdingAPI.exe"
 $ModsDir     = Join-Path $GamePath "Mods"
 $ValleyAgentDir      = Join-Path $ProjectRoot "src\ValleyAgent"

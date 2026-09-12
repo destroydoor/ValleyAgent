@@ -26,9 +26,12 @@ if (-not $StardewPath) {
         "$env:ProgramFiles\Steam\steamapps\common\Stardew Valley",
         "C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley",
         "${env:ProgramFiles(x86)}\Steam\steamapps\common\Stardew Valley",
-        "D:\SteamLibrary\steamapps\common\Stardew Valley",
-        "E:\SteamLibrary\steamapps\common\Stardew Valley"
+        "${env:ProgramFiles}\GOG Games\Stardew Valley"
     )
+    # 追加所有盘符下的常见 Steam 库位置（不硬编码某台机器的盘符）
+    foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+        $candidates += (Join-Path $d.Root "SteamLibrary\steamapps\common\Stardew Valley")
+    }
     foreach ($c in $candidates) {
         if (Test-Path "$c\Stardew Valley.exe") {
             $StardewPath = $c

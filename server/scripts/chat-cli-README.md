@@ -7,7 +7,7 @@
 ### 1. 启动 Agent Server
 
 ```bash
-cd D:/Source/ValleyAI
+cd <ValleyAI 仓库根目录>
 
 # 最简启动（需要 LLM API key）
 LLM_API_KEY=your_key bun run packages/stardew/src/cli.ts
@@ -31,7 +31,7 @@ bun run packages/stardew/src/cli.ts --llm-config path/to/config.json
 ### 2. 启动 Chat CLI
 
 ```bash
-cd D:/Source/ValleyAI
+cd <ValleyAI 仓库根目录>
 
 # 默认连接 Haley
 bun run scripts/chat-cli.ts
@@ -156,7 +156,7 @@ LLM 响应时间取决于 provider。MiniMax 通常 2-5 秒，OpenAI 1-3 秒。C
 server 将记忆存储在 `agents/` 目录下。删除对应 NPC 的 rel 文件：
 
 ```bash
-rm -rf D:/Source/ValleyAI/agents/Haley_players/
+rm -rf ./agents/Haley_players/
 ```
 
 然后用 `/npc Haley` 重连即可获得全新对话。

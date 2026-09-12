@@ -2,8 +2,8 @@
 
 > 日期：2026-08-03
 > 状态：设计稿（不含代码改动）
-> 依据：对 `D:/Source/ValleyAI`（TS 智能层）与 `D:/Source/ValleyTalk`（C# 执行层）现状代码的实证核实。文中 `文件:行号` 均为现状。
-> 跨仓库说明：本设计改动落在 `D:/Source/ValleyAI`（TS），C# 侧仅作为日志通道现状核实，不改 C#。
+> 依据：对 `<VALLEYAI_ROOT>`（TS 智能层）与 `<REPO_ROOT>`（C# 执行层）现状代码的实证核实。文中 `文件:行号` 均为现状。
+> 跨仓库说明：本设计改动落在 `<VALLEYAI_ROOT>`（TS），C# 侧仅作为日志通道现状核实，不改 C#。
 
 ---
 
@@ -23,9 +23,9 @@
 
 `agent-loop.ts` 已 emit 完整决策事件：`turn_start` / `message_end`（含 LLM 原始输出 content）/ `tool_call_start`（含 args）/ `tool_call_end`（含 result）/ `error` / `agent_end`。
 
-当前唯一消费者是 [transcript-recorder.ts:100](file:///D:/Source/ValleyAI/packages/stardew/src/transcript-recorder.ts#L100) 的 `attach(agent)`，它把事件**写进留痕文件**（TranscriptStore），**没有任何消费者把事件打到 stdout**。所以排障时 stdout 看不到 NPC 想了什么、输出了什么、调了什么工具——这些恰好是最该看的。
+当前唯一消费者是 [transcript-recorder.ts:100](file:///<VALLEYAI_ROOT>/packages/stardew/src/transcript-recorder.ts#L100) 的 `attach(agent)`，它把事件**写进留痕文件**（TranscriptStore），**没有任何消费者把事件打到 stdout**。所以排障时 stdout 看不到 NPC 想了什么、输出了什么、调了什么工具——这些恰好是最该看的。
 
-[stardew-agent.ts:436](file:///D:/Source/ValleyAI/packages/stardew/src/stardew-agent.ts#L436) `recorder?.attach(this.coreAgent)` 是 attach 的唯一位置，新增 sink 在此并列即可。
+[stardew-agent.ts:436](file:///<VALLEYAI_ROOT>/packages/stardew/src/stardew-agent.ts#L436) `recorder?.attach(this.coreAgent)` 是 attach 的唯一位置，新增 sink 在此并列即可。
 
 ### 0.3 协议层日志单薄且 dialogue 主路径是盲区
 
@@ -33,7 +33,7 @@
 
 ### 0.4 导演 Director 零日志且未接线
 
-[director.ts](file:///D:/Source/ValleyAI/packages/stardew/src/director.ts) 的 `morningPlan`（131）/ `milestoneReact`（149）/ `callLlmForBeats`（205）全程静默：调 LLM、解析 JSON、验证丢弃 beat、`recordPlanRun` 终态全无日志。且 `new Director` 在 `packages/stardew/src` 下**零匹配**——Director 当前未在 server 实例化（[director.ts:106](file:///D:/Source/ValleyAI/packages/stardew/src/director.ts#L106) 注释明示），其留痕接缝 `transcriptStore` 缺省 `undefined` → no-op。
+[director.ts](file:///<VALLEYAI_ROOT>/packages/stardew/src/director.ts) 的 `morningPlan`（131）/ `milestoneReact`（149）/ `callLlmForBeats`（205）全程静默：调 LLM、解析 JSON、验证丢弃 beat、`recordPlanRun` 终态全无日志。且 `new Director` 在 `packages/stardew/src` 下**零匹配**——Director 当前未在 server 实例化（[director.ts:106](file:///<VALLEYAI_ROOT>/packages/stardew/src/director.ts#L106) 注释明示），其留痕接缝 `transcriptStore` 缺省 `undefined` → no-op。
 
 ### 0.5 63 处裸 console 无统一格式
 
@@ -42,8 +42,8 @@
 ### 0.6 stdout 通道现状（C# 侧，不改）
 
 TS server 由 C# `ServerProcessManager` 拉起：
-- `ConsoleWindow=true`（默认，[ServerProcessManager.cs:36](file:///d:/Source/ValleyTalk/src/ValleyAgent/WebSocket/ServerProcessManager.cs#L36)）：TS server 在独立 cmd 窗口运行，stdout 直接显示，不重定向。
-- `ConsoleWindow=false`：stdout 被捕获，每行前缀 `[Server]`/`[Server:ERR]` 经 `LogCallback`（[ServerProcessManager.cs:241-248](file:///d:/Source/ValleyTalk/src/ValleyAgent/WebSocket/ServerProcessManager.cs#L241)）转发到 SMAPI 日志。
+- `ConsoleWindow=true`（默认，[ServerProcessManager.cs:36](file:///<REPO_ROOT>/src/ValleyAgent/WebSocket/ServerProcessManager.cs#L36)）：TS server 在独立 cmd 窗口运行，stdout 直接显示，不重定向。
+- `ConsoleWindow=false`：stdout 被捕获，每行前缀 `[Server]`/`[Server:ERR]` 经 `LogCallback`（[ServerProcessManager.cs:241-248](file:///<REPO_ROOT>/src/ValleyAgent/WebSocket/ServerProcessManager.cs#L241)）转发到 SMAPI 日志。
 
 两种模式下"完整原始"日志均可行：cmd 窗口可滚屏，SMAPI 日志文件可 grep。**TS 侧无需自带文件输出**，避免与 SMAPI 日志重复。
 
@@ -101,7 +101,7 @@ TS server 由 C# `ServerProcessManager` 拉起：
 - 构造时传入 `npcName`，每条日志带 NPC 名（per-NPC 对话是核心场景，无 NPC 关联则日志无法追踪）。
 - 耗时用事件自带 `timestamp` 差计算（`tool_call_end.timestamp - tool_call_start.timestamp`），不引入额外计时器。
 - `attach(agent: Agent)` 调 `agent.subscribe`，返回 unsubscribe 函数；run 结束 dispose。
-- 在 [stardew-agent.ts runOnce](file:///D:/Source/ValleyAI/packages/stardew/src/stardew-agent.ts#L436) 里和 `recorder?.attach` 并列调用。runDialogue / runBeat 共用（都走 runOnce）。
+- 在 [stardew-agent.ts runOnce](file:///<VALLEYAI_ROOT>/packages/stardew/src/stardew-agent.ts#L436) 里和 `recorder?.attach` 并列调用。runDialogue / runBeat 共用（都走 runOnce）。
 - 全部输出 best-effort，try/catch 包裹，绝不向上抛（仿 transcript-recorder 防御）。
 
 ### 3.2 `packages/core/src/llm-provider.ts` 埋点
@@ -170,7 +170,7 @@ dialogue 主路径当前是盲区，重点补。已有 state/consolidate/route_s
 
 ## 4. 错误处理
 
-- 所有日志 best-effort：try/catch 包裹，绝不向上抛、不阻塞主流程（仿 [transcript-recorder.ts:116-118](file:///D:/Source/ValleyAI/packages/stardew/src/transcript-recorder.ts#L116) 防御）。
+- 所有日志 best-effort：try/catch 包裹，绝不向上抛、不阻塞主流程（仿 [transcript-recorder.ts:116-118](file:///<VALLEYAI_ROOT>/packages/stardew/src/transcript-recorder.ts#L116) 防御）。
 - 格式化大对象（工具 args/result）用 safe-stringify（`JSON.stringify` try/catch + 循环引用 fallback `String()`），防循环引用导致 console 抛错。
 - `console.log` 本身不抛，但防御性包裹仍保留，统一风格。
 - sink 订阅绝不影响 agentLoop 事件流：subscribe 失败不阻断 Agent.prompt。
@@ -181,12 +181,12 @@ dialogue 主路径当前是盲区，重点补。已有 state/consolidate/route_s
 
 ### 5.1 单元测试
 - **console-log-subscriber**：构造 mock Agent 事件序列（turn_start → message_end → tool_call_start → tool_call_end → turn_end），spy `console.log`，断言输出格式、NPC 名、完整内容、耗时计算正确。
-- **llm-provider 埋点**：现有 [llm-provider.test.ts](file:///D:/Source/ValleyAI/packages/core/tests/llm-provider.test.ts) 用 `callOverride`，spy `console.log` 断言 `→`/`←`/retry/billing 行触发；callOverride 路径标注 `override=true`。
-- **protocol-adapter**：现有 [protocol-adapter.test.ts](file:///D:/Source/ValleyAI/packages/stardew/tests/protocol-adapter.test.ts) spy `console.log` 断言 `recv`/`send` 成对、内容完整。
-- **director**：现有 [director.test.ts](file:///D:/Source/ValleyAI/packages/stardew/tests/director.test.ts) spy `console.log` 断言 morningPlan 产出/丢弃日志。
+- **llm-provider 埋点**：现有 [llm-provider.test.ts](file:///<VALLEYAI_ROOT>/packages/core/tests/llm-provider.test.ts) 用 `callOverride`，spy `console.log` 断言 `→`/`←`/retry/billing 行触发；callOverride 路径标注 `override=true`。
+- **protocol-adapter**：现有 [protocol-adapter.test.ts](file:///<VALLEYAI_ROOT>/packages/stardew/tests/protocol-adapter.test.ts) spy `console.log` 断言 `recv`/`send` 成对、内容完整。
+- **director**：现有 [director.test.ts](file:///<VALLEYAI_ROOT>/packages/stardew/tests/director.test.ts) spy `console.log` 断言 morningPlan 产出/丢弃日志。
 
 ### 5.2 集成测试
-[dialogue-e2e.test.ts](file:///D:/Source/ValleyAI/packages/stardew/tests/dialogue-e2e.test.ts) 跑一次完整对话，重定向 stdout 捕获，断言关键日志行存在：`[turn] #0 start` / `[llm] →` / `[llm] ←` / `[tool] → speak` / `[recv] dialogue` / `[send] dialogue`。
+[dialogue-e2e.test.ts](file:///<VALLEYAI_ROOT>/packages/stardew/tests/dialogue-e2e.test.ts) 跑一次完整对话，重定向 stdout 捕获，断言关键日志行存在：`[turn] #0 start` / `[llm] →` / `[llm] ←` / `[tool] → speak` / `[recv] dialogue` / `[send] dialogue`。
 
 ### 5.3 验收门槛（铁律3）
 1. `bun test packages/core` 全绿

@@ -4,7 +4,7 @@
 
 **Goal:** 消除 NPC 跨图瞬移到玩家脚下的出戏感（D1）、防止 NPC 闯入节日/事件地图（D2）、验证并补完 TS 服务器人格注入（B2 收尾）、联机模式下 farmhand 完全惰性化防止烧 token 与状态冲突（E2）。
 
-**Architecture:** 全部改动在现有架构内进行，不依赖 P3 重构。C# 侧改 `AgentNavigator`（跨图旅行）与 `EventHandlerInitializer`（事件入口）；TS 侧（`D:\Source\ValleyAI`）仅补 PromptBuilder 对话历史注入；联机止血利用已有但未接线的 `MultiplayerHelper`。
+**Architecture:** 全部改动在现有架构内进行，不依赖 P3 重构。C# 侧改 `AgentNavigator`（跨图旅行）与 `EventHandlerInitializer`（事件入口）；TS 侧（`<VALLEYAI_ROOT>`）仅补 PromptBuilder 对话历史注入；联机止血利用已有但未接线的 `MultiplayerHelper`。
 
 **Tech Stack:** C# (.NET 6 + SMAPI 1.6)、TypeScript (Bun)、TestMod（游戏内 E2E）、bun test（TS 单元/集成）
 
@@ -19,7 +19,7 @@
 
 ## 背景：D1 缺陷的三处代码（探查确认）
 
-瞬移不是一处，而是 `AgentNavigator.cs` 里三个直接传送分支（`D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`）：
+瞬移不是一处，而是 `AgentNavigator.cs` 里三个直接传送分支（`<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`）：
 
 | 分支 | 行号 | 现状 | 缺陷 |
 |------|------|------|------|
@@ -35,7 +35,7 @@
 
 ## 文件结构映射
 
-### C# Mod 侧（`D:\Source\ValleyTalk\src\`）
+### C# Mod 侧（`<REPO_ROOT>\src\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -53,7 +53,7 @@
 | `ValleyAgent.TestMod\Tests\Experience\EXP013_QuickSceneSwitch.cs` | Create | D1 验收：5 秒内连切两图，NPC 不瞬移 |
 | `ValleyAgent.TestMod\Tests\Functional\Func_FarmhandInert.cs` | Create | E2 验收：模拟 farmhand 上下文时全部入口惰性 |
 
-### TS 服务器侧（`D:\Source\ValleyAI\packages\stardew\`）
+### TS 服务器侧（`<VALLEYAI_ROOT>\packages\stardew\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -67,7 +67,7 @@
 ### Task 1: GameEventGuard 静态守卫类（先行，D1/D2 共用）
 
 **Files:**
-- Create: `D:\Source\ValleyTalk\src\ValleyAgent\Utils\GameEventGuard.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Utils\GameEventGuard.cs`
 - Test: 无独立单测基建（C# 单测项目当前不可用），通过 TestMod 功能测试覆盖
 
 - [ ] **Step 1: 创建守卫类**
@@ -112,7 +112,7 @@ namespace ValleyAgent.Utils
 - [ ] **Step 2: Commit**
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/Utils/GameEventGuard.cs
 git commit -m "feat(utils): add GameEventGuard single-source event/festival predicate
 
@@ -124,7 +124,7 @@ D2 fix foundation. Expression reused from NPCDialoguePatch:27-35. Injectable ove
 ### Task 2: TravelState 记录出发位置 + CancelTravel 位置恢复
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
 
 **背景**：现状 `CancelTravel`（:164-168）只删旅行状态和隐藏标记；若 NPC 已被 `HideNpc` 挪到 `(-1000,-1000)`，取消后 NPC 永远卡在地图外。D2 守卫和玩家往返取消旅行都依赖安全的取消语义。
 
@@ -204,7 +204,7 @@ TravelState now records DepartureLocation/DepartureNpcTile at StartTravel time."
 ### Task 3: D1 修复 — QuickTravel 条件收敛 + 落点验证（Travelling 分支）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（:96-117）
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（:96-117）
 
 - [ ] **Step 1: 重写 Travelling 阶段 QuickTravel**
 
@@ -255,7 +255,7 @@ Condition now compares against travel.TargetLocation (was: any map mismatch)."
 ### Task 4: D1 修复 — Departing 分支同样收敛（:540-558）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
 
 - [ ] **Step 1: 重写 Departing 阶段重定向**
 
@@ -291,7 +291,7 @@ git commit -m "fix(navigator): D1 departing quick-travel redirects via simulated
 ### Task 5: D1 修复 — 消除无旅行状态的直接追赶传送（:123-145）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
 
 - [ ] **Step 1: 改为启动模拟旅行**
 
@@ -341,7 +341,7 @@ All warpCharacter-to-player-tile + unvalidated setTileLocation offset patterns e
 ### Task 6: OnPlayerWarped 归一化 + 每 tick 旁路收敛
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1529-1603, :1805-1824）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1529-1603, :1805-1824）
 
 - [ ] **Step 1: OnPlayerWarped 传 NameOrUniqueName**
 
@@ -381,7 +381,7 @@ Fixes dynamic-location (mine/volcano) name mismatch between warped event and nav
 ### Task 6A: 到达表现 — NPC 从地图入口"走过来"（用户决策 2026-07-18）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（UpdateTravel :487-522）
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（UpdateTravel :487-522）
 
 **用户硬要求**：模拟旅行到达后，NPC 出现的方向必须与来路一致，且观感是"像玩家一样从入口走过来"，**不是传送贴脸**。传送只允许作为卡死兜底。
 
@@ -434,7 +434,7 @@ with travel origin (graph entry tile), teleport only as stuck recovery."
 ### Task 7: OnPlayerWarped 守卫
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1552-1573）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1552-1573）
 
 - [ ] **Step 1: FOLLOW 分支加守卫**
 
@@ -462,7 +462,7 @@ git commit -m "fix(init): D2 guard OnPlayerWarped FOLLOW travel during event/fes
 ### Task 8: 每 tick FOLLOW 自动旅行守卫（堵旁路）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1805-1824）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（:1805-1824）
 
 - [ ] **Step 1: 加守卫**
 
@@ -487,7 +487,7 @@ Without this, the per-tick path bypasses the OnPlayerWarped guard on the next ti
 ### Task 9: AgentNavigator 中央守卫（保护 move_to / FARM / MINE / FORAGE 调用方）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（NavigateToTaskLocation :174-208）
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`（NavigateToTaskLocation :174-208）
 
 - [ ] **Step 1: NavigateToTaskLocation 入口守卫**
 
@@ -537,7 +537,7 @@ with position restore. Protects move_to/FARM/MINE/FORAGE callers."
 ### Task 10: D3 顺手修复 — 出发语音改 chat 可见（可选，低成本）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Navigation\AgentNavigator.cs`
 
 **背景**：D3 核心是"走向出口玩家看不到"（PathFindController 只在激活地图推进，玩家已在新图）。彻底修复（预 warp 钩子）成本高、收益低，本计划只做低成本部分：出发/到达语音从"旧地图头顶气泡"（玩家看不见）改为 `NpcSpeechHelper.Speak`（气泡 + chat 消息，chat 在新图可见）。
 
@@ -565,13 +565,13 @@ Overhead bubble is invisible once player left the map; chat copy preserves the f
 
 ---
 
-## Phase 3: B2 验证 + 对话历史注入补完（TS，`D:\Source\ValleyAI`）
+## Phase 3: B2 验证 + 对话历史注入补完（TS，`<VALLEYAI_ROOT>`）
 
 ### Task 11: PromptBuilder 注入对话历史 transcript
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\prompt-builder.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\prompt-builder.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\prompt-builder.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\prompt-builder.test.ts`
 
 **背景**：P0 已解决 npc_prompts.json 死数据问题（33 NPC × 5 阶段注入，`prompt-builder.ts:43-52`）。遗留缺口：`AgentMemory.getConversationContext(10)` 存在但从未被调用，prompt 只有最近 5 条短期记忆，NPC 看不到对话 transcript → 玩家追问"我刚才说了什么"时 NPC 只能靠短期记忆猜测。
 
@@ -608,7 +608,7 @@ test("conversation history section degrades gracefully when empty", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/prompt-builder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/prompt-builder.test.ts`
 Expected: FAIL with "expected prompt to contain 农场主: 我叫张三"
 
 - [ ] **Step 3: Write minimal implementation**
@@ -634,21 +634,21 @@ const fullPrompt = template
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/prompt-builder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/prompt-builder.test.ts`
 Expected: PASS（含既有 93 行测试无回归）
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: B2 全量验证（既有测试确认）**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
 Expected: PASS（33 NPC × 5 阶段加载、好感度→阶段映射——B2 核心已由 P0 解决，此处为确认门）
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/prompt-builder.ts packages/stardew/tests/prompt-builder.test.ts
 git commit -m "feat(stardew): inject conversation history transcript into dialogue prompt
 
@@ -667,7 +667,7 @@ the actual dialogue transcript, not just last 5 short-term memories. B2 confirme
 ### Task 12: ModEntry.Entry farmhand 早退
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\ModEntry.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\ModEntry.cs`
 
 - [ ] **Step 1: Entry 开头加守卫**
 
@@ -727,10 +727,10 @@ secondary screens. GetApi returns null. Replaces the toothless warning log."
 ### Task 13: Harmony 补丁 belt-and-braces 守卫
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCDialoguePatch.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCGiftPatch.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\SocialPagePatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCDialoguePatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCGiftPatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\SocialPagePatch.cs`
 
 **背景**：Entry 早退后 farmhand 上 `harmony.PatchAll()` 不会执行，补丁本不会存在。此任务防的是未来重构把守卫挪晚、或分屏场景静态字段串扰（`DialogueBoxInputPatch._activeAgentNpc` 等静态状态）。
 
@@ -780,7 +780,7 @@ Defense in depth against future guard regression and split-screen static-field b
 ### TS 测试
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test                                    # 全部（含覆盖率 80% 门槛）
 bun run typecheck                           # 0 errors
 ```
@@ -788,7 +788,7 @@ bun run typecheck                           # 0 errors
 ### C# 构建
 
 ```bash
-cd D:\Source\ValleyTalk\src\ValleyAgent
+cd <REPO_ROOT>\src\ValleyAgent
 dotnet build -c Release                     # 0 warning 0 error
 ```
 

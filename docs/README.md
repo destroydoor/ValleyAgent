@@ -32,7 +32,7 @@
 |------|------|
 | [spec_npc_arc/](spec_npc_arc/) | NPC 弧线故事系统设计规范（spec.md / tasks.md / checklist.md） |
 | [spec_autopilot/](spec_autopilot/) | Autopilot 自动驾驶模式设计规范（spec.md / plan.md） |
-| [superpowers/specs/2026-07-08-valleyai-ts-server-design.md](superpowers/specs/2026-07-08-valleyai-ts-server-design.md) | **TS Agent Server 设计规范** — 设计阶段文档，已实现（参考 `D:\Source\ValleyAI`） |
+| [superpowers/specs/2026-07-08-valleyai-ts-server-design.md](superpowers/specs/2026-07-08-valleyai-ts-server-design.md) | **TS Agent Server 设计规范** — 设计阶段文档，已实现（参考 `<VALLEYAI_ROOT>`） |
 | [superpowers/plans/2026-07-08-valleyai-core-plan.md](superpowers/plans/2026-07-08-valleyai-core-plan.md) | TS Agent Server 实现计划 — 已实现 |
 | [superpowers/specs/2026-07-21-narrative-director-design.md](superpowers/specs/2026-07-21-narrative-director-design.md) | 叙事导演系统设计 |
 | [superpowers/plans/2026-07-18-p0-dialogue-pipeline.md](superpowers/plans/2026-07-18-p0-dialogue-pipeline.md) | 对话管线 P0 实现计划（历史） |

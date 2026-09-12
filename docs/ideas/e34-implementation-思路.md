@@ -229,8 +229,8 @@ public static class InventoryDisplayInteraction
 
 ## 10. 验证门槛
 
-1. `dotnet build src\ValleyAgent\ValleyAgent.csproj -c Debug -p:GamePath="D:\Source\ValleyTalk\Stardew Valley" --no-incremental --verbosity minimal`
+1. `dotnet build src\ValleyAgent\ValleyAgent.csproj -c Debug -p:GamePath="<REPO_ROOT>\Stardew Valley" --no-incremental --verbosity minimal`
    → 0 warning 0 error。
-2. `dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj -c Debug -p:GamePath="D:\Source\ValleyTalk\Stardew Valley" --no-build --verbosity minimal`
+2. `dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj -c Debug -p:GamePath="<REPO_ROOT>\Stardew Valley" --no-build --verbosity minimal`
    → 新测试全绿 + 既有测试不回归（零跳过零失败）。
 3. 提交后 `git checkout -- "Stardew Valley/Mods"` 还原构建部署残留，只 stage 源码。

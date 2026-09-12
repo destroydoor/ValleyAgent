@@ -7,10 +7,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$GamePath = "D:\Source\ValleyTalk\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$RepoRoot = Get-RepoRoot
+$GamePath = Get-GamePath
 $ModsDir  = Join-Path $GamePath "Mods"
-$ValleyAIDir = "D:\Source\ValleyAI"
+$ValleyAIDir = Get-ValleyAIRoot
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $logFile = Join-Path $RepoRoot "scripts\results\deploy-$timestamp.txt"
 
@@ -155,7 +156,7 @@ if (Test-Path $ValleyAIExeSrc) {
     Write-Log "Copied valley-ai-server.exe (${sizeMB} MB)" "Success"
 } else {
     Write-Log "ERROR: valley-ai-server.exe not found at $ValleyAIExeSrc" "Error"
-    Write-Log "       Run bun build --compile in D:\Source\ValleyAI\packages\stardew first." "Error"
+    Write-Log "       Run bun build --compile in $ValleyAIDir\packages\stardew first." "Error"
     exit 1
 }
 

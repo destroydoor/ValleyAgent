@@ -1,6 +1,6 @@
 {
   "Name": "ValleyAgent TestMod",
-  "Author": "dandm1",
+  "Author": "destroydoor (based on ValleyTalk by dandm1)",
   "Version": "1.0.0",
   "Description": "Automated in-game test suite for ValleyAgent.",
   "UniqueID": "dandm1.ValleyAgent.TestMod",

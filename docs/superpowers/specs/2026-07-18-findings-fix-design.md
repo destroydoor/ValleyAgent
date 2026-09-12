@@ -4,8 +4,8 @@
 > **状态**: 设计阶段（待用户审核）
 > **修复范围**: P0-P3 全量
 > **实施顺序**: P0 先交付 → P3 架构 → P1/P2
-> **代码位置**: `D:\Source\ValleyAI`（TS 服务器）+ `D:\Source\ValleyTalk`（C# Mod）
-> **原始报告**: `D:\Source\ValleyTalk\test-recordings\kimi_player_eval\FINDINGS.md`
+> **代码位置**: `<VALLEYAI_ROOT>`（TS 服务器）+ `<REPO_ROOT>`（C# Mod）
+> **原始报告**: `<REPO_ROOT>\test-recordings\kimi_player_eval\FINDINGS.md`
 
 ---
 
@@ -517,7 +517,7 @@ const dialogueCircuitBreaker = new CircuitBreaker({
 
 ```bash
 # TS 单元 + 集成测试
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test
 
 # TS 静态检查
@@ -525,11 +525,11 @@ bun run typecheck
 bun run check:imports
 
 # C# 静态检查 + 构建
-cd D:\Source\ValleyTalk\src\ValleyAgent
+cd <REPO_ROOT>\src\ValleyAgent
 dotnet build -c Release
 
 # 游戏内 E2E
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 .\scripts\test\run-game-tests.bat
 ```
 

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { Agent } from "../src/agent";
 import type { AgentLoopConfig, LlmCallResult } from "../src/agent-loop";
 import type { AgentContext, LlmMessage, AgentEvent } from "../src/types";
@@ -611,7 +612,7 @@ async function main() {
   log.push(`| #6 Deepseek 404 | .chat() Chat Completions | Deepseek 调用是否成功 | ${deepseekOk} |\n`);
 
   // 写入文件
-  const outputPath = "D:\\Source\\ValleyTalk\\docs\\valley-core-stardew-e2e-log.md";
+  const outputPath = join(import.meta.dir, "..", "..", "..", "..", "docs", "valley-core-stardew-e2e-log.md");
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, log.join(""), "utf-8");
   console.log(`日志已写入: ${outputPath}`);

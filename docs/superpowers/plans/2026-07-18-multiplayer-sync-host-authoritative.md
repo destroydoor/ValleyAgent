@@ -39,7 +39,7 @@ var hostMod = helper.Multiplayer
 
 ---
 
-## 文件结构映射（全部在 `D:\Source\ValleyTalk\src\`）
+## 文件结构映射（全部在 `<REPO_ROOT>\src\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -69,8 +69,8 @@ var hostMod = helper.Multiplayer
 ### Task 1: AgentSyncMessages 字段审计与补齐
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Multiplayer\AgentSyncMessages.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.TestMod\Tests\Functional\Func_MultiplayerSync.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Multiplayer\AgentSyncMessages.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.TestMod\Tests\Functional\Func_MultiplayerSync.cs`
 
 **背景**：8 种 DTO 已定义（AgentState/FullSync/DialogueResponse/GiftResponse/NpcAction + DialogueRequest/GiftRequest/InteractionRequest，行 39-155），但字段清单未经验证。位置插值需要 `position`、`locationName`、`facingDirection`、`isMoving`；HUD 需要 `health/maxHealth/state/emotion`。
 
@@ -108,7 +108,7 @@ var hostMod = helper.Multiplayer
 - [ ] **Step 4: Commit**
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent.Abstractions/Multiplayer/AgentSyncMessages.cs src/ValleyAgent.TestMod/Tests/Functional/Func_MultiplayerSync.cs
 git commit -m "feat(mp): audit + complete sync DTOs, add ProtocolVersion envelope
 
@@ -123,8 +123,8 @@ version field guards against mod version drift."
 ### Task 2: MultiplayerEventRouter（联机事件统一入口）
 
 **Files:**
-- Create: `D:\Source\ValleyTalk\src\ValleyAgent\Multiplayer\MultiplayerEventRouter.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Multiplayer\MultiplayerEventRouter.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`
 
 - [ ] **Step 1: 创建 Router**
 
@@ -199,9 +199,9 @@ git commit -m "feat(mp): add MultiplayerEventRouter for message/peer lifecycle r
 ### Task 3: Broadcaster 实例化 + 快照生产 + 节流驱动
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\ServiceInitializer.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Multiplayer\AgentSyncBroadcaster.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（OnUpdateTicked）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\ServiceInitializer.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Multiplayer\AgentSyncBroadcaster.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs`（OnUpdateTicked）
 
 - [ ] **Step 1: ServiceInitializer 注册（仅 HostMode 会走到）**
 
@@ -241,9 +241,9 @@ git commit -m "feat(mp): wire AgentSyncBroadcaster into host tick loop with delt
 ### Task 4: 事件触发广播（状态/表情/说话/血量）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\StateMachine\AgentStateMachine.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Core\AgentHealth.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Core\CommandExecutor.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\StateMachine\AgentStateMachine.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Core\AgentHealth.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Core\CommandExecutor.cs`
 
 - [ ] **Step 1: 状态转换广播**
 
@@ -271,8 +271,8 @@ git commit -m "feat(mp): event-driven broadcasts for state change, npc actions, 
 ### Task 5: Renderer 实例化 + 消息接入
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\ModEntry.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Multiplayer\AgentRemoteRenderer.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\ModEntry.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Multiplayer\AgentRemoteRenderer.cs`
 
 - [ ] **Step 1: ThinClientMode 初始化（ModEntry.Entry 三模式分支，Task 9 详述）**
 
@@ -309,7 +309,7 @@ git commit -m "feat(mp): wire AgentRemoteRenderer on farmhand thin client"
 ### Task 6: 位置插值引擎（客机观感核心）
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Multiplayer\AgentRemoteRenderer.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\Multiplayer\AgentRemoteRenderer.cs`
 
 **设计**：快照 1s 一次（60 tick），两帧之间插值平滑：
 1. `HandleAgentStateMessage` 更新缓存时记录 `(targetPosition, targetLocation, facing, isMoving)`；
@@ -366,10 +366,10 @@ git commit -m "feat(mp): client-side position interpolation with collision-aware
 ### Task 7: 对话传输抽象 + 客机代理
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`
-- Create: `D:\Source\ValleyTalk\src\ValleyAgent\Multiplayer\FarmhandDialogueTransport.cs`
-- Create: `D:\Source\ValleyTalk\src\ValleyAgent\Multiplayer\HostRequestHandlers.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCDialoguePatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Multiplayer\FarmhandDialogueTransport.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Multiplayer\HostRequestHandlers.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCDialoguePatch.cs`
 
 **设计**：`DialogueBoxInputPatch.SubmitInput` 当前直连 `IAgentServerProvider`。抽象出 `IDialogueTransport`：
 - `HostDialogueTransport`：现状（WebSocket → TS 服务器）。
@@ -407,8 +407,8 @@ Single-soul NPC memory on host; responses routed by TargetPlayerId; E4 serialize
 ### Task 8: 送礼代理
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCGiftPatch.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Multiplayer\HostRequestHandlers.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCGiftPatch.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Multiplayer\HostRequestHandlers.cs`
 
 **设计**：
 - 客机送礼：`NPCGiftPatch.Prefix` 的 ThinClient 分支 → 不放行原版、不本地评估；发 `GiftRequestMessage{npcName, itemId, quantity, fromPlayerId}` → 本地先消费物品（与原版一致）→ 等 `GiftResponseMessage` → 显示 NPC 反应文本/表情。
@@ -428,7 +428,7 @@ git commit -m "feat(mp): farmhand gifting proxied to host evaluation"
 ### Task 9: ModEntry.Entry 三模式分支
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\ModEntry.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\ModEntry.cs`
 
 **背景**：P1 Task 12 的单一惰性早退演进为三模式。
 

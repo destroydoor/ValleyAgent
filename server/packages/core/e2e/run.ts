@@ -11,7 +11,7 @@
  *   bun run packages/core/e2e/run.ts
  */
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import {
   buildProvider,
   buildAgent,
@@ -65,7 +65,7 @@ interface SmokeProbeResult {
   contentPreview: string;
 }
 
-const LOG_PATH = "D:\\Source\\ValleyTalk\\docs\\valley-core-e2e-log.md";
+const LOG_PATH = join(import.meta.dir, "..", "..", "..", "..", "docs", "valley-core-e2e-log.md");
 
 function extractFinalAssistant(events: AgentEvent[]): {
   content: string;

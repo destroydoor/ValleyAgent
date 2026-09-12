@@ -1,6 +1,9 @@
 ﻿$ErrorActionPreference = "Stop"
 
-$gameDir = "D:\Source\ValleyTalk\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$gameDir = Get-GamePath
+# 测试存档名不硬编码（存档名含 Steam 账号数字，属个人信息）；用 VALLEY_TEST_SAVE 覆盖。
+$SaveName = if ($env:VALLEY_TEST_SAVE) { $env:VALLEY_TEST_SAVE } else { "TestSave_Main" }
 $smapi = "$gameDir\StardewModdingAPI.exe"
 $logDir = Join-Path $env:APPDATA "StardewValley\ErrorLogs"
 $hostLog = Join-Path $logDir "SMAPI-latest.txt"
@@ -193,7 +196,7 @@ if (Test-Path $testCfg) {
 $autoLoadCfg = "$gameDir\Mods\AutoLoadGame\config.json"
 if (Test-Path $autoLoadCfg) {
     $cfgText = Get-Content $autoLoadCfg -Raw -Encoding UTF8
-    $cfgText = $cfgText -replace '"LastFileLoaded"\s*:\s*("[^"]*"|null)', '"LastFileLoaded": "awa_445353290"'
+    $cfgText = $cfgText -replace '"LastFileLoaded"\s*:\s*("[^"]*"|null)', "`"LastFileLoaded`": `"$SaveName`""
     [System.IO.File]::WriteAllText($autoLoadCfg, $cfgText, (New-Object System.Text.UTF8Encoding $false))
     Write-Host "AutoLoadGame LastFileLoaded restored"
 }

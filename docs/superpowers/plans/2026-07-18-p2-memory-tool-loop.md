@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 补完 TS 服务器（`D:\Source\ValleyAI`）的记忆闭环：`forget` 工具注册（B3）、工具执行结果回注 LLM（C3）、短期记忆计数合并去重（B4）、输出校验器接线（C1 补强）。全部工作在 TS 侧，C# 侧仅一处验证/补发 `action_result`。
+**Goal:** 补完 TS 服务器（`<VALLEYAI_ROOT>`）的记忆闭环：`forget` 工具注册（B3）、工具执行结果回注 LLM（C3）、短期记忆计数合并去重（B4）、输出校验器接线（C1 补强）。全部工作在 TS 侧，C# 侧仅一处验证/补发 `action_result`。
 
 **Architecture:** 沿用 P0 建立的三层架构。关键结构性约束（探查确认）：`StardewAgent` 每次对话重建 core `Agent` 实例（`stardew-agent.ts:94`），跨对话状态只能挂在 `StardewAgentRegistry` 或 `AgentMemory` 上——C3 的反馈队列因此设计在 Registry 层。
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 文件结构映射（全部在 `D:\Source\ValleyAI\packages\stardew\`，除注明外）
+## 文件结构映射（全部在 `<VALLEYAI_ROOT>\packages\stardew\`，除注明外）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -33,7 +33,7 @@
 | `tests\stardew-tools.test.ts` | Modify | 工具数 8→9；forget 行为（删除/拒绝删 SignificantMemory/无匹配） |
 | `tests\tool-result-feedback.test.ts` | Create | C3 集成：action_result 入队 → 下次对话注入 → 队列清空 |
 | `tests\output-validator-wired.test.ts` | Create | 校验器触发重试/fallback |
-| `D:\Source\ValleyTalk\src\ValleyAgent\Core\CommandExecutor.cs` | Verify/Modify | 确认执行 action 后回发 `action_result`；缺失则补 |
+| `<REPO_ROOT>\src\ValleyAgent\Core\CommandExecutor.cs` | Verify/Modify | 确认执行 action 后回发 `action_result`；缺失则补 |
 
 ---
 
@@ -42,8 +42,8 @@
 ### Task 1: AgentMemory.removeMemory（模糊匹配删除）
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\agent-memory.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\agent-memory.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\agent-memory.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\agent-memory.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -91,7 +91,7 @@ test("removeMemory persists through save/load roundtrip", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/agent-memory.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/agent-memory.test.ts`
 Expected: FAIL with "mem.removeMemory is not a function"
 
 - [ ] **Step 3: Write minimal implementation**
@@ -116,13 +116,13 @@ removeMemory(matchText: string): number {
 
 - [ ] **Step 4: Run test to verify it passes + typecheck**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/agent-memory.test.ts && cd packages/stardew && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/agent-memory.test.ts && cd packages/stardew && bun run typecheck`
 Expected: PASS + 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/agent-memory.ts packages/stardew/tests/agent-memory.test.ts
 git commit -m "feat(stardew): add AgentMemory.removeMemory with fuzzy substring match
 
@@ -134,8 +134,8 @@ B3 foundation. Never touches significantMemories per AGENTS.md 3.3 contract."
 ### Task 2: 注册 forget 工具
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\stardew-tools.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\stardew-tools.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-tools.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-tools.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -222,9 +222,9 @@ LLM 由此知道"上次送礼失败了，因为玩家背包满了"，不再盲�
 ### Task 3: C# 侧 action_result 回发验证（先行确认项）
 
 **Files:**
-- Verify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`（SubmitInput 消费 `response.Actions` 处）
-- Verify: `D:\Source\ValleyTalk\src\ValleyAgent\Core\CommandExecutor.cs`（ExecuteAction）
-- Verify: `D:\Source\ValleyTalk\src\ValleyAgent\Network\WebSocketClient.cs` 或 `StateSyncSender.cs`
+- Verify: `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs`（SubmitInput 消费 `response.Actions` 处）
+- Verify: `<REPO_ROOT>\src\ValleyAgent\Core\CommandExecutor.cs`（ExecuteAction）
+- Verify: `<REPO_ROOT>\src\ValleyAgent\Network\WebSocketClient.cs` 或 `StateSyncSender.cs`
 
 - [ ] **Step 1: 确认 C# 是否在执行 action 后回发 `action_result` 消息**
 
@@ -235,7 +235,7 @@ LLM 由此知道"上次送礼失败了，因为玩家背包满了"，不再盲�
 - [ ] **Step 2: Commit（如有改动）**
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/
 git commit -m "fix(mod): C3 send action_result to server after ExecuteAction
 
@@ -248,8 +248,8 @@ can close the tool-result feedback loop."
 ### Task 4: Registry per-NPC 反馈队列
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent-registry.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\tool-result-feedback.test.ts`（新建）
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent-registry.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\tool-result-feedback.test.ts`（新建）
 
 - [ ] **Step 1: Write the failing test**
 
@@ -338,9 +338,9 @@ C3 foundation. Holds at most 10 pending results per NPC until next dialogue drai
 ### Task 5: ProtocolAdapter 路由结果到队列
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\types.ts`（消息加 `npcName`/`tool` 字段，若 C# 侧未发则标记 optional）
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\tool-result-feedback.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\types.ts`（消息加 `npcName`/`tool` 字段，若 C# 侧未发则标记 optional）
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\tool-result-feedback.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -413,10 +413,10 @@ Replaces P0 ack-only no-ops. C3 loop closed at ingress."
 ### Task 6: 对话时注入反馈 + 失败落记忆
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\prompt-builder.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`（把 drain 结果传入 runDialogue）
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\tool-result-feedback.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\prompt-builder.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`（把 drain 结果传入 runDialogue）
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\tool-result-feedback.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -485,9 +485,9 @@ and failures are persisted to short-term memory across sessions."
 ### Task 7: MemoryEntry.count + addMemory 合并逻辑
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\core\src\memory-backend.ts`（`MemoryEntry` 加 `count`）
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\agent-memory.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\tests\agent-memory.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\memory-backend.ts`（`MemoryEntry` 加 `count`）
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\agent-memory.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\tests\agent-memory.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -578,7 +578,7 @@ addMemory(text, importance = 1.0, entryType = "generic", location = "", tags = [
 
 - [ ] **Step 4: Run tests + typecheck + core 包测试回归**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/memory-backend.test.ts packages/stardew/tests/agent-memory.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/memory-backend.test.ts packages/stardew/tests/agent-memory.test.ts`
 Expected: PASS（core 接口测试需同步加 `count` 字段——修改 `memory-backend.test.ts` 的 fakeMemory 构造）
 
 - [ ] **Step 5: Commit**
@@ -601,8 +601,8 @@ Old memory files load with count=1 (backward compatible)."
 ### Task 8: 对话路径接线 OutputValidator
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`（或 `dialogue-handler.ts`，以 P0 实际结构为准）
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\output-validator-wired.test.ts`（新建）
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`（或 `dialogue-handler.ts`，以 P0 实际结构为准）
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\output-validator-wired.test.ts`（新建）
 
 - [ ] **Step 1: Write the failing test**
 
@@ -670,7 +670,7 @@ C1 hardening. CJK-ratio/empty-speech failures retry once, then RuleEngine fallba
 
 ```bash
 # TS 全量（bunfig.toml 强制 80% 行覆盖）
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test
 bun run typecheck
 ```

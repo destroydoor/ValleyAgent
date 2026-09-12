@@ -8,15 +8,15 @@
 > **当前架构权威文档**：[`../../../AGENTS.md`](../../../AGENTS.md) 第 2.1.1 节
 > "TS Agent 服务器架构（v4.3 现状）"。
 >
-> **TS 服务器源码**：`D:\Source\ValleyAI`（bun workspace：`packages/core`
+> **TS 服务器源码**：`<VALLEYAI_ROOT>`（bun workspace：`packages/core`
 > 抽象框架 + `packages/stardew` 星露谷实现）。
 
 ---
 
 > **创建时间**: 2026-07-08
 > **状态**: 设计阶段（待用户审核）
-> **项目位置**: `D:\Source\ValleyAI`（新建）
-> **现有项目**: `D:\Source\ValleyTalk`（Python服务器 + C# Mod）
+> **项目位置**: `<VALLEYAI_ROOT>`（新建）
+> **现有项目**: `<REPO_ROOT>`（Python服务器 + C# Mod）
 
 ---
 
@@ -80,7 +80,7 @@
 ### 2.1 目录布局
 
 ```
-D:\Source\ValleyAI\
+<VALLEYAI_ROOT>\
 ├── packages/
 │   ├── core/                    @valley/core
 │   └── stardew/                 @valley/stardew

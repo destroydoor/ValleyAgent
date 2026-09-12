@@ -10,11 +10,11 @@
 ### P0 阻塞类
 
 1. **IT14 从未运行过**：`IT14_MultiplayerAdjust` 写完未注册进 `V3TestRunner.InitializeTests()`（V3TestRunner.cs:694-710 只加 IT01-IT13），目前只能手动触发。playerId 三分支实际只靠 E2E harness 覆盖。
-2. **C 盘容量**（已缓解）：清理后 22G 可用；WSL2 vhdx 增长仍需观察。测试临时文件已立规走 `D:\Source\ValleyTalk\.tmp`。
+2. **C 盘容量**（已缓解）：清理后 22G 可用；WSL2 vhdx 增长仍需观察。测试临时文件已立规走 `<REPO_ROOT>\.tmp`。
 
 ### P1 测试体系缺口（2026-08-17 审计遗留）
 
-3. 游戏内测试强依赖唯一真实存档 `awa_445353290` + 真实 Haley NPC——无最小化测试存档、无快照/种子机制，测试副作用靠 Teardown 手工恢复。
+3. 游戏内测试强依赖唯一真实存档 `TestSave_Main` + 真实 Haley NPC——无最小化测试存档、无快照/种子机制，测试副作用靠 Teardown 手工恢复。
 4. IT11 无 Teardown 恢复；IT06/IT08 清整槽会销毁玩家原有同 ID 物品。
 5. PIPE001-006（含自带 MockWebSocketServer 的 WS 链路测试）走 `vat_run pipeline` 手动触发，不进自动队列。
 6. `AdjustExecutor.FindCachedResult` 无生产调用方（重连闭环只靠 TS 重发，设计 §6 的"查询"通道未实现）。
@@ -28,7 +28,7 @@
 7. `ServerProcessManager`：端口清理用 `netstat+taskkill`、控制台用 `cmd.exe /c start`（ServerProcessManager.cs:299-333, 631-692）——容器内若让 mod 自起服务器则崩溃。
 8. `valley-ai-server.exe` 是 `bun-windows-x64` 产物——Linux 容器需 `bun-linux-x64` 构建或容器内 `bun run cli.ts`。
 9. E2E harness（run_farmhand_e2e.ps1）整体 Windows-bound：user32 P/Invoke 窗口编排 + gdigrab 录屏 + 固定窗口坐标。
-10. `build-deploy.ps1:37` 硬编码过期路径 `F:\SteamLibrary\...`（实际游戏在 `D:\Source\ValleyTalk\Stardew Valley`）。
+10. `build-deploy.ps1` 曾硬编码本机绝对游戏路径；现已改为 `scripts/lib/paths.ps1` 的 `Get-GamePath`（`STARDW_PATH` 环境变量可覆盖）。
 
 ### 风险注记
 
@@ -52,7 +52,7 @@ C 盘清理（已完成）；Docker Desktop 启动 + WSL2 数据根确认在 D �
 2. **spike 容器** `docker/Dockerfile.gameit`：
    - 基础镜像 `jlesage/baseimage-gui`（内建 Xvfb + VNC，JunimoServer 同款）；
    - 构建期装 Linux SMAPI 4.3.2（installer `--game-path /game`，脚本化同 JunimoServer：`printf "2\n\n" | SMAPI.Installer --install --game-path /game`）；
-   - 运行时挂载：游戏目录（只读）→ `/game`；宿主 `Mods/`（含 ValleyAgent + TestMod + AutoLoadGame，config 改：`AutoStartServer=false`、`UseAgentServer=false`、`ConsoleWindow=false`）；存档 `awa_445353290` → `~/.local/share/StardewValley/Saves/`；`logs/test_results` 挂出宿主；
+   - 运行时挂载：游戏目录（只读）→ `/game`；宿主 `Mods/`（含 ValleyAgent + TestMod + AutoLoadGame，config 改：`AutoStartServer=false`、`UseAgentServer=false`、`ConsoleWindow=false`）；存档 `TestSave_Main` → `~/.local/share/StardewValley/Saves/`；`logs/test_results` 挂出宿主；
    - 运行链：容器起 → SMAPI 启动游戏 → AutoLoadGame 载档 → V3TestRunner 自动跑（含 IT14）→ 写 JSON 结果 + `_TEST_COMPLETE.txt` → `Game1.quit` → 容器自然退出；
    - 驱动脚本 `scripts/docker/run-it.{ps1,sh}`：起容器、等 `_TEST_COMPLETE.txt`、读 `_summary.json` 判 PASS/FAIL、导出 VNC 端口排障。
 3. **验证门槛**：IT01-IT13 + IT14 全 PASS（与宿主跑分一致）；跑 3 次无 flakes；软渲染下总时长可接受（预计 <5 分钟）。
@@ -100,7 +100,7 @@ C 盘清理（已完成）；Docker Desktop 启动 + WSL2 数据根确认在 D �
 | 文件 | 内容 |
 |---|---|
 | `docs/plan/2026-08-17-docker-test-containerization-plan.md` | 本文档 |
-| `D:\Source\ValleyAI\Dockerfile` + `docker-compose.test.yml` | TS 层 |
+| `<VALLEYAI_ROOT>\Dockerfile` + `docker-compose.test.yml` | TS 层 |
 | `docker/Dockerfile.unittests` + `.dockerignore` + 运行脚本 | C# 单测层 |
 | `docker/Dockerfile.gameit` + `scripts/docker/run-it.{ps1,sh}` | 游戏 IT spike |
 | `src/ValleyAgent.TestMod/Runners/V3TestRunner.cs` 补 IT14 注册 | 修问题 #1 |

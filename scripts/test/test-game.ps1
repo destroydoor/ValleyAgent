@@ -11,8 +11,8 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $resultFile = Join-Path $RepoRoot "scripts\results\game-test-$timestamp.txt"
 # 优先用 STARDW_PATH 环境变量，回退到项目内默认路径（与 deploy.ps1 保持一致）
-$GamePath = $env:STARDW_PATH
-if (-not $GamePath) { $GamePath = "D:\Source\ValleyTalk\Stardew Valley" }
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath
 $SMAPIExe = Join-Path $GamePath "StardewModdingAPI.exe"
 $ModsDir = Join-Path $GamePath "Mods"
 

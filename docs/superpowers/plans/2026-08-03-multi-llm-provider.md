@@ -11,8 +11,8 @@
 **关联设计文档：** `docs/design/2026-08-03-multi-llm-provider-design.md`
 
 **两仓库布局：**
-- C# 仓库：`d:\Source\ValleyTalk`（ValleyAgent + ValleyAgent.Abstractions）
-- TS 仓库：`D:\Source\ValleyAI`（packages/core + packages/stardew）
+- C# 仓库：`<REPO_ROOT>`（ValleyAgent + ValleyAgent.Abstractions）
+- TS 仓库：`<VALLEYAI_ROOT>`（packages/core + packages/stardew）
 
 **分支：** `feature/multi-llm-provider`（两个仓库都开这个分支）
 
@@ -21,14 +21,14 @@
 ## Task 1: TS 端 LlmRouter 核心类 + 配置类型（纯 TS，可单测）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\core\src\llm-router.ts`
-- Modify: `D:\Source\ValleyAI\packages\core\src\llm-config.ts`（扩展类型）
-- Modify: `D:\Source\ValleyAI\packages\core\src\index.ts`（导出）
-- Test: `D:\Source\ValleyAI\packages\core\tests\llm-router.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\core\src\llm-router.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\llm-config.ts`（扩展类型）
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\index.ts`（导出）
+- Test: `<VALLEYAI_ROOT>\packages\core\tests\llm-router.test.ts`
 
 ### Step 1.1: 扩展 LLMProviderType 联合类型
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\core\src\llm-config.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\core\src\llm-config.ts`**
 
 在现有 `LLMProviderType` 联合类型中新增 5 个 provider（moonshot/zhipu/baichuan/qwen/custom），它们都走 OpenAI 兼容分支：
 
@@ -48,7 +48,7 @@ export type LLMProviderType =
   | "custom";
 ```
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\core\src\llm-provider.ts` 的 `createModel()`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\core\src\llm-provider.ts` 的 `createModel()`**
 
 在 `case "minimax":` 分支后追加 5 个新 provider 的 fallthrough：
 
@@ -73,20 +73,20 @@ case "custom": {
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors
 
 - [ ] **Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/llm-config.ts packages/core/src/llm-provider.ts
 git commit -m "feat(core): extend LLMProviderType with moonshot/zhipu/baichuan/qwen/custom"
 ```
 
 ### Step 1.2: 写 LlmRouter 的失败测试
 
-- [ ] **创建 `D:\Source\ValleyAI\packages\core\tests\llm-router.test.ts`**
+- [ ] **创建 `<VALLEYAI_ROOT>\packages\core\tests\llm-router.test.ts`**
 
 ```typescript
 import { describe, test, expect, mock } from "bun:test";
@@ -238,12 +238,12 @@ describe("LlmRouter 不变量", () => {
 
 - [ ] **运行测试验证失败**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-router.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-router.test.ts`
 Expected: FAIL（`llm-router.ts` 不存在）
 
 ### Step 1.3: 实现 LlmRouter
 
-- [ ] **创建 `D:\Source\ValleyAI\packages\core\src\llm-router.ts`**
+- [ ] **创建 `<VALLEYAI_ROOT>\packages\core\src\llm-router.ts`**
 
 ```typescript
 import { VercelAIProvider, LLMBillingError } from "./llm-provider";
@@ -378,7 +378,7 @@ export class LlmRouter {
 }
 ```
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\core\src\llm-provider.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\core\src\llm-provider.ts`**
 
 暴露 `config` 字段供 LlmRouter 日志读取。找到 `private readonly config` 改为 `readonly config`（或新增 getter `getConfig()`）。具体定位 VercelAIProvider 类内的 `this.config` 声明行（约 L107），把 `private` 改为 `public readonly`：
 
@@ -389,7 +389,7 @@ private readonly config: Required<LLMConfig>;
 readonly config: Required<LLMConfig>;
 ```
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\core\src\index.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\core\src\index.ts`**
 
 导出 LlmRouter 相关类型：
 
@@ -399,25 +399,25 @@ export * from "./llm-router";
 
 - [ ] **运行测试验证通过**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-router.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-router.test.ts`
 Expected: PASS（所有测试绿）
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors
 
 - [ ] **Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/llm-router.ts packages/core/src/index.ts packages/core/src/llm-provider.ts packages/core/tests/llm-router.test.ts
 git commit -m "feat(core): add LlmRouter with role-based routing and billing fallback"
 ```
 
 ### Step 1.4: 写 loadRouterConfig 校验测试 + 实现
 
-- [ ] **扩展 `D:\Source\ValleyAI\packages\core\tests\llm-router.test.ts`**
+- [ ] **扩展 `<VALLEYAI_ROOT>\packages\core\tests\llm-router.test.ts`**
 
 追加配置校验测试：
 
@@ -521,10 +521,10 @@ describe("loadRouterConfig 校验", () => {
 
 - [ ] **运行测试验证失败**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-router.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-router.test.ts`
 Expected: FAIL（`loadRouterConfig`/`validateRouterConfig` 未导出）
 
-- [ ] **在 `D:\Source\ValleyAI\packages\core\src\llm-router.ts` 末尾追加 loadRouterConfig + validateRouterConfig**
+- [ ] **在 `<VALLEYAI_ROOT>\packages\core\src\llm-router.ts` 末尾追加 loadRouterConfig + validateRouterConfig**
 
 ```typescript
 import { readFileSync } from "node:fs";
@@ -618,13 +618,13 @@ function validateProviderConfig(raw: unknown, path: string): RoleProviderConfig 
 
 - [ ] **运行测试验证通过**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-router.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-router.test.ts`
 Expected: PASS（全部测试绿）
 
 - [ ] **Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/llm-router.ts packages/core/tests/llm-router.test.ts
 git commit -m "feat(core): add loadRouterConfig with strict validation"
 ```
@@ -634,16 +634,16 @@ git commit -m "feat(core): add loadRouterConfig with strict validation"
 ## Task 2: TS 端 StardewAgent/Registry/server/cli/director 改造
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent-registry.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\server.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\cli.ts`
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\director.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent-router.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent-registry.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\server.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\cli.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\director.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent-router.test.ts`
 
 ### Step 2.1: 改造 StardewAgent 持有 LlmRouter + role
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\stardew\src\stardew-agent.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent.ts`**
 
 找到 `StardewAgentConfig`（约 L20-28）和 `llmProvider` 字段声明（约 L119, L133），改造为持有 LlmRouter + role：
 
@@ -711,12 +711,12 @@ private async makeLlmCall(messages: LlmMessage[], tools?: Tool[]): Promise<LcmCa
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 编译错误（registry 和 server 还没改），暂时记录错误数量作为基线
 
 ### Step 2.2: 改造 StardewAgentRegistry 持有 LlmRouter
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\stardew\src\stardew-agent-registry.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent-registry.ts`**
 
 ```typescript
 // 顶部 import
@@ -762,12 +762,12 @@ getOrCreate(npcName: string): StardewAgent {
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 仍有 server.ts 的错误，但 registry 错误应消除
 
 ### Step 2.3: 改造 server.ts 支持双模式
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\stardew\src\server.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\stardew\src\server.ts`**
 
 ```typescript
 // 顶部 import
@@ -870,12 +870,12 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors（server/registry/agent 三处一致）
 
 ### Step 2.4: 改造 cli.ts 支持 --llm-config
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\stardew\src\cli.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\stardew\src\cli.ts`**
 
 `CliArgs` 接口扩展（约 L20-31）：
 
@@ -953,16 +953,16 @@ async function main() {
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors
 
 ### Step 2.5: 改造 director.ts 通过 LlmRouter 调用
 
-- [ ] **修改 `D:\Source\ValleyAI\packages\stardew\src\director.ts`**
+- [ ] **修改 `<VALLEYAI_ROOT>\packages\stardew\src\director.ts`**
 
 `DirectorConfig` 保持函数式接口不变（已解耦），但在 server.ts 构造 Director 时（当 Director 启用时）用 LlmRouter 适配：
 
-在 `D:\Source\ValleyAI\packages\stardew\src\server.ts` 找到 Director 构造位置（当前是注释 L111-113），改为条件构造：
+在 `<VALLEYAI_ROOT>\packages\stardew\src\server.ts` 找到 Director 构造位置（当前是注释 L111-113），改为条件构造：
 
 ```typescript
 // server.ts startServer 内，registry 构造之后
@@ -1001,12 +1001,12 @@ if (config.enableDirector !== false) {
 
 - [ ] **运行类型检查**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors
 
 ### Step 2.6: 写 StardewAgent + LlmRouter 集成测试
 
-- [ ] **创建 `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent-router.test.ts`**
+- [ ] **创建 `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent-router.test.ts`**
 
 ```typescript
 import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
@@ -1071,23 +1071,23 @@ describe("StardewAgent with LlmRouter", () => {
 
 - [ ] **运行测试验证通过**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-agent-router.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-agent-router.test.ts`
 Expected: PASS
 
 - [ ] **运行全部 stardew 测试确保不回归**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew`
 Expected: 所有现有测试仍绿（向后兼容）
 
 - [ ] **运行协议契约检查**
 
-Run: `cd D:\Source\ValleyAI && bun run check:protocol`
+Run: `cd <VALLEYAI_ROOT> && bun run check:protocol`
 Expected: 全绿
 
 - [ ] **Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/ packages/stardew/tests/stardew-agent-router.test.ts
 git commit -m "feat(stardew): integrate LlmRouter into agent/registry/server/cli/director"
 ```
@@ -1097,12 +1097,12 @@ git commit -m "feat(stardew): integrate LlmRouter into agent/registry/server/cli
 ## Task 3: C# 端 ModConfig 扩展 + 迁移
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs`
-- Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\ConfigMigrationTests.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\ConfigMigrationTests.cs`
 
 ### Step 3.1: ModConfig 新增字段
 
-- [ ] **修改 `d:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs`**
+- [ ] **修改 `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs`**
 
 在现有字段之后（约 L383 `DebugLogEnabled` 之后），追加以下字段：
 
@@ -1178,12 +1178,12 @@ public string WebSocketUrl { get; set; } = "ws://127.0.0.1:8765";
 
 - [ ] **编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors（可能有 Obsolete 警告，后续步骤处理）
 
 ### Step 3.2: MigrateLegacyFields 扩展
 
-- [ ] **修改 `d:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs` 的 `MigrateLegacyFields()`**
+- [ ] **修改 `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs` 的 `MigrateLegacyFields()`**
 
 在现有迁移逻辑末尾（约 L441 `#pragma warning restore CS0618` 之前）追加：
 
@@ -1217,12 +1217,12 @@ if (ProactiveTradeProbability < 0f || ProactiveTradeProbability > 1f) { Proactiv
 
 - [ ] **编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors, 0 warnings（Obsolete 字段用 #pragma 隔离）
 
 ### Step 3.3: 写迁移单元测试
 
-- [ ] **创建 `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\ConfigMigrationTests.cs`**
+- [ ] **创建 `<REPO_ROOT>\src\ValleyAgent.UnitTests\ConfigMigrationTests.cs`**
 
 ```csharp
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -1337,13 +1337,13 @@ namespace ValleyAgent.UnitTests
 
 - [ ] **运行测试验证通过**
 
-Run: `cd d:\Source\ValleyTalk && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "ConfigMigrationTests"`
+Run: `cd <REPO_ROOT> && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "ConfigMigrationTests"`
 Expected: PASS
 
 - [ ] **Commit**
 
 ```bash
-cd d:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/Config/ModConfig.cs src/ValleyAgent.UnitTests/ConfigMigrationTests.cs
 git commit -m "feat(config): add multi-provider fields, feature toggles, probability, seconds cooldown"
 ```
@@ -1353,13 +1353,13 @@ git commit -m "feat(config): add multi-provider fields, feature toggles, probabi
 ## Task 4: C# 端 LlmConfigWriter + ServerProcessManager
 
 **Files:**
-- Create: `d:\Source\ValleyTalk\src\ValleyAgent\Config\LlmConfigWriter.cs`
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\WebSocket\ServerProcessManager.cs`
-- Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\LlmConfigWriterTests.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Config\LlmConfigWriter.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\WebSocket\ServerProcessManager.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\LlmConfigWriterTests.cs`
 
 ### Step 4.1: 写 LlmConfigWriter 失败测试
 
-- [ ] **创建 `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\LlmConfigWriterTests.cs`**
+- [ ] **创建 `<REPO_ROOT>\src\ValleyAgent.UnitTests\LlmConfigWriterTests.cs`**
 
 ```csharp
 using System.IO;
@@ -1520,12 +1520,12 @@ namespace ValleyAgent.UnitTests
 
 - [ ] **运行测试验证失败**
 
-Run: `cd d:\Source\ValleyTalk && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "LlmConfigWriterTests"`
+Run: `cd <REPO_ROOT> && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "LlmConfigWriterTests"`
 Expected: FAIL（`LlmConfigWriter` 不存在）
 
 ### Step 4.2: 实现 LlmConfigWriter
 
-- [ ] **创建 `d:\Source\ValleyTalk\src\ValleyAgent\Config\LlmConfigWriter.cs`**
+- [ ] **创建 `<REPO_ROOT>\src\ValleyAgent\Config\LlmConfigWriter.cs`**
 
 ```csharp
 using System;
@@ -1631,12 +1631,12 @@ namespace ValleyAgent.Config
 
 - [ ] **运行测试验证通过**
 
-Run: `cd d:\Source\ValleyTalk && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "LlmConfigWriterTests"`
+Run: `cd <REPO_ROOT> && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --filter "LlmConfigWriterTests"`
 Expected: PASS
 
 ### Step 4.3: 改造 ServerProcessManager
 
-- [ ] **修改 `d:\Source\ValleyTalk\src\ValleyAgent\WebSocket\ServerProcessManager.cs`**
+- [ ] **修改 `<REPO_ROOT>\src\ValleyAgent\WebSocket\ServerProcessManager.cs`**
 
 找到 `StartServerCoreAsync` 方法内的参数构造（约 L161-238），改造为双模式：
 
@@ -1680,13 +1680,13 @@ if (!_config.EnableDirector)
 
 - [ ] **编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors, 0 warnings
 
 - [ ] **Commit**
 
 ```bash
-cd d:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/Config/LlmConfigWriter.cs src/ValleyAgent/WebSocket/ServerProcessManager.cs src/ValleyAgent.UnitTests/LlmConfigWriterTests.cs
 git commit -m "feat(config): add LlmConfigWriter + ServerProcessManager dual-mode"
 ```
@@ -1696,11 +1696,11 @@ git commit -m "feat(config): add LlmConfigWriter + ServerProcessManager dual-mod
 ## Task 5: C# 端 WebSocket 自动绑定 + 冷却字段加载修复
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Initialization\ServiceInitializer.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\ServiceInitializer.cs`
 
 ### Step 5.1: 修复 WebSocketUrl 断裂 + 冷却字段未加载
 
-- [ ] **读取 `d:\Source\ValleyTalk\src\ValleyAgent\Initialization\ServiceInitializer.cs` 的 L210 和 L162-165**
+- [ ] **读取 `<REPO_ROOT>\src\ValleyAgent\Initialization\ServiceInitializer.cs` 的 L210 和 L162-165**
 
 确认当前代码：
 - L210: `var wsClient = new WebSocketClient(config.AgentServerUri, "ValleyAgent");`
@@ -1735,7 +1735,7 @@ var dialogueStateManager = new Api.DialogueStateManager
 };
 ```
 
-**注意**：如果 `DialogueStateManager` 没有 `GiftCooldownMs` 属性，需要先在 `d:\Source\ValleyTalk\src\ValleyAgent.Abstractions\Api\DialogueStateManager.cs` 追加该属性（参考现有 `DialogueCooldownMs` 的声明方式）。
+**注意**：如果 `DialogueStateManager` 没有 `GiftCooldownMs` 属性，需要先在 `<REPO_ROOT>\src\ValleyAgent.Abstractions\Api\DialogueStateManager.cs` 追加该属性（参考现有 `DialogueCooldownMs` 的声明方式）。
 
 - [ ] **修改 L233 日志（如果存在引用 AgentServerUri 的日志）**
 
@@ -1748,13 +1748,13 @@ _monitor.Log($"Agent Server initialized (WS: ws://127.0.0.1:{config.ServerPort},
 
 - [ ] **编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors, 0 warnings（如果有 AgentServerUri 引用残留，全部替换为自动绑定）
 
 - [ ] **Commit**
 
 ```bash
-cd d:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/Initialization/ServiceInitializer.cs src/ValleyAgent.Abstractions/Api/DialogueStateManager.cs
 git commit -m "fix: auto-bind WebSocket URL from ServerPort + load cooldown config into DialogueStateManager"
 ```
@@ -1764,11 +1764,11 @@ git commit -m "fix: auto-bind WebSocket URL from ServerPort + load cooldown conf
 ## Task 6: C# 端 GMCMIntegration UI 扩展
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Config\GMCMIntegration.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Config\GMCMIntegration.cs`
 
 ### Step 6.1: 基础页新增功能开关 + 概率 + 秒单位冷却
 
-- [ ] **修改 `d:\Source\ValleyTalk\src\ValleyAgent\Config\GMCMIntegration.cs` 的 `AddBasicPageOptions`**
+- [ ] **修改 `<REPO_ROOT>\src\ValleyAgent\Config\GMCMIntegration.cs` 的 `AddBasicPageOptions`**
 
 找到 Section 2 "Agent Behavior" 末尾（约 L325 `MaxConsecutiveIdleBeforeRelease` 之后），追加功能开关：
 
@@ -2070,13 +2070,13 @@ target.GiftCooldownSeconds = source.GiftCooldownSeconds;
 
 - [ ] **编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors, 0 warnings
 
 - [ ] **Commit**
 
 ```bash
-cd d:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/Config/GMCMIntegration.cs
 git commit -m "feat(gmcm): add multi-provider UI, feature toggles, probability, seconds cooldown"
 ```
@@ -2086,13 +2086,13 @@ git commit -m "feat(gmcm): add multi-provider UI, feature toggles, probability, 
 ## Task 7: C# 端功能开关消费点 + 端到端验证
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\GiftTradeMenuLogic.cs`（EnableTrade）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\ContractService.cs`（EnableHire + ProactiveTradeProbability）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\ProactiveSpeechQuota.cs`（EnableProactiveSpeech）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\ProactiveSpeechTrigger.cs`（ProactiveSpeechProbability）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\SocialCommands.cs`（ProactiveGiftProbability）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Features\RuleBasedDecisionEngine.cs`（ProactiveFollowProbability）
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCDialoguePatch.cs`（EnableInfiniteDialogue）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\GiftTradeMenuLogic.cs`（EnableTrade）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\ContractService.cs`（EnableHire + ProactiveTradeProbability）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\ProactiveSpeechQuota.cs`（EnableProactiveSpeech）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\ProactiveSpeechTrigger.cs`（ProactiveSpeechProbability）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\SocialCommands.cs`（ProactiveGiftProbability）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Features\RuleBasedDecisionEngine.cs`（ProactiveFollowProbability）
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCDialoguePatch.cs`（EnableInfiniteDialogue）
 
 **注意**：以上文件路径是预期的，实际路径需要先用 Grep 确认每个消费点类的真实位置。
 
@@ -2138,34 +2138,34 @@ if (Random.Shared.NextDouble() < _config.ProactiveSpeechProbability)
 
 - [ ] **对每个消费点编译验证**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj`
 Expected: 0 errors, 0 warnings
 
 ### Step 7.3: 端到端验证清单
 
 - [ ] **TS 端全部测试绿**
 
-Run: `cd D:\Source\ValleyAI && bun test`
+Run: `cd <VALLEYAI_ROOT> && bun test`
 Expected: 所有测试 PASS
 
 - [ ] **TS 端类型检查绿**
 
-Run: `cd D:\Source\ValleyAI && bun run tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bun run tsc --noEmit`
 Expected: 0 errors
 
 - [ ] **TS 端协议契约绿**
 
-Run: `cd D:\Source\ValleyAI && bun run check:protocol`
+Run: `cd <VALLEYAI_ROOT> && bun run check:protocol`
 Expected: 全绿
 
 - [ ] **C# 端编译 0 警告**
 
-Run: `cd d:\Source\ValleyTalk && dotnet build src\ValleyAgent\ValleyAgent.csproj -warnaserror`
+Run: `cd <REPO_ROOT> && dotnet build src\ValleyAgent\ValleyAgent.csproj -warnaserror`
 Expected: 0 errors, 0 warnings
 
 - [ ] **C# 端单元测试全绿**
 
-Run: `cd d:\Source\ValleyTalk && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj`
+Run: `cd <REPO_ROOT> && dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj`
 Expected: 所有测试 PASS
 
 - [ ] **游戏内手动验证（L5 体验打分）**
@@ -2183,13 +2183,13 @@ Expected: 所有测试 PASS
 - [ ] **Final Commit**
 
 ```bash
-cd d:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/
 git commit -m "feat: wire feature toggles + probability consumption points"
 ```
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add .
 git commit -m "test: verify multi-provider integration end-to-end"
 ```

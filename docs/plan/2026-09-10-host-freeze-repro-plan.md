@@ -38,13 +38,13 @@
 
 > 原计划派 3 个 Explore 代理，localrouter（Agent 工具后端）故障未执行；换 agent 后重派或直接 grep。
 
-**探查 A：TS 侧"每玩家一个导演"真相**（源码在 `D:\Source\ValleyAI`，主代码 `packages/stardew/src`）
+**探查 A：TS 侧"每玩家一个导演"真相**（源码在 `<VALLEYAI_ROOT>`，主代码 `packages/stardew/src`）
 1. 连接/分配模型：C# 主机 hello + allocate_agent 后创建什么状态？是否存在**按 playerId 实例化**的 Director 或任何 per-player 对象（搜 playerId 作 key 的 map：记忆桶、好感、对话历史、导演上下文）？引用 M2 的世界桶/玩家桶代码位置。
 2. Director 日志：所有含 "Director"/"director"/"beat" 的 logger 调用，**逐条引用格式串原文**。判定用户读这些行是否会合理得出"每玩家一个导演"。
 3. 每玩家流量缩放：3 个不同 playerId 活跃时，是否有周期性/beat 驱动的回 C# 流量按玩家缩放（set_npc_* 命令、spawn_beat 节奏）？Director beat 的触发源是什么（定时？连接事件？对话？）——能否解释"过中午"或"玩家在不同地图"时流量变大？
 4. 多连接：TS 能否同时接多个 C# 连接？若客机意外也连上会怎样（per-connection Director？显示双连接的日志行？）。
 
-**探查 B：C# 主机主线程阻塞/死锁审计**（`D:\Source\ValleyTalk\src\ValleyAgent` + `.Abstractions`）
+**探查 B：C# 主机主线程阻塞/死锁审计**（`<REPO_ROOT>\src\ValleyAgent` + `.Abstractions`）
 1. 所有 `.Result`/`.Wait()`/`GetAwaiter().GetResult()`/`Thread.Sleep`/`lock(...)`，限可达路径：UpdateTicked 处理器、Harmony patches（DialogueBoxInputPatch/NPCGiftPatch/ChatBoxInputPatch/其他）、ModMessage 接收（HostRequestHandlers/AgentSyncBroadcaster）、PeerConnected/Disconnected、DayStarted/TimeChanged/Saving、WS 消息分发（WebSocketClient/DualPathAgentServerProvider）。每个给出 file:line + 3 玩家负载下无限阻塞的机理。
 2. 主线程泵死锁对：EnqueueMainThread/ProcessMainThreadActions、NPCGiftPatch._mainThreadActions、DialogueBoxInputPatch._pendingReplies 里入队的动作，有没有**自己再等主线程**（自饥饿）或与入队线程取同一把锁。
 3. 玩家数缩放：per-tick/per-snapshot 上遍历 farmers/getOnlineFarmers 的热路径（WorldSnapshotBuilder/DirectorContextBuilder），调用频率与开销。
@@ -73,10 +73,10 @@
 
 ## 4. 环境速查（本机已踩过的坑）
 
-- TS 源码：`D:\Source\ValleyAI`（本仓库的兄弟目录）；C# 源码：`D:\Source\ValleyTalk`。
+- TS 源码：`<VALLEYAI_ROOT>`（本仓库的兄弟目录）；C# 源码：`<REPO_ROOT>`。
 - Docker 三容器配方：`docker/docker-compose.e2e.yml`；重跑前必须重建 valley-ts 镜像（构建期装依赖）+ 重新 build/deploy dll + `prep-mods.ps1 -Role host|farmhand` 双角色（现需扩 3 房客角色）。
 - 游戏容器：Xvnc 必须；卡死判据退出码 124；SteamCMD CN 网络重试可解。
-- `dotnet test` 需 `DOTNET_ROOT="C:\Program Files\dotnet"`；TMP/TEMP 指向 `D:\Source\ValleyTalk\.tmp`（禁落 C 盘）。
+- `dotnet test` 需 `DOTNET_ROOT="C:\Program Files\dotnet"`；TMP/TEMP 指向 `<REPO_ROOT>\.tmp`（禁落 C 盘）。
 - Mimosa git 门禁 2026-09-10 起已放行会话内 commit（7e41696 实测）。
 - 流程规矩：先分析后动手、先复现后定罪、实机测试由用户自己跑（副屏）；偏好简单集中方案。
 - 记忆参考：`multiplayer-freeze-investigation`、`docker-multiplayer-e2e`、`docker-unittest-environment`、`steamcmd-cn-network-gotcha`、`test-fail-gate`。

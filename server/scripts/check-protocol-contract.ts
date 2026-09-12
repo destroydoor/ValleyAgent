@@ -24,8 +24,9 @@ import { join, resolve } from "node:path";
 // 常量
 // ============================================================================
 
-const REPO_ROOT = resolve(process.env["VALLEYAI_ROOT"] ?? "D:\\Source\\ValleyAI");
-const CSHARP_ROOT = resolve(process.env["VALLEYTALK_SRC_ROOT"] ?? "D:\\Source\\ValleyTalk\\src");
+// 默认：本文件位于 <server>/scripts/ → 仓库内 server/ 工作区根
+const REPO_ROOT = resolve(process.env["VALLEYAI_ROOT"] ?? join(import.meta.dir, ".."));
+const CSHARP_ROOT = resolve(process.env["VALLEYTALK_SRC_ROOT"] ?? join(import.meta.dir, "..", "..", "src"));
 
 /** C# 发送端源码扫描根目录（递归） */
 const CSHARP_SCAN_DIRS: readonly string[] = [

@@ -196,7 +196,7 @@ src/autopilot_mcp/
     "stardew-autopilot": {
       "command": "python",
       "args": ["-m", "autopilot_mcp.server"],
-      "cwd": "d:/Source/ValleyTalk/src/autopilot_mcp"
+      "cwd": "<REPO_ROOT>/src/autopilot_mcp"
     }
   }
 }

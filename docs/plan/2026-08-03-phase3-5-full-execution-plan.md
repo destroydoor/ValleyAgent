@@ -81,7 +81,7 @@ E3-1 数据层 ──┐                       共享 QuotaService ──┐
   dotnet build src\ValleyAgent\ValleyAgent.csproj --no-incremental --verbosity minimal
   dotnet build src\ValleyTalk.ApiTest\ValleyTalk.ApiTest.csproj --no-incremental --verbosity minimal
   dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --no-build --verbosity minimal
-  cd D:\Source\ValleyAI; bun test packages/stardew; tsc --noEmit; bun run check:protocol
+  cd <VALLEYAI_ROOT>; bun test packages/stardew; tsc --noEmit; bun run check:protocol
   ```
 - 验收：6 项目 0 警告 0 错误；118 pass 0 fail；349 pass 0 fail；check:protocol PASS
 
@@ -370,9 +370,9 @@ Track B          B0(Quota)          B1(喊话) ┘
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| check:protocol 硬编码 D:\Source\ValleyAI 路径 | TS worktree 中无法直接运行 | 合并到主 checkout 后运行 check:protocol |
+| check:protocol 硬编码 <VALLEYAI_ROOT> 路径 | TS worktree 中无法直接运行 | 合并到主 checkout 后运行 check:protocol |
 | ValleyTalk "Stardew Valley/Mods" git 跟踪被 mod deploy 覆盖 | 误提交部署产物 | 每次构建后 `git checkout -- "Stardew Valley/Mods"` |
-| 隔离 worktree 的 Stardew Valley 文件夹缺 exe | ModBuildConfig 拒绝 | `-p:GamePath="D:\Source\ValleyTalk\Stardew Valley"` |
+| 隔离 worktree 的 Stardew Valley 文件夹缺 exe | ModBuildConfig 拒绝 | `-p:GamePath="<REPO_ROOT>\Stardew Valley"` |
 | TS 多项并行同分支提交竞争 | git add/commit 冲突 | 每个 TS 项独立 worktree 分支，顺序合并到 TS 集成分支 |
 | E3-2 Q4 拍板后仍可能有边界争议 | 定价实现偏差 | 实现前以需求 §1.2-1.4 为权威 |
 | E4-1 "导演高优先级 beat" 语义 | Director 未接线 → 需 C# 状态机实现 | 按 记忆 §4.2 复用 beat 模式（时限/前提检查/失败解释），在 C# 直接实现 |
@@ -433,9 +433,9 @@ Track B          B0(Quota)          B1(喊话) ┘
 | 世界快照 | `src\ValleyAgent\AI\WorldSnapshotBuilder.cs` | E4-1 添加 playerMoney |
 | 友谊 | `src\ValleyAgent\Systems\FriendshipSystem.cs` | E4-1 好感修正读取 |
 | 右键 | `src\ValleyAgent\Patches\NPCGiftPatch.cs` | 参考 — 新建 NPCRightClickPatch |
-| TS 协议 | `D:\Source\ValleyAI\packages\stardew\src\protocol\types.ts` | WorldSnapshot + 消息类型 |
-| TS 工具 | `D:\Source\ValleyAI\packages\stardew\src\stardew-tools.ts` | 新增 haggle_reply / accept_job |
-| TS Prompt | `D:\Source\ValleyAI\packages\stardew\src\prompt-builder.ts` | 交易/雇佣 prompt 段 |
+| TS 协议 | `<VALLEYAI_ROOT>\packages\stardew\src\protocol\types.ts` | WorldSnapshot + 消息类型 |
+| TS 工具 | `<VALLEYAI_ROOT>\packages\stardew\src\stardew-tools.ts` | 新增 haggle_reply / accept_job |
+| TS Prompt | `<VALLEYAI_ROOT>\packages\stardew\src\prompt-builder.ts` | 交易/雇佣 prompt 段 |
 
 ---
 
@@ -444,7 +444,7 @@ Track B          B0(Quota)          B1(喊话) ┘
 ### C# 项目（worktree 中）
 ```powershell
 # 构建（需 GamePath 指向主仓库游戏目录）
-dotnet build src\ValleyAgent\ValleyAgent.csproj -c Debug -p:GamePath="D:\Source\ValleyTalk\Stardew Valley" --no-incremental --verbosity minimal
+dotnet build src\ValleyAgent\ValleyAgent.csproj -c Debug -p:GamePath="<REPO_ROOT>\Stardew Valley" --no-incremental --verbosity minimal
 dotnet build src\ValleyAgent.Abstractions\ValleyAgent.Abstractions.csproj -c Debug --no-incremental --verbosity minimal
 dotnet build src\ValleyTalk.ApiTest\ValleyTalk.ApiTest.csproj -c Debug --no-incremental --verbosity minimal
 
@@ -457,7 +457,7 @@ git checkout -- "Stardew Valley/Mods"
 
 ### ValleyAI TS
 ```powershell
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test packages/stardew
 tsc --noEmit
 bun run check:protocol
@@ -470,7 +470,7 @@ dotnet build src\ValleyAgent\ValleyAgent.csproj --no-incremental --verbosity min
 dotnet test src\ValleyAgent.UnitTests\ValleyAgent.UnitTests.csproj --no-build --verbosity minimal
 
 # ValleyAI 主 checkout（合并后）
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test packages/stardew
 tsc --noEmit
 bun run check:protocol  # 验证 0 DEAD_PIPELINES / 0 SCHEMA_DRIFT

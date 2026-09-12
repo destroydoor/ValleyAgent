@@ -3,7 +3,7 @@
 > **分支**：`fix/multiplayer-farmhand-chain`  
 > **验收范围**：C1、C2、C3 三个 bug 修复 + 双端通用联机检查  
 > **术语**：主机 = 创建/加载存档的玩家（Host 模式）；客机 = 远程加入的 farmhand（ThinClient 模式）  
-> **TS 服务器**：`D:\Source\ValleyAI\packages\stardew\bin\valley-ai-server.exe`（Bun 编译产物，源码在 `D:\Source\ValleyAI\packages\stardew\src`）  
+> **TS 服务器**：`<VALLEYAI_ROOT>\packages\stardew\bin\valley-ai-server.exe`（Bun 编译产物，源码在 `<VALLEYAI_ROOT>\packages\stardew\src`）  
 > **日志路径**（Windows）：`%appdata%/StardewValley/ErrorLogs/SMAPI-latest.txt`，或在 SMAPI 控制台中实时过滤。  
 > **自动分析脚本**：`scripts/test/analyze-multiplayer-logs.ps1`
 
@@ -18,7 +18,7 @@
 bun --version
 
 # 2. 重新编译可执行文件（源码修改后必须执行）
-cd D:\Source\ValleyAI\packages\stardew
+cd <VALLEYAI_ROOT>\packages\stardew
 bun build --compile --target=bun-windows-x64 src/cli.ts --outfile bin/valley-ai-server.exe
 
 # 3. 配置 ValleyAgent config.json（主机与客机相同）
@@ -30,8 +30,8 @@ bun build --compile --target=bun-windows-x64 src/cli.ts --outfile bin/valley-ai-
 ```json
 {
   "Provider": "MiniMax",
-  "ServerExecutablePath": "D:\\Source\\ValleyAI\\packages\\stardew\\bin\\valley-ai-server.exe",
-  "ServerDirectory": "D:\\Source\\ValleyAI\\packages\\stardew",
+  "ServerExecutablePath": "<VALLEYAI_ROOT>\\packages\\stardew\\bin\\valley-ai-server.exe",
+  "ServerDirectory": "<VALLEYAI_ROOT>\\packages\\stardew",
   "AgentServerUri": "ws://127.0.0.1:8765",
   "UseAgentServer": true,
   "AutoStartServer": true,
@@ -46,7 +46,7 @@ bun build --compile --target=bun-windows-x64 src/cli.ts --outfile bin/valley-ai-
 | 序号 | 准备项 | 完成标准 |
 |---|---|---|
 | 1.1 | 两端安装同一构建产物 | 主机与客机的 `ValleyAgent` mod 文件、manifest 版本完全一致（主版本号必须相同）。 |
-| 1.2 | 启动 Agent 服务器 | 主机端 TypeScript 服务器已启动并可连接，无 `connection refused`/`timeout`。服务器可执行文件位于 `D:\Source\ValleyAI\packages\stardew\bin\valley-ai-server.exe`。 |
+| 1.2 | 启动 Agent 服务器 | 主机端 TypeScript 服务器已启动并可连接，无 `connection refused`/`timeout`。服务器可执行文件位于 `<VALLEYAI_ROOT>\packages\stardew\bin\valley-ai-server.exe`。 |
 | 1.3 | SMAPI 版本一致 | 两端 SMAPI 版本相同，且均启用控制台/日志输出。 |
 | 1.4 | 创建/加载联机存档 | 主机进入农场，客机通过 Steam/邀请码/LAN 成功加入。 |
 | 1.5 | 准备 Agent NPC | 主机确保至少一名村民为 Agent NPC（如 Haley/Abigail），且客机当前地图可见该 NPC。 |

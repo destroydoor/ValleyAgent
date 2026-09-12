@@ -10,7 +10,7 @@
 
 **设计依据:** [docs/design/2026-08-03-ts-server-logging-design.md](../design/2026-08-03-ts-server-logging-design.md)
 
-**跨仓库:** 改动落在 `D:/Source/ValleyAI`（TS）。验收命令均在 `D:/Source/ValleyAI` 下执行。
+**跨仓库:** 改动落在 `<VALLEYAI_ROOT>`（TS）。验收命令均在 `<VALLEYAI_ROOT>` 下执行。
 
 **重要机制说明:** `Agent.subscribe` 是 run 结束后**全量 replay**（`agent.ts:88-94`），非逐事件实时。console-log-subscriber 与 transcript-recorder 同机制——日志在 run 结束（通常 1-3 秒）后按事件顺序批量输出。对本需求足够（排障看完整序列），非实时流式。
 
@@ -35,9 +35,9 @@
 ## Task 1: console-log-subscriber 新增 + 单测 + 接线
 
 **Files:**
-- Create: `D:/Source/ValleyAI/packages/stardew/src/console-log-subscriber.ts`
-- Create: `D:/Source/ValleyAI/packages/stardew/tests/console-log-subscriber.test.ts`
-- Modify: `D:/Source/ValleyAI/packages/stardew/src/stardew-agent.ts`（runOnce）
+- Create: `<VALLEYAI_ROOT>/packages/stardew/src/console-log-subscriber.ts`
+- Create: `<VALLEYAI_ROOT>/packages/stardew/tests/console-log-subscriber.test.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/stardew/src/stardew-agent.ts`（runOnce）
 
 ### Step 1.1: 写失败测试
 
@@ -153,7 +153,7 @@ test("never throws on malformed event (best-effort)", async () => {
 
 ### Step 1.2: 跑测试看失败
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/console-log-subscriber.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/console-log-subscriber.test.ts`
 - **Expected:** FAIL — `Cannot find module '../src/console-log-subscriber'`
 
 ### Step 1.3: 实现 console-log-subscriber.ts
@@ -256,7 +256,7 @@ export class ConsoleLogSubscriber {
 
 ### Step 1.5: 跑测试通过
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/console-log-subscriber.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/console-log-subscriber.test.ts`
 - **Expected:** PASS — 5 tests pass
 
 ### Step 1.6: 接线 stardew-agent.ts runOnce
@@ -309,19 +309,19 @@ import { ConsoleLogSubscriber } from "./console-log-subscriber";
 
 ### Step 1.7: 跑 stardew 包测试不回归
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew`
 - **Expected:** PASS — 全绿（含新测试 + 既有 transcript-wiring/protocol-adapter/stardew-agent 等）
 
 ### Step 1.8: tsc 类型检查
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
 - **Expected:** 0 error 0 warning
 
 ### Step 1.9: Commit
 
 - [ ] **Commit:**
 ```bash
-cd D:/Source/ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/console-log-subscriber.ts packages/stardew/tests/console-log-subscriber.test.ts packages/stardew/src/stardew-agent.ts
 git commit -m "feat(log): add ConsoleLogSubscriber for agentLoop event stdout logging"
 ```
@@ -331,8 +331,8 @@ git commit -m "feat(log): add ConsoleLogSubscriber for agentLoop event stdout lo
 ## Task 2: llm-provider 埋点
 
 **Files:**
-- Modify: `D:/Source/ValleyAI/packages/core/src/llm-provider.ts`
-- Modify: `D:/Source/ValleyAI/packages/core/tests/llm-provider.test.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/core/src/llm-provider.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/core/tests/llm-provider.test.ts`
 
 ### Step 2.1: 写失败测试（追加到 llm-provider.test.ts 末尾）
 
@@ -422,7 +422,7 @@ test("log: final unavailable emits unavailable line", async () => {
 
 ### Step 2.2: 跑测试看失败
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/core/tests/llm-provider.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-provider.test.ts`
 - **Expected:** FAIL — 5 new tests fail（无 `[llm]` 日志输出）
 
 ### Step 2.3: 实现 llm-provider.ts 埋点
@@ -601,16 +601,16 @@ function logTimestamp(): string {
 
 ### Step 2.4: 跑测试通过
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/core/tests/llm-provider.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-provider.test.ts`
 - **Expected:** PASS — 全部测试（含 5 新增）绿
 
 ### Step 2.5: tsc + commit
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bunx tsc --noEmit -p packages/core/tsconfig.json`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bunx tsc --noEmit -p packages/core/tsconfig.json`
 - **Expected:** 0 error 0 warning
 - [ ] **Commit:**
 ```bash
-cd D:/Source/ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/llm-provider.ts packages/core/tests/llm-provider.test.ts
 git commit -m "feat(log): add LLM call metadata logging in llm-provider (model/tokens/retry/billing/queue)"
 ```
@@ -620,8 +620,8 @@ git commit -m "feat(log): add LLM call metadata logging in llm-provider (model/t
 ## Task 3: protocol-adapter 收发埋点
 
 **Files:**
-- Modify: `D:/Source/ValleyAI/packages/stardew/src/protocol-adapter.ts`
-- Modify: `D:/Source/ValleyAI/packages/stardew/tests/protocol-adapter.test.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/stardew/src/protocol-adapter.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/stardew/tests/protocol-adapter.test.ts`
 
 ### Step 3.1: 写失败测试（追加到 protocol-adapter.test.ts）
 
@@ -675,7 +675,7 @@ test("log: handleActionResult emits recv line", async () => {
 
 ### Step 3.2: 跑测试看失败
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/protocol-adapter.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter.test.ts`
 - **Expected:** FAIL — 2 new tests fail（无 `[recv]`/`[send]` 日志）
 
 ### Step 3.3: 实现 protocol-adapter 收发埋点
@@ -717,16 +717,16 @@ console.log(`[${timestamp()}] [recv] state_changed npc=${req.npcName} ${req.prev
 
 ### Step 3.4: 跑测试通过
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/protocol-adapter.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter.test.ts`
 - **Expected:** PASS — 全绿
 
 ### Step 3.5: tsc + commit
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
 - **Expected:** 0 error 0 warning
 - [ ] **Commit:**
 ```bash
-cd D:/Source/ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/protocol-adapter.ts packages/stardew/tests/protocol-adapter.test.ts
 git commit -m "feat(log): add protocol recv/send logging for dialogue/action_result/state_changed/hello"
 ```
@@ -736,8 +736,8 @@ git commit -m "feat(log): add protocol recv/send logging for dialogue/action_res
 ## Task 4: director 埋点（暂不生效）
 
 **Files:**
-- Modify: `D:/Source/ValleyAI/packages/stardew/src/director.ts`
-- Modify: `D:/Source/ValleyAI/packages/stardew/tests/director.test.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/stardew/src/director.ts`
+- Modify: `<VALLEYAI_ROOT>/packages/stardew/tests/director.test.ts`
 
 ### Step 4.1: 写失败测试（追加到 director.test.ts）
 
@@ -789,7 +789,7 @@ test("log: morningPlan emits start and end lines", async () => {
 
 ### Step 4.2: 跑测试看失败
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/director.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/director.test.ts`
 - **Expected:** FAIL — 1 new test fail（无 `[director]` 日志）
 
 ### Step 4.3: 实现 director.ts 埋点
@@ -840,16 +840,16 @@ function logTimestamp(): string {
 
 ### Step 4.4: 跑测试通过
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/stardew/tests/director.test.ts`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/director.test.ts`
 - **Expected:** PASS — 全绿
 
 ### Step 4.5: tsc + commit
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bunx tsc --noEmit -p packages/stardew/tsconfig.json`
 - **Expected:** 0 error 0 warning
 - [ ] **Commit:**
 ```bash
-cd D:/Source/ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/director.ts packages/stardew/tests/director.test.ts
 git commit -m "feat(log): add director morningPlan/milestoneReact logging (inactive until wired)"
 ```
@@ -883,17 +883,17 @@ logSpy.mockRestore();
 
 ### Step 5.2: 全量 bun test
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun test packages/core && bun test packages/stardew`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun test packages/core && bun test packages/stardew`
 - **Expected:** 全绿，0 fail
 
 ### Step 5.3: tsc 全量
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bunx tsc --noEmit`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bunx tsc --noEmit`
 - **Expected:** 0 error 0 warning
 
 ### Step 5.4: protocol 契约不回归
 
-- [ ] **Run:** `cd D:/Source/ValleyAI && bun run check:protocol`
+- [ ] **Run:** `cd <VALLEYAI_ROOT> && bun run check:protocol`
 - **Expected:** 不回归（exit code 与改动前一致；当前 memory 记录为 exit 1 预期红，保持一致即可，不应新增 orphan routes）
 
 ### Step 5.5: 手动多模态验证（铁律3）
@@ -914,7 +914,7 @@ logSpy.mockRestore();
 
 - [ ] **Commit:**
 ```bash
-cd D:/Source/ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/tests/dialogue-e2e.test.ts
 git commit -m "test(log): assert stdout log lines in dialogue e2e"
 ```

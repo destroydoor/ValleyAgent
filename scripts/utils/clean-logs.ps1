@@ -1,8 +1,11 @@
 # Archive old SMAPI log files
 param(
     [int]$KeepCount = 5,
-    [string]$GamePath = "F:\SteamLibrary\steamapps\common\Stardew Valley"
+    [string]$GamePath
 )
+
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath -Hint $GamePath
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
