@@ -1,9 +1,14 @@
-# ValleyTalk — 给星露谷的 NPC 装上真正的 AI 大脑
+# ValleyAgent — 对ValleyTalk的全面改进，对把agent真正接入星露谷的尝试
 
-ValleyTalk（mod 内名 **ValleyAgent**）= 一个 Stardew Valley SMAPI mod + 一个本地 TS Agent Server。
-它把原版的程序化木偶 NPC 变成**活的虚拟生命**：有真实性格、能记住玩家、有钱有物、能交易、能被雇佣、能和你一起冒险——并且每次对话都独一无二。
+ValleyAgent = 一个 Stardew Valley SMAPI mod + 一个本地 TS Agent Server。
 
-> 100% 单机本地运行：游戏内 C# mod 通过 WebSocket 连接本机 TS 服务器，LLM 调用走你自己配置的 API key，不依赖任何第三方托管服务。
+
+它基于ValleyTlak项目的NPC设定和把NPC接入星露谷的理念继续开发，搞定了一些繁琐的程序工作
+
+它想把原版的程序化木偶 NPC 变成**活的虚拟生命**：有真实性格、能记住玩家、有钱有物、能交易、能被雇佣、能和你一起冒险——并且每次对话都独一无二。
+（太多agent框架都这么说，但是实际上会面临价格昂贵、效果不佳等等问题，本项目只是尝试了一种之前就有过的解法，也就是靠导演系统驱动，并不是很独创哈。我也不会吹嘘什么）
+
+它100% 单机本地运行：游戏内 C# mod 通过 WebSocket 连接本机 TS 服务器，LLM 调用走你自己配置的 API key，不依赖任何第三方托管服务。
 
 ## 核心特性
 
@@ -13,8 +18,9 @@ ValleyTalk（mod 内名 **ValleyAgent**）= 一个 Stardew Valley SMAPI mod + �
 - **共同冒险** — NPC 可接 `set_goal` 和你一起砍树、挖矿、浇水、战斗、跟随（C# GoalExecutor 确定性执行，零 LLM 循环；另带低血量逃跑、卡住检测等生存反射）
 - **导演编排** — Director 智能体基于全局视野编排事件、创造相遇机会、改写 NPC 状态；NPC Agent 永远不知道导演存在（职责隔离）
 - **联机支持** — Host / ThinClient 双模式，房客也能与 AI NPC 对话、送礼、交易，经济账本主机权威
+（基本的agent功能都有了，就是手动测试还是不算特别全面不保证完全没bug哈）
 
-## 架构一页纸
+## 架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
