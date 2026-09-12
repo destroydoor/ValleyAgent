@@ -210,25 +210,11 @@ export interface Beat {
 }
 
 // ============================================================================
-// 8 种 WebSocket 消息类型 (Narrative Director protocol extension)
+// WebSocket 消息类型（Narrative Director protocol extension）
+// 2026-09-12 死代码清除：beat_directive/beat_activate/beat_event/beat_state/
+// activity_report/activity_milestone/player_state_update 7 个旧设计消息类型删除
+// （两端从未实现；活跃的 wire 消息统一在 types.ts / protocol/messages.json）。
 // ============================================================================
-
-export interface ActivityReportMessage {
-  type: "activity_report";
-  requestId: string;
-  dailyActivity: DailyActivity;
-  farmSnapshot: PlayStyle[];
-}
-
-export interface ActivityMilestoneMessage {
-  type: "activity_milestone";
-  requestId: string;
-  milestone: {
-    type: string;
-    description: string;
-    detectedAt: string;
-  };
-}
 
 export interface GameContextSyncMessage {
   type: "game_context_sync";
@@ -236,37 +222,3 @@ export interface GameContextSyncMessage {
   context: GameContext;
 }
 
-export interface BeatDirectiveMessage {
-  type: "beat_directive";
-  requestId: string;
-  beat: Beat;
-}
-
-export interface BeatActivateMessage {
-  type: "beat_activate";
-  requestId: string;
-  beatId: string;
-  npcName: string;
-}
-
-export interface BeatEventMessage {
-  type: "beat_event";
-  requestId: string;
-  beatId: string;
-  eventType: string;
-  payload: Record<string, unknown>;
-}
-
-export interface BeatStateMessage {
-  type: "beat_state";
-  requestId: string;
-  beatId: string;
-  status: BeatStatus;
-  toolCall?: { tool: string; args: Record<string, unknown> };
-}
-
-export interface PlayerStateUpdateMessage {
-  type: "player_state_update";
-  requestId: string;
-  playerState: GameContext["playerState"];
-}

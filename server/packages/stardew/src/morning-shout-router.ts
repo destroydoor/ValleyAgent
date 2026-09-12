@@ -4,9 +4,11 @@ import type { RouteShoutMessage, RouteShoutResponse } from "./types";
  * E5-2 喊话歧义兜底路由（TS 侧）。
  *
  * C# 的 4 层确定性路由（名字提及→当前会话→跟随/雇佣者→已醒来+关系最近）全空时，
- * 把候选列表发给本模块：用轻量路由 LLM 选目标（最多 1 次调用），断线/失败走确定性兜底。
+ * 把候选列表发给本模块选目标。
  *
- * 性能纪律（AGENTS §2.6）：LLM 只花在歧义上——确定性兜底能解决时根本不调 LLM；
+ * 2026-09-12 审计对齐（M-4）：生产装配处（protocol-adapter）构造 MorningShoutRouter
+ * 时不注入 LLM——生产恒走确定性兜底（醒着的候选里挑关系最近）。类保留可选 llm
+ * 钩子供未来接线；性能纪律（AGENTS §2.6）下确定性选择对喊话歧义已足够。
  * 全员未醒/空候选直接沉默（返回 null targetName，不调 LLM）。
  */
 export interface ShoutCandidate {

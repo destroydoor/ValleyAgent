@@ -77,8 +77,9 @@ bun build --compile --target=bun-windows-x64 src/cli.ts --outfile bin/valley-ai-
 # 2. C# mod
 dotnet build src/ValleyAgent/ValleyAgent.csproj -c Debug
 
-# 3. 部署到游戏 Mods 目录（DLL/exe/i18n/RAG/人设数据）
-#    注意按需修改脚本内的游戏路径
+# 3. 部署到游戏 Mods 目录（DLL/exe/i18n/人设数据）
+#    游戏路径默认读 $env:VALLEY_GAME_PATH（回落 D:\Source\ValleyTalk\Stardew Valley），
+#    也可显式传参：pwsh scripts/build/deploy.ps1 -GamePath "X:\...\Stardew Valley"
 pwsh scripts/build/deploy.ps1
 ```
 
@@ -114,6 +115,7 @@ bun run check:protocol
 - 情绪引擎目前是 NPC 世界级而非 per-player（A 激怒 NPC，B 对话会承接情绪）
 - 房客聊天栏/交易菜单依赖主机端组件，部分场景受限
 - 导演/玩家画像仍为单玩家视角（多玩家化 M3 未完成）
+- 逐 NPC 日结 LLM（consolidate_day 画像进化按日聚合触发，非逐人）尚未实现
 
 ## 声明
 

@@ -30,7 +30,7 @@ const SEASON_MAP: Record<string, string> = {
 /**
  * In-memory cache of the latest GameContext pushed by the C# Mod via
  * `game_context_sync` messages. Provides:
- *   - cached reads (Director queries this on every morningPlan / milestoneReact)
+ *   - cached reads (DirectorAgent queries this on every dayPlan run)
  *   - NPC availability checks (BeatScheduler + Director validation)
  *   - compact prompt-injection summaries for the Director and NPC agents
  *

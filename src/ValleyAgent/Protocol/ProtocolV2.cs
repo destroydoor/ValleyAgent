@@ -83,11 +83,8 @@ public static class ProtocolV2
         InternalError
     }
 
-    public const string MessageTypeCommand = "command";
     public const string MessageTypeDialogueRequest = "dialogue_request";
     public const string MessageTypeDialogueResponse = "dialogue_response";
-    public const string MessageTypePlayerInput = "player_input";
-    public const string MessageTypeEvent = "event";
     public const string MessageTypeActionResult = "action_result";
 
     /// <summary>导演请求 C# 分配某 NPC 为 Agent（TS→C#, fire_and_forget）。设计文档 §4.2.2。</summary>
@@ -136,37 +133,6 @@ public static class ProtocolV2
         [JsonPropertyName("callId")] public string CallId { get; set; } = "";
     }
 
-    public class CommandMessage
-    {
-        [JsonPropertyName("type")] public string Type { get; set; } = MessageTypeCommand;
-        [JsonPropertyName("requestId")] public string RequestId { get; set; } = "";
-        [JsonPropertyName("npcName")] public string NpcName { get; set; } = "";
-        [JsonPropertyName("commands")] public List<CommandAction> Commands { get; set; } = new();
-        [JsonPropertyName("toolCalls")] public List<CommandAction>? ToolCallsAlias { get; set; }
-        [JsonPropertyName("status")] public string Status { get; set; } = "ok";
-
-        /// <summary>
-        ///     统一访问命令列表：优先 commands，其次 toolCalls（兼容旧 ToolCallMessage 路径）。
-        /// </summary>
-        [JsonIgnore]
-        public List<CommandAction> AllCommands
-        {
-            get
-            {
-                if (Commands != null && Commands.Count > 0)
-                {
-                    return Commands;
-                }
-
-                if (ToolCallsAlias != null && ToolCallsAlias.Count > 0)
-                {
-                    return ToolCallsAlias;
-                }
-
-                return Commands ?? new List<CommandAction>();
-            }
-        }
-    }
 
     public class DialogueRequestMessage
     {
@@ -187,23 +153,7 @@ public static class ProtocolV2
         [JsonPropertyName("action")] public string? Action { get; set; }
     }
 
-    public class PlayerInputMessage
-    {
-        [JsonPropertyName("type")] public string Type { get; set; } = MessageTypePlayerInput;
-        [JsonPropertyName("requestId")] public string RequestId { get; set; } = Guid.NewGuid().ToString();
-        [JsonPropertyName("npcName")] public string NpcName { get; set; } = "";
-        [JsonPropertyName("inputType")] public string InputType { get; set; } = "";
-        [JsonPropertyName("context")] public Dictionary<string, object> Context { get; set; } = new();
-    }
 
-    public class EventMessage
-    {
-        [JsonPropertyName("type")] public string Type { get; set; } = MessageTypeEvent;
-        [JsonPropertyName("requestId")] public string RequestId { get; set; } = Guid.NewGuid().ToString();
-        [JsonPropertyName("npcName")] public string NpcName { get; set; } = "";
-        [JsonPropertyName("eventType")] public string EventType { get; set; } = "";
-        [JsonPropertyName("data")] public Dictionary<string, object> Data { get; set; } = new();
-    }
 
     public class ActionResultMessage
     {
@@ -467,11 +417,4 @@ public static class ProtocolV2
     /// <summary>
     ///     Wraps one or more tool calls from the TS Agent Server.
     /// </summary>
-    public class ToolCallMessage
-    {
-        [JsonPropertyName("type")] public string Type { get; set; } = MessageTypeCommand;
-        [JsonPropertyName("requestId")] public string RequestId { get; set; } = "";
-        [JsonPropertyName("npcName")] public string NpcName { get; set; } = "";
-        [JsonPropertyName("toolCalls")] public List<ToolCall> ToolCalls { get; set; } = new();
-    }
 }

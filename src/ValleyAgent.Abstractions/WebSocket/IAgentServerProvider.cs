@@ -37,6 +37,16 @@ namespace ValleyAgent.WebSocket
         int Quantity,
         int MarketPrice);
 
+    /// <summary>
+    ///     E3-5: NPC 当日求购单条目（2026-09-12 接线）。NPC 在对话中以此锚定求购价，
+    ///     命中送礼时提示玩家"走对话议价"后 NPC 有价格依据。UnitPrice 为单价。
+    /// </summary>
+    public record PurchaseOfferInfo(
+        string ItemId,
+        string ItemName,
+        int Quantity,
+        int UnitPrice);
+
     public record WorldSnapshot(
         string Season,
         int Day,
@@ -70,7 +80,10 @@ namespace ValleyAgent.WebSocket
         // 阶段3 L2: NPC 欠款（g）。默认 null 向后兼容。
         int? NpcOwedMoney = null,
         // 阶段3 L3: 当前活跃 beat 场景描述（BeatStore 提供，beat 有效期内注入）。默认 null 向后兼容。
-        string? CurrentBeat = null
+        string? CurrentBeat = null,
+        // E3-5: NPC 当日求购单（NpcPurchaseRequestService.PurchaseOffers；对话议价的价格锚）。
+        // 默认 null 向后兼容（无求购/服务未接线）。
+        IReadOnlyList<PurchaseOfferInfo>? NpcPurchaseOffers = null
     );
 
     public record DialogueRequest(

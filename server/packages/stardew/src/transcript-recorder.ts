@@ -1,4 +1,4 @@
-// RunTranscriptRecorder — 把 runDialogue / runBeat 的一次执行接线到
+// RunTranscriptRecorder — 把 runDialogue 的一次执行接线到
 // TranscriptStore（Phase 1 E1-1）。职责：
 //   1. run 生命周期：构造时写 status="running" 行，结束时按 runId UPSERT 终态
 //      （success → "completed"，失败 → "error"/"fallback"）；
@@ -21,14 +21,15 @@ import type {
   AgentRunRecord,
   AgentRunStatus,
   AgentRunTokens,
+  AgentRunTrigger,
   AgentTurnRecord,
 } from "./transcript-types";
 
 /** 创建 RunTranscriptRecorder 所需的 run 级元信息。 */
 export interface RunTranscriptOptions {
   npcName: string;
-  /** 触发来源：dialogue（runDialogue）或 beat（runBeat）。director 归 Task 4。 */
-  trigger: "dialogue" | "beat";
+  /** 触发来源（AgentRunTrigger 全集；runDialogue 用 "dialogue"）。 */
+  trigger: AgentRunTrigger;
   /** 完整 system prompt（静态+动态合一段，Builder 不暴露切分）。 */
   systemPrompt: string;
   /** 玩家输入 / 导演指令，作为 user_input 落库。 */
@@ -62,7 +63,7 @@ export class RunTranscriptRecorder {
   // run 级不变字段；startedAt/status/终态字段在每次写入时按需填。
   private readonly base: {
     npcName: string;
-    trigger: "dialogue" | "beat";
+    trigger: AgentRunTrigger;
     systemPromptHash: string;
     systemPromptFull: string;
     systemPromptDynamic: string;
@@ -123,7 +124,7 @@ export class RunTranscriptRecorder {
 
   /**
    * 失败终态：LLM 超时 / 校验重试失败 → status="error"。
-   * fallback=true 时写 "fallback"（当前 runDialogue/runBeat 不自带兜底，
+   * fallback=true 时写 "fallback"（当前 runDialogue 不自带兜底，
    * 兜底在 protocol-adapter，此处预留该状态给未来自兜底路径）。
    */
   finalizeError(err: unknown, fallback = false): void {

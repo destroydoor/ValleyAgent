@@ -4,7 +4,7 @@ import { PromptBuilder } from "./prompt-builder";
 import { StardewAgentRegistry } from "./stardew-agent-registry";
 import type { TranscriptConfig, RegistryConfig } from "./stardew-agent-registry";
 import { ProtocolAdapter, type ProtocolAdapterOptions } from "./protocol-adapter";
-import { Director } from "./director";
+import { DirectorAgent, type DirectorLlm } from "./director-agent";
 import { BeatStore } from "./beat-store";
 import { PlayerProfileManager } from "./player-profile";
 import { PlayerProfileStore } from "./player-profile-store";
@@ -133,13 +133,24 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
   // --- 导演依赖项实例化（仅在 enableDirector !== false 时构造） ---
   // 依赖：BeatStore、PlayerProfileManager（含 PlayerProfileStore）、GameContextManager、ActivityLogStore
   // 全部使用 SQLite 持久化，dbDir = {dataPath}/director/
-  let director: Director | undefined;
+  let directorAgent: DirectorAgent | undefined;
   let beatStore: BeatStore | undefined;
   let profileMgr: PlayerProfileManager | undefined;
   let activityStore: ActivityLogStore | undefined;
   let gameCtxMgr: GameContextManager | undefined;
   // activeWs 在 websocket open 回调中赋值，供 sendToCsharp 发送 allocate_agent 等主动消息
   let activeWs: import("bun").ServerWebSocket<unknown> | null = null;
+
+  // sendToCsharp 与 ledger 始终接线（即使 Director 未启用——execute_adjust 不依赖 Director）。
+  const sendToCsharp = (msg: unknown) => {
+    if (activeWs && activeWs.readyState === 1) {
+      activeWs.send(JSON.stringify(msg));
+    } else {
+      // 2026-09-11 观测补强：断连/无连接期间的主动消息此前静默丢弃——只打 type
+      // 不打全文（prompt 级大消息会刷爆日志）。
+      console.warn("[sendToCsharp] dropped message (no active ws connection): type=" + ((msg as { type?: string }).type ?? "unknown"));
+    }
+  };
 
   if (config.enableDirector !== false) {
     const dbDir = join(dirname(config.dataPath), "director");
@@ -151,8 +162,12 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
     const profileStore = new PlayerProfileStore(join(dbDir, "profiles.sqlite"));
     profileStore.init();
 
-    // 复用 RegistryConfig 中的 provider/router 构造 directorCallLlm
-    const directorCallLlm = registryConfig.llmRouter
+    // 复用 RegistryConfig 中的 provider/router 构造 directorLlm（chatWithTools 语义——
+    // DirectorAgent 是工具循环，需要工具调用能力）+ profileCallLlm（纯补全，画像刷新用）。
+    const directorLlm: DirectorLlm = registryConfig.llmRouter
+      ? (messages, tools) => registryConfig.llmRouter!.chatWithTools("director", messages, tools)
+      : (messages, tools) => registryConfig.llmProvider!.chatWithTools(messages, tools);
+    const profileCallLlm = registryConfig.llmRouter
       ? async (prompt: string) => {
           const result = await registryConfig.llmRouter!.chatCompletion("director", [{ role: "user", content: prompt }]);
           return {
@@ -174,11 +189,16 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
           };
         };
 
-    profileMgr = new PlayerProfileManager(profileStore, activityStore, { callLlm: directorCallLlm });
+    profileMgr = new PlayerProfileManager(profileStore, activityStore, { callLlm: profileCallLlm });
     gameCtxMgr = new GameContextManager();
-    director = new Director(beatStore, profileMgr, gameCtxMgr, activityStore, { callLlm: directorCallLlm },
-      // E1-1 留痕活化：注入 registry 的 TranscriptStore（留痕未启用时为 null → undefined），
-      // morningPlan / milestoneReact 自动写 director_runs。
+    // 2026-09-12 Director 有效化：工具型导演大脑（9 工具经 director_command 下发；
+    // 替代退役的 Director beat-JSON 管线）。E1-1 留痕活化：注入 registry 的
+    // TranscriptStore，dayPlan 每次调度自动写 director_runs。
+    directorAgent = new DirectorAgent(
+      beatStore,
+      profileMgr,
+      gameCtxMgr,
+      { llm: directorLlm, sendToCsharp },
       registry.getTranscriptStore() ?? undefined);
   }
 
@@ -190,22 +210,16 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
 
   // sendToCsharp 与 ledger 始终接线（即使 Director 未启用——execute_adjust 不依赖 Director）。
   const adapterOptions: ProtocolAdapterOptions = {
-    sendToCsharp: (msg: unknown) => {
-      if (activeWs && activeWs.readyState === 1) {
-        activeWs.send(JSON.stringify(msg));
-      } else {
-        // 2026-09-11 观测补强：断连/无连接期间的主动消息此前静默丢弃——只打 type
-        // 不打全文（prompt 级大消息会刷爆日志）。
-        console.warn("[sendToCsharp] dropped message (no active ws connection): type=" + ((msg as { type?: string }).type ?? "unknown"));
-      }
-    },
+    sendToCsharp,
     ledger,
     emotionEngine,
   };
-  if (director && gameCtxMgr) {
-    adapterOptions.director = director;
+  if (directorAgent && gameCtxMgr) {
+    adapterOptions.directorAgent = directorAgent;
     adapterOptions.gameCtxMgr = gameCtxMgr;
     adapterOptions.directorTriggerProbability = config.directorTriggerProbability ?? 0.1;
+    // consolidate_day 画像日刷新（2026-09-12 实做）需要 profileMgr。
+    if (profileMgr) adapterOptions.profileMgr = profileMgr;
   }
   const adapter = new ProtocolAdapter(registry, adapterOptions);
 

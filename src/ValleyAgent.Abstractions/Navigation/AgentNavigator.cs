@@ -5,7 +5,6 @@ using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Pathfinding;
-using ValleyAgent.Controllers;
 using ValleyAgent.Utils;
 
 namespace ValleyAgent.Navigation
@@ -16,7 +15,7 @@ namespace ValleyAgent.Navigation
     /// All PathFindController lifecycle is delegated to IMovementService.
     ///
     /// Fix #9: stuck offset targets are now validated for walkability.
-    /// Fix #10: FollowController hysteresis logic merged directly into UpdateLocalFollowing.
+    /// Fix #10: follow hysteresis logic lives directly in UpdateLocalFollowing (旧 FollowController 已删除).
     /// Fix #11: NPC is hidden during cross-map travel to prevent visible "frozen" state.
     /// </summary>
     public class AgentNavigator
@@ -25,8 +24,8 @@ namespace ValleyAgent.Navigation
         private readonly IMonitor? _monitor;
         private readonly IMovementService _movementService;
 
-        // ─── Follow hysteresis (merged from FollowController) ─────────────
-        // Fix #10: direct distance-based hysteresis without FollowController lag.
+        // ─── Follow hysteresis (原 FollowController 逻辑内联于此) ─────────────
+        // Fix #10: direct distance-based hysteresis (无控制器间滞后).
         // NPC stops when close (< closeThreshold), starts when far (> farThreshold).
         // In the dead zone, maintains previous intent to avoid flicker.
         private const float CloseDistanceThreshold = 2.0f;
@@ -128,7 +127,7 @@ namespace ValleyAgent.Navigation
 
         /// <summary>
         /// Main update called every tick when the NPC is in FOLLOW state.
-        /// Fix #10: no longer requires FollowController — uses direct distance checks.
+        /// Fix #10: uses direct distance checks.
         /// </summary>
         public void Update(NPC npc, int currentTick)
         {
@@ -218,12 +217,6 @@ namespace ValleyAgent.Navigation
 
             UpdateLocalFollowing(npc, currentTick);
         }
-
-        /// <summary>
-        /// Backward-compatible overload that accepts FollowController (now ignored).
-        /// Fix #10: FollowController is no longer used for decision-making.
-        /// </summary>
-        public void Update(NPC npc, FollowController _, int currentTick) => Update(npc, currentTick);
 
         /// <summary>
         /// Returns true if the NPC is currently in cross-map travel.
@@ -416,7 +409,7 @@ namespace ValleyAgent.Navigation
         // ─── Local (same-map) following ──────────────────────────────────────
 
         /// <summary>
-        /// Fix #10: merged FollowController hysteresis directly.
+        /// Fix #10: follow hysteresis merged directly into this method.
         /// Uses direct distance checks with hysteresis to prevent flicker.
         /// </summary>
         private void UpdateLocalFollowing(NPC npc, int currentTick)
@@ -471,7 +464,7 @@ namespace ValleyAgent.Navigation
                 return;
             }
 
-            // ── Hysteresis: direct distance-based, no FollowController lag ──
+            // ── Hysteresis: direct distance-based ──
             if (distToTarget < CloseDistanceThreshold)
             {
                 _wantsToFollow[npcName] = false;

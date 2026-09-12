@@ -335,7 +335,7 @@ public class ModEntry : Mod
 
         // SaveLoaded 时机 Context.IsMultiplayer/IsMainPlayer 已确定。
         // 单机或联机主机：完整初始化。
-        // 使用全限定名避免与 ValleyAgent.Context 命名空间冲突（参考 MultiplayerHelper.cs 同样的处理）。
+        // 使用全限定名（旧 ValleyAgent.Context 命名空间已于 2026-09-12 删除）。
         if (!StardewModdingAPI.Context.IsMultiplayer || StardewModdingAPI.Context.IsMainPlayer)
         {
             return AgentRuntimeMode.Host;

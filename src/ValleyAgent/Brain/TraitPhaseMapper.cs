@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+// BioTrait 定义于 ValleyAgent.Abstractions/RAG/Models（同命名空间 ValleyAgent.RAG.Models）。
 using ValleyAgent.RAG.Models;
 
 namespace ValleyAgent.Brain;

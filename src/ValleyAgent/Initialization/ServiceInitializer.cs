@@ -107,10 +107,9 @@ public class ServiceInitializer
         };
         _container.RegisterSingleton(debugLogger);
 
-        var knowledgeBase = new RAGKnowledgeBase(_monitor);
-        knowledgeBase.Load(_helper);
-        _container.RegisterSingleton(knowledgeBase);
-
+        // 2026-09-12 死代码清除：RAGKnowledgeBase（flat npcs.json 检索）删除——
+        // 容器内无消费者；ValleyTalkBioLoader / GameSummaryLoader 保留（AllocateAgentHandler /
+        // DecisionContextBuilder 在用）。
         var bioLoader = new ValleyTalkBioLoader(_monitor);
         bioLoader.Initialize(_helper);
         bioLoader.Load();
@@ -328,6 +327,8 @@ public class ServiceInitializer
         {
             TradeProbability = config.ProactiveTradeProbability
         };
+        // 2026-09-12 L2 接线：静态引用供 WorldSnapshotBuilder 注入 npcPurchaseOffers。
+        NpcPurchaseRequestService.Current = purchaseRequestService;
         _container.RegisterSingleton(purchaseRequestService);
 
         var locationGraph = new LocationGraph();

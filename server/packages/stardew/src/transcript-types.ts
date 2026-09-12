@@ -39,7 +39,7 @@ export interface AgentRunTokens {
 }
 
 /**
- * agent_runs 一行 —— 一次 runDialogue / runBeat / 导演调用的完整留痕。
+ * agent_runs 一行 —— 一次 runDialogue / 导演调用的完整留痕（runBeat 已于 2026-09-12 退役）。
  * 数组字段默认 []；可选字段省略时落库为 NULL。
  */
 export interface AgentRunRecord {

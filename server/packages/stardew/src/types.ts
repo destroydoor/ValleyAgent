@@ -65,10 +65,24 @@ export interface WorldSnapshot {
   npcMood?: string;
   // Phase 3 L2: NPC 近期事件（AgentBrain.TodayEvents）。可选，旧 C# 客户端不携带。
   npcRecentEvents?: string[];
-  // Phase 3 L2: NPC 工作标记（Director set_npc_working_on 写入）。可选，旧 C# 客户端不携带。
+  // Phase 3 L2: NPC 工作标记（Director set_npc_working_on / GoalExecutor 写入）。可选，旧 C# 客户端不携带。
   npcWorkingOn?: string | null;
   // Phase 3 L2: NPC 欠款。可选，旧 C# 客户端不携带。
   npcOwedMoney?: number;
+  // Phase 3 L3: 当前活跃 beat 场景描述（C# BeatStore；Director spawn_beat 写入）。
+  // 可选，旧 C# 客户端不携带。第三人称场景描述，绝不提"导演"。
+  currentBeat?: string | null;
+  // E3-5: NPC 当日求购单（C# NpcPurchaseRequestService；命中送礼时提示走对话议价，
+  // 这里让 NPC 在对话中有价格锚）。可选，旧 C# 客户端不携带。
+  npcPurchaseOffers?: PurchaseOfferInfo[] | null;
+}
+
+/** 单条 NPC 求购（E3-5）：unitPrice 为单价（公道价 1.0~1.1×）。 */
+export interface PurchaseOfferInfo {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface DialogueRequest {
@@ -167,7 +181,7 @@ export interface DayStartedMessage {
   type: "day_started";
   requestId: string;
   dateIso: string;
-  /** 阶段 3: DirectorContextBuilder 拼装的导演上下文（压缩结构化文本，800-1500 token 预算）。可空向后兼容；当前 morningPlan 走 game_context_sync 结构化通道，此字段供工具型 Director 消费。 */
+  /** 阶段 3: DirectorContextBuilder 拼装的导演上下文（压缩结构化文本，800-1500 token 预算）。可空向后兼容；由 DirectorAgent.runDayPlan 消费（2026-09-12 起，此前接收即丢弃）。 */
   directorContext?: string;
 }
 
@@ -208,8 +222,12 @@ export interface RouteShoutResponse {
  * Phase 3 Director 工具调用（TS→C#）。9 个 Director 工具（set_npc_position/
  * set_npc_inventory/set_npc_money/set_npc_mood/set_npc_recent_events/
  * set_npc_working_on/spawn_beat/spawn_group_beat/inject_memory）统一走此通道：
- * TS 端 Director agent 的工具调用 → routeMessage → sendToCsharp → C# DirectorTools.Execute。
+ * TS 端 DirectorAgent（2026-09-12 工具大脑）→ routeMessage → sendToCsharp → C# DirectorTools.Execute。
  * C# 侧 CommandExecutor 对 type=director_command 特殊路由（不走 NPC Agent switch）。
+ *
+ * ⚠️ 绝不携带 npcName 字段：C# 收到后回 action_result（NpcName = msg.npcName ?? ""），
+ * TS 按 npcName 路由进 per-NPC 反馈队列——空值才会被安全丢弃。填了 npcName 会把
+ * 导演元层结果回注 NPC 对话上下文（职责隔离泄漏）。
  */
 export interface DirectorCommandMessage {
   type: "director_command";
@@ -377,6 +395,11 @@ export interface SceneState {
   npcWorkingOn: string | null;
   // Phase 3 L2: NPC 欠款。null=无欠款。
   npcOwedMoney: number | null;
+  // Phase 3 L3: 当前活跃 beat 场景描述（第三人称，无导演概念）。null/缺省=无活跃 beat。
+  // （decodeWorldSnapshot 恒填充；手写夹具可省略——语义等同 null。）
+  currentBeat?: string | null;
+  // E3-5: NPC 当日求购单（价格锚）。null/缺省=未知（旧客户端）；空数组=无求购。
+  npcPurchaseOffers?: PurchaseOfferInfo[] | null;
 }
 
 // Re-export narrative director types for unified import surface.

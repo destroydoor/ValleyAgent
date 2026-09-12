@@ -31,7 +31,7 @@ const MAX_BEAT_HISTORY = 50;
  * - `appendBeatHistory` keeps only the latest 50 entries (by insertion order).
  *
  * Why single-row JSON instead of normalized columns? The PlayerProfile is
- * read whole on every Director call (morningPlan / milestoneReact), and
+ * read whole on every Director dayPlan / profile refresh, and
  * mutations are infrequent (once per day at most). A single JSON document
  * avoids schema-migration pain as the profile structure evolves, and is
  * more than fast enough at the expected scale (one player, one row).

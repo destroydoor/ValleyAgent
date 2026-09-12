@@ -89,7 +89,7 @@ namespace ValleyAgent.Navigation
         /// Uses <see cref="MovementMode.LongRange"/> cooldown internally.
         ///
         /// This method is intended for the FOLLOW state and replaces the
-        /// current <c>AgentNavigator.Update(npc, follow, currentTick)</c> call.
+        /// current <c>AgentNavigator.Update(npc, currentTick)</c> call.
         /// Cross-map travel (warp delay simulation) is managed internally.
         /// </summary>
         /// <param name="npc">The NPC that should follow.</param>

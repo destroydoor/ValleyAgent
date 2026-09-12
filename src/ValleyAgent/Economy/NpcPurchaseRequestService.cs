@@ -7,14 +7,24 @@ namespace ValleyAgent.Economy;
 /// <summary>
 ///     E3-5 NPC 求购服务。逐人设生成求购（格斯收食材、克林特收矿石等），
 ///     求购价 1.0~1.1× 公道价，每 NPC 每天频率受限，当日有效（长 TTL）。
-///     交付复用 E3-3 结算路径：求购单写入自持的 <see cref="PurchaseOffers" />
-///     （长 TTL Registry），NPCGiftPatch 命中后经 TradeSettlement.SettleNpcBuys 原子结算。
+///     交付路径（2026-08-15 步骤 2 起）：求购单写入自持的 <see cref="PurchaseOffers" />
+///     （长 TTL Registry）；NPCGiftPatch 命中时拒绝送礼交接并提示走对话议价，
+///     经济结算由 TS 对话流 trade 工具 → execute_adjust 原子批完成（SettleNpcBuys
+///     已随 TradeSettlement 删除——本注释 2026-09-12 修正）。
+///     2026-09-12 L2 接线：<see cref="Current" /> 供 WorldSnapshotBuilder 把活跃求购
+///     注入 worldSnapshot.npcPurchaseOffers（NPC 议价的价格锚）。
 ///     设计文档：docs/ideas/e35-implementation-思路.md
 /// </summary>
 public sealed class NpcPurchaseRequestService
 {
     /// <summary>求购单默认有效期（覆盖到当天结束的兜底）。</summary>
     public static readonly TimeSpan DefaultRequestTtl = TimeSpan.FromHours(20);
+
+    /// <summary>
+    ///     当前服务实例（ServiceInitializer 注册时写入，BeatStore.Current 同模式）。
+    ///     WorldSnapshotBuilder 读取活跃求购注入 worldSnapshot。测试环境可为 null。
+    /// </summary>
+    public static NpcPurchaseRequestService? Current { get; internal set; }
 
     // 每 NPC 每日已生成数（gameDate 隔离）。
     private readonly Dictionary<string, int> _dailyCounts = new(StringComparer.OrdinalIgnoreCase);

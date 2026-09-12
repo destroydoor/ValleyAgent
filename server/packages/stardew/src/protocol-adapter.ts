@@ -31,8 +31,9 @@ import type { AgentMemory } from "./agent-memory";
 import { EmotionEngine } from "./emotion-engine";
 import { MEMORY_SIDE_EFFECT_RECORDED, DEFAULT_EMOTION } from "./types";
 import { MorningShoutRouter } from "./morning-shout-router";
-import type { Director } from "./director";
+import type { DirectorAgent } from "./director-agent";
 import type { GameContextManager } from "./game-context";
+import type { PlayerProfileManager } from "./player-profile";
 
 const SERVER_VERSION = "0.1.0";
 
@@ -48,9 +49,12 @@ function truncate(s: string, max: number): string {
 
 export interface ProtocolAdapterOptions {
   sendToCsharp?: (msg: unknown) => void;
-  director?: Director;
+  /** 2026-09-12 Director 有效化：工具型导演大脑（原 Director beat-JSON 管线退役）。 */
+  directorAgent?: DirectorAgent;
   directorTriggerProbability?: number;
   gameCtxMgr?: GameContextManager;
+  /** 玩家画像管理器（consolidate_day 日刷新用；Director 启用时由 server.ts 注入）。 */
+  profileMgr?: PlayerProfileManager;
   /** 2026-08-15 账本迁移（步骤 1）：权威经济账本（adjust_result 路由 + worldSnapshot 播种）。 */
   ledger?: AgentLedger;
   /** adjust_result 回执等待超时 ms（默认 10s；测试可调小）。 */
@@ -76,9 +80,12 @@ export class ProtocolAdapter {
   private readonly ruleEngine = new RuleEngine();
   private readonly seenConsolidations = new Set<string>();
   // 2026-09-11 观测补强：同一游戏日多次 day_started 的重复计数（联机下已知现象，
-  // 此前重复跑 morningPlan 无任何日志标记——"每玩家一个导演"误读的直接来源）。
+  // 此前重复跑导演编排无任何日志标记——"每玩家一个导演"误读的直接来源）。
   // adapter 是长生命周期单例（server.ts 只 new 一次），Map 每天仅增 1 key，无增长忧。
   private readonly seenDayStartedDates = new Map<string, number>();
+  // 2026-09-12 consolidate_day：当日玩家画像 LLM 刷新是否已触发（每日期一次，
+  // C# 会逐 NPC 发送 consolidate_day，画像刷新只需一次）。
+  private readonly consolidatedProfileDates = new Set<string>();
   private pendingSaves: Promise<void>[] = [];
   private readonly shoutRouter = new MorningShoutRouter();
   // Phase 2: set_goal 意图暂存（callId → 目标类型）。action_result 不带工具参数，
@@ -144,54 +151,59 @@ export class ProtocolAdapter {
   /**
    * Handle day_started (fire-and-forget) from C# DayStarted event.
    * Rolls against directorTriggerProbability (default 0.1). If triggered,
-   * calls director.morningPlan() and sends one allocate_agent message per
-   * produced beat via sendToCsharp. Returns ack — C# does not register a
-   * pending request for this type.
+   * runs DirectorAgent.runDayPlan() (tool brain: 9 director tools via
+   * director_command) and sends one allocate_agent per spawned beat so the
+   * beat NPC stays allocated for the beat window. Returns ack — C# does not
+   * register a pending request for this type.
    */
   async handleDayStarted(req: DayStartedMessage): Promise<{ type: "ack"; requestId: string }> {
     // 2026-09-11 观测补强：重复 day_started 只告警不去重（去重是行为修复，本批
-    // 仅观测——已知联机现象：情绪重置 + 导演 morningPlan 会对该日期重复执行）。
+    // 仅观测——已知联机现象：情绪重置 + 导演编排会对该日期重复执行）。
     const seen = (this.seenDayStartedDates.get(req.dateIso) ?? 0) + 1;
     this.seenDayStartedDates.set(req.dateIso, seen);
     if (seen > 1) {
-      console.warn(`[protocol] duplicate day_started date=${req.dateIso} (count=${seen}) — known multiplayer artifact: emotion reset + director morningPlan will run again for this date`);
+      console.warn(`[protocol] duplicate day_started date=${req.dateIso} (count=${seen}) — known multiplayer artifact: emotion reset + director dayPlan will run again for this date`);
     }
     // 2026-08-17 步骤 3 补全：换日重置所有 NPC 情绪回 baseline（引擎枚举 day_started
     // 事件类别、resetDay 产出 source:"day_started"，但此前从未接线——昨天的情绪
     // 会一直挂进今天的 prompt。重置与 Director 是否接线无关，放最前无条件执行）。
     this.options?.emotionEngine?.resetAll();
-    // directorContext 由 C# DirectorContextBuilder 拼装（阶段 3）；接收即记录长度，
-    // 内容消费留给工具型 Director（morningPlan 走 GameContextManager 结构化通道）。
+    // directorContext 由 C# DirectorContextBuilder 拼装：2026-09-12 起被
+    // DirectorAgent 消费（此前接收即丢弃）。
     const dctxLen = req.directorContext?.length;
     console.log(`[${timestamp()}] [recv] day_started date=${req.dateIso} directorContext=${dctxLen !== undefined ? `${dctxLen} chars` : "(none)"}`);
-    const director = this.options?.director;
+    const directorAgent = this.options?.directorAgent;
     const sendToCsharp = this.options?.sendToCsharp;
-    if (!director || !sendToCsharp) {
-      console.log(`[${timestamp()}] [director] skipped: director=${director ? "yes" : "no"} sendToCsharp=${sendToCsharp ? "yes" : "no"}`);
+    if (!directorAgent || !sendToCsharp) {
+      console.log(`[${timestamp()}] [director] skipped: directorAgent=${directorAgent ? "yes" : "no"} sendToCsharp=${sendToCsharp ? "yes" : "no"}`);
       return { type: "ack", requestId: req.requestId };
     }
     const probability = this.options?.directorTriggerProbability ?? 0.1;
     const roll = Math.random();
     if (roll >= probability) {
-      console.log(`[${timestamp()}] [director] skipped: probability=${probability} roll=${roll.toFixed(4)} (未命中，跳过 morningPlan)`);
+      console.log(`[${timestamp()}] [director] skipped: probability=${probability} roll=${roll.toFixed(4)} (未命中，跳过 dayPlan)`);
       return { type: "ack", requestId: req.requestId };
     }
-    console.log(`[${timestamp()}] [director] triggered: probability=${probability} roll=${roll.toFixed(4)} (命中，调用 morningPlan)`);
+    console.log(`[${timestamp()}] [director] triggered: probability=${probability} roll=${roll.toFixed(4)} (命中，调用 DirectorAgent.runDayPlan)`);
     try {
-      const beats = await director.morningPlan();
-      console.log(`[${timestamp()}] [director] morningPlan 返回 ${beats.length} 个 beat`);
-      for (const beat of beats) {
+      const summary = await directorAgent.runDayPlan(req.directorContext);
+      console.log(`[${timestamp()}] [director] dayPlan 完成: beats=${summary.spawnedBeats.length} commands=${summary.commandsSent} rejected=${summary.rejectedCalls.length}`);
+      // 每个 spawned beat 发 allocate_agent 保活（KeepUntil 豁免互动空闲淘汰）。
+      // keepUntilIso 必须是 ISO 8601——旧实现传 "16:00" 非 ISO，C# 解析 fail-open
+      // 等于没有豁免（2026-09-12 修复）。
+      for (const beat of summary.spawnedBeats) {
+        const keepUntilIso = new Date(Date.now() + beat.durationMinutes * 60_000).toISOString();
         const msg: AllocateAgentMessage = {
           type: "allocate_agent",
           requestId: crypto.randomUUID(),
           npcName: beat.npcName,
-          keepUntilIso: beat.windowEnd,
+          keepUntilIso,
         };
-        console.log(`[${timestamp()}] [send] allocate_agent npc=${beat.npcName} keepUntil=${beat.windowEnd} directive="${beat.directive}"`);
+        console.log(`[${timestamp()}] [send] allocate_agent npc=${beat.npcName} keepUntil=${keepUntilIso} (${beat.durationMinutes}min)`);
         sendToCsharp(msg);
       }
     } catch (err) {
-      console.error(`[${timestamp()}] [director] morningPlan 失败:`, err);
+      console.error(`[${timestamp()}] [director] dayPlan 失败:`, err);
     }
     return { type: "ack", requestId: req.requestId };
   }
@@ -199,7 +211,7 @@ export class ProtocolAdapter {
   /**
    * Handle game_context_sync (fire-and-forget) from C# GameContextSender.
    * Pushes the game-world snapshot into GameContextManager so that
-   * Director.morningPlan / milestoneReact can read real game state instead
+   * DirectorAgent.runDayPlan can read real game state instead
    * of falling into the no-game-context branch. Returns ack — C# does not
    * register a pending request for this type.
    */
@@ -215,11 +227,14 @@ export class ProtocolAdapter {
   }
 
   /**
-   * Phase 3 Director 工具调用（TS→C#）。TS 端 Director agent 的工具调用经
-   * routeMessage 进入，通过 sendToCsharp 通道转发给 C# DirectorTools.Execute
-   * （CommandExecutor 对 type=director_command 特殊路由，不走 NPC Agent switch）。
-   * sendToCsharp 未配置时丢弃并记日志（与 day_started 的 director 降级一致）。
-   * 返回 ack — C# 侧为 fire-and-forget，工具执行结果走 action_result/state_changed。
+   * Phase 3 Director 工具调用（TS→C#，orphan_route：C# 从不发送，本 case 仅为
+   * check:protocol 的路由面完整性保留——收到同名消息时原样转发 C#）。
+   * 生产路径：DirectorAgent（2026-09-12 工具大脑）→ sendToCsharp 直接下发
+   * director_command → C# DirectorTools.Execute（CommandExecutor 特殊路由，
+   * 不走 NPC Agent switch）。sendToCsharp 未配置时丢弃并记日志（降级不静默）。
+   * 返回 ack — C# 侧为 fire-and-forget，执行结果仅落 SMAPI 日志（回执
+   * action_result 的 NpcName 为空，被本端 routeToolResult 安全丢弃——见
+   * types.ts DirectorCommandMessage 的 npcName 禁填说明）。
    */
   async handleDirectorCommand(req: DirectorCommandMessage): Promise<{ type: "ack"; requestId: string }> {
     const sendToCsharp = this.options?.sendToCsharp;
@@ -483,7 +498,25 @@ export class ProtocolAdapter {
     this.seenConsolidations.add(key);
     const id = (req as { requestId?: string }).requestId ?? "unknown";
     console.log(`[${timestamp()}] [consolidate] ${req.npcName} date=${req.dateIso}${duplicate ? " (duplicate, skipped)" : ""}`);
-    // Phase 1（E1-1 TranscriptStore）将在这里接入实际的逐 Agent LLM 日结。
+    // 2026-09-12 从存根变实做（审计 M-3/M-6）：当日首次 consolidate 触发玩家画像
+    // LLM 日刷新（refreshPreferences/refreshPersonality——player-profile.ts 既有
+    // 实现此前无生产调用方）。失败静默保旧值（PlayerProfileManager 内部已吞错）。
+    // 逐 NPC 的 LLM 记忆日结仍留待后续（记忆写入已在对话路径即时持久化）。
+    if (!duplicate && !this.consolidatedProfileDates.has(req.dateIso)) {
+      this.consolidatedProfileDates.add(req.dateIso);
+      const profileMgr = this.options?.profileMgr;
+      if (profileMgr) {
+        console.log(`[${timestamp()}] [consolidate] refreshing player profile for ${req.dateIso}`);
+        void (async () => {
+          try {
+            await profileMgr.refreshPreferences();
+            await profileMgr.refreshPersonality();
+          } catch (err) {
+            console.error(`[${timestamp()}] [consolidate] profile refresh failed (kept stale):`, err);
+          }
+        })();
+      }
+    }
     return { type: "ack", requestId: id };
   }
 
@@ -601,6 +634,14 @@ export class ProtocolAdapter {
       }
       // 步骤 2：账本已播种 → 场景经济字段以账本为准（TS 自填，覆盖 C# 镜像）。
       this.applyLedgerToScene(req.npcName, scene);
+
+      // 2026-09-12 情绪引擎接线（审计 P1-1 修复）：scene.npcMood 为空（Director 未覆盖）时
+      // 用 TS 情绪引擎当前状态预填——引擎从 action_result/state_changed 事件累积的情绪
+      // 首次进入 NPC prompt（此前只进 dialogue_response.emotion，NPC 认知恒"平静"）。
+      // 覆盖权次序不变：Director set_npc_mood（snapshot）> 情绪引擎 > 默认。
+      if ((scene.npcMood === null || scene.npcMood === undefined || scene.npcMood.trim() === "") && this.options?.emotionEngine) {
+        scene.npcMood = this.options.emotionEngine.current(req.npcName).emotion;
+      }
 
       // M2a：预加载对话发起玩家的关系桶（玩家桶的后续读写全部同步依赖此步），
       // 并做快照自愈——快照好感（C# 镜像，含送礼等 TS 不知情的变动）与 TS 值差 >50

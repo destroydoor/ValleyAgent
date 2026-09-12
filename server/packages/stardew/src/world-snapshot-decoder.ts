@@ -57,6 +57,21 @@ export function decodeWorldSnapshot(snap: WorldSnapshot): SceneState {
     npcWorkingOn: snap.npcWorkingOn === undefined || snap.npcWorkingOn === null ? null : String(snap.npcWorkingOn),
     // Phase 3 L2: NPC 欠款。字段缺失/为 null → null（无欠款）。
     npcOwedMoney: snap.npcOwedMoney === undefined || snap.npcOwedMoney === null ? null : Number(snap.npcOwedMoney),
+    // Phase 3 L3: 当前活跃 beat 场景描述。字段缺失/为 null → null（无活跃 beat，
+    // prompt 整段省略）。2026-09-12 修复：C# 自 2026-08-06 起就发送该字段，但 TS
+    // 解码器没有它——L3 剧本接收即丢弃，NPC 从未见过任何 beat。
+    currentBeat: snap.currentBeat === undefined || snap.currentBeat === null || String(snap.currentBeat).trim() === ""
+      ? null
+      : String(snap.currentBeat),
+    // E3-5: NPC 当日求购单。字段缺失 → null（未知，旧客户端）；空数组 → 无求购。
+    npcPurchaseOffers: Array.isArray(snap.npcPurchaseOffers)
+      ? snap.npcPurchaseOffers.map((o) => ({
+          itemId: String(o.itemId ?? ""),
+          itemName: String(o.itemName ?? ""),
+          quantity: Number(o.quantity ?? 1),
+          unitPrice: Number(o.unitPrice ?? 0),
+        }))
+      : null,
   };
 }
 

@@ -3,7 +3,7 @@ namespace ValleyAgent.Multiplayer
     /// <summary>
     /// 联机模式工具类。提供统一的多玩家判断和消息发送接口。
     /// Phase 1: 提供守卫方法，防止 Farmhand 端崩溃。
-    /// 注意：使用 StardewModdingAPI.Context 全限定名，避免与 ValleyAgent.Context 命名空间冲突。
+    /// 注意：使用 StardewModdingAPI.Context 全限定名（旧 ValleyAgent.Context 命名空间已于 2026-09-12 删除）。
     ///
     /// 关键设计决策：
     /// - 分屏非主玩家 (IsSplitScreenFarmhand) 在主机电脑上运行，共享主机内存。

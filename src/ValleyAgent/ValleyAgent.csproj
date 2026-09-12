@@ -25,9 +25,6 @@
         <None Update="manifest.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="RAG\*.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
         <EmbeddedResource Include="i18n\*.json"/>
         <None Update="i18n\*.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

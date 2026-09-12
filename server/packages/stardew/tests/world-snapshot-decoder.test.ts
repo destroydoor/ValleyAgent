@@ -163,6 +163,31 @@ test("L2 npcRecentEvents 显式空数组解码为空数组（无近期事件 ≠
   expect(scene.npcRecentEvents).toEqual([]);
 });
 
+// === Phase 3 L3 / E3-5：currentBeat / npcPurchaseOffers（2026-09-12 接线） ===
+
+test("L3 currentBeat 缺失/空串解码为 null，非空字符串原样解码", () => {
+  const missing = decodeWorldSnapshot(validSnapshot);
+  expect(missing.currentBeat).toBeNull();
+  const empty = decodeWorldSnapshot({ ...validSnapshot, currentBeat: "" } as WorldSnapshot);
+  expect(empty.currentBeat).toBeNull();
+  const active = decodeWorldSnapshot({ ...validSnapshot, currentBeat: "她在湖边画画" } as WorldSnapshot);
+  expect(active.currentBeat).toBe("她在湖边画画");
+});
+
+test("E3-5 npcPurchaseOffers 缺失解码为 null，数组逐项解码", () => {
+  const missing = decodeWorldSnapshot(validSnapshot);
+  expect(missing.npcPurchaseOffers).toBeNull();
+  const withOffers = decodeWorldSnapshot({
+    ...validSnapshot,
+    npcPurchaseOffers: [{ itemId: "(O)388", itemName: "木材", quantity: 1, unitPrice: 12 }],
+  } as WorldSnapshot);
+  expect(withOffers.npcPurchaseOffers).toEqual([
+    { itemId: "(O)388", itemName: "木材", quantity: 1, unitPrice: 12 },
+  ]);
+  const emptyArr = decodeWorldSnapshot({ ...validSnapshot, npcPurchaseOffers: [] } as WorldSnapshot);
+  expect(emptyArr.npcPurchaseOffers).toEqual([]);
+});
+
 test("decodes snapshot with missing required fields throws", () => {
   // Use unknown cast to bypass TS check at call site
   const broken = { season: "summer" } as unknown as WorldSnapshot;

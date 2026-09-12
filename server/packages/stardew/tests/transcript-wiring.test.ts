@@ -1,4 +1,4 @@
-// E1-1 接线测试：runDialogue / runBeat 通过 TranscriptStore 落全量留痕。
+// E1-1 接线测试：runDialogue 通过 TranscriptStore 落全量留痕。
 // Run: bun test packages/stardew/tests/transcript-wiring.test.ts
 // Spec: docs/design/2026-08-01-memory-narrative-extensibility.md §1
 //
@@ -6,24 +6,20 @@
 //   1. 启用 + 临时目录：一次 runDialogue 恰好 1 行 agent_runs，终态 completed；
 //   2. 该 run 至少 1 行 agent_turns；
 //   3. 校验失败 / LLM 故障路径写 status="error"；
-//   4. getAgentRuns(npcName, gameDate?) 往返（runBeat 携带游戏日期）；
+//   4. run 行 trigger 标记正确（runBeat 已退役）；
 //   5. 禁用时零构造：无 SQLite 文件、无行。
 
 import { test, expect } from "bun:test";
 import { StardewAgentRegistry } from "../src/stardew-agent-registry";
 import { NpcPromptLoader } from "../src/npc-prompt-loader";
 import { PromptBuilder } from "../src/prompt-builder";
-import { PlayerProfileManager } from "../src/player-profile";
-import { PlayerProfileStore } from "../src/player-profile-store";
-import { ActivityLogStore } from "../src/activity-log-store";
-import { GameContextManager } from "../src/game-context";
 import { TranscriptStore } from "../src/transcript-store";
 import { VercelAIProvider } from "@valley/core";
 import { mkdtempSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { resolve } from "path";
-import type { SceneState, Beat, GameContext, PlayerProfile } from "../src/types";
+import type { SceneState } from "../src/types";
 
 const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
 
@@ -233,50 +229,24 @@ test("enabled: LLM failure writes run status error", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. getAgentRuns(npcName, gameDate) 往返 —— runBeat 携带游戏日期
+// 4. runDialogue 的 run 行 trigger 标记（runBeat 已于 2026-09-12 退役）
 // ---------------------------------------------------------------------------
 
-test("enabled: runBeat writes run with gameDate and getAgentRuns(npcName, gameDate) round-trips", async () => {
+test("enabled: runDialogue rows carry trigger=\"dialogue\"", async () => {
   const stack = makeEnabledStack(async () => ({
     content: "（思考中）",
     toolCalls: [
-      { id: "tc-1", name: "speak", args: { text: "嘿，听说你最近在酿酒？我能看看吗？" } },
-      { id: "tc-2", name: "emote", args: { emote_id: "happy" } },
+      { id: "tc-1", name: "speak", args: { text: "你好。" } },
     ],
   }));
   try {
     const agent = stack.registry.getOrCreate("Abigail");
-    const profileStore = new PlayerProfileStore(join(stack.dir, "profiles.db"));
-    const activityStore = new ActivityLogStore(join(stack.dir, "activity.db"));
-    profileStore.init();
-    activityStore.init();
-    const profileMgr = new PlayerProfileManager(profileStore, activityStore, {
-      callLlm: async () => ({ text: "", usage: { promptTokens: 0, completionTokens: 0 } }),
-    });
-    profileMgr.initProfile(makePlayerProfile().static);
-    const gameCtxMgr = new GameContextManager();
-    gameCtxMgr.update(makeGameContext());
-
-    const result = await agent.runBeat(makeBeat(), makeGameContext(), profileMgr, gameCtxMgr);
-    expect(result.speech).toContain("酿酒");
-
-    profileStore.close();
-    activityStore.close();
-
-    const store = stack.openReadStore();
+    await agent.runDialogue("你好", scene);
+    const store = new TranscriptStore(join(stack.dir, "transcript.sqlite"));
     try {
-      // 无日期过滤也能查到。
-      const all = store.getAgentRuns("Abigail");
-      expect(all).toHaveLength(1);
-      expect(all[0]!.trigger).toBe("beat");
-      expect(all[0]!.gameDate).toBe("2026-07-21");
-      // 按 (npcName, gameDate) 过滤往返。
-      const filtered = store.getAgentRuns("Abigail", "2026-07-21");
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0]!.runId).toBe(all[0]!.runId);
-      expect(filtered[0]!.status).toBe("completed");
-      expect(filtered[0]!.finalSpeech).toBe(result.speech);
-      expect(filtered[0]!.userInput).toContain("导演指令");
+      const runs = store.getAgentRuns("Abigail");
+      expect(runs.length).toBeGreaterThan(0);
+      expect(runs[0]!.trigger).toBe("dialogue");
     } finally {
       store.close();
     }
@@ -321,118 +291,3 @@ test("disabled: no transcript file created and no rows written", async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// runBeat 测试夹具（与 stardew-agent-beat.test.ts 同源）
-// ---------------------------------------------------------------------------
-
-function makeGameContext(): GameContext {
-  return {
-    time: {
-      year: 2,
-      season: "summer",
-      day: 14,
-      dayOfWeek: "Tuesday",
-      weather: "sunny",
-      isFestivalDay: false,
-    },
-    progress: {
-      communityCenterComplete: false,
-      communityCenterBundlesDone: ["Pantry"],
-      jojaMartRoute: false,
-      islandsUnlocked: [],
-      desertUnlocked: true,
-      railroadUnlocked: false,
-      sewersUnlocked: false,
-      greenhouseRestored: true,
-    },
-    seasonalResources: {
-      plantableCrops: ["Corn"],
-      catchableFish: ["Rainbow Trout"],
-      forageItems: ["Spice Berry"],
-      activeFestivals: [],
-    },
-    npcStates: [
-      {
-        name: "Abigail",
-        location: "Town",
-        tile: { x: 30, y: 20 },
-        isAvailable: true,
-        currentState: "IDLE",
-        friendshipPoints: 500,
-      },
-    ],
-    playerState: {
-      location: "Farm",
-      tile: { x: 32, y: 18 },
-      health: 95,
-      maxHealth: 100,
-      energy: 200,
-      maxEnergy: 270,
-      money: 8500,
-      inventory: [{ name: "Corn", quantity: 12 }],
-    },
-    lastUpdated: "2026-07-21T06:00:00Z",
-  };
-}
-
-function makePlayerProfile(): PlayerProfile {
-  return {
-    static: {
-      farmerName: "Alice",
-      gender: "female",
-      farmName: "Riverland",
-      farmType: "Riverland",
-      startDate: "2026-06-01",
-      lastUpdated: "2026-07-21",
-    },
-    behavior: {
-      dailyActivities: [],
-      totalStats: {
-        fishCaught: 47,
-        itemsShipped: 25,
-        monstersKilled: 3,
-        cropsHarvested: 80,
-        itemsForaged: 15,
-        giftsGiven: 8,
-        dialoguesHad: 32,
-        miningLevelsDescended: 5,
-      },
-    },
-    preferences: {
-      playStyle: [{ tag: "brewer", confidence: 0.8, evidence: "12 个酒桶" }],
-      topActivities: [],
-      topLocations: [],
-      routinePattern: "早晨种地下午钓鱼",
-      lastUpdated: "2026-07-21",
-    },
-    relationships: {},
-    personality: {
-      traits: ["内向"],
-      archetype: "独行者",
-      narrativeRole: "不情愿的农场主",
-      lastUpdated: "2026-07-21",
-    },
-    story: {
-      completedBeats: [],
-      recurringTropes: [],
-      lastUpdated: "2026-07-21",
-    },
-  };
-}
-
-function makeBeat(): Beat {
-  return {
-    id: "beat-transcript-test-1",
-    npcName: "Abigail",
-    triggerTime: "14:00",
-    windowEnd: "16:00",
-    directive: "去农场看看玩家，对她的酿酒事业表达好奇",
-    context: {
-      reasonGenerated: "玩家是酿酒流，Abigail 对农场生活感兴趣",
-      playerProfileSnapshot: makePlayerProfile(),
-      gameContextSnapshot: makeGameContext(),
-      recentBeats: [],
-    },
-    status: "active",
-  };
-}

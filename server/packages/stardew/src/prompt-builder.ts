@@ -2,7 +2,6 @@ import type { AgentMemory } from "./agent-memory";
 import type { SceneState } from "./types";
 import type { NpcPromptLoader } from "./npc-prompt-loader";
 import { timeToPeriod, coarsenLocation, summarizeNearby } from "./world-snapshot-decoder";
-import type { Beat } from "./types";
 
 // 段序按变动频率从低到高排列（静态在前、动态在后），以维持前缀缓存高命中率。
 // 防回归断言见 tests/prompt-builder.test.ts 的段序单调递增测试。
@@ -12,8 +11,7 @@ export const DIALOGUE_SYSTEM_TEMPLATE = `## 你的状态
 心情：{mood_tag}
 近期事件：{recent_events}
 正在做：{working_on}
-欠款：{owed_money}
-当前目标：{current_goal_desc}
+{owed_money_line}当前目标：{current_goal_desc}
 
 规则：
 - 回复简短，1-2句话，像游戏NPC对白
@@ -45,7 +43,7 @@ export const DIALOGUE_SYSTEM_TEMPLATE = `## 你的状态
 ─── 我永远不会忘记的事 ───
 {significant_memories}
 
-{actual_state_section}最近记忆：
+{beat_section}{actual_state_section}最近记忆：
 {recent_memory}
 
 ─── 最近对话 ───
@@ -60,7 +58,15 @@ export const DIALOGUE_SYSTEM_TEMPLATE = `## 你的状态
 你称呼{farmer_nickname}为：{farmer_nickname}
 {farmer_nickname}钱包：{player_money_desc}
 {farmer_nickname}手持：{playerHeldItem_desc}
-{tool_results_section}`;
+{purchase_offers_line}{tool_results_section}`;
+
+// Phase 3 L3 临时剧本段（2026-09-12 接线）：当前活跃 beat 的第三人称场景描述。
+// beat 有效期内注入（C# BeatStore → worldSnapshot.currentBeat → decoder）；
+// 无 beat 时整段省略。措辞绝不提"导演"——NPC 不知道导演存在（职责隔离 P0）。
+const BEAT_SECTION_TEMPLATE = `─── 眼下正发生的事 ───
+{beat_scene}
+
+`;
 
 // 真实状态镜像段（中频，状态变化才变）。由 state_changed 消息驱动，
 // actualState 为空时整段省略，避免向 LLM 呈现空头标题。
@@ -73,57 +79,6 @@ const TOOL_RESULTS_SECTION = `─── 上次行动结果 ───
 {tool_results}
 
 `;
-
-// Beat system prompt template (Task 9). Used by StardewAgent.runBeat to
-// drive NPC ReAct execution of a Director-issued beat directive.
-// 段序按变动频率从低到高排列：静态段（接管说明/行动规则/记忆规则）前置，
-// 动态段（最近对话/当前场景）后置，维持前缀缓存命中率。
-export const BEAT_SYSTEM_TEMPLATE = `你现在被叙事导演临时接管，按照导演的高层指令行动，给玩家带来有意义的互动。
-
-─── 行动规则 ───
-- 用 speak 工具对玩家说话，1-2 句简短对白，像游戏 NPC
-- 完全代入角色，不做旁白式描述，绝不提及 AI 或游戏
-- 至少调用一个 speak 工具和一个其他工具（如 set_state / emote / give_item / move_to）
-- 只嘴上说话却不行动是不允许的——既然导演派你来，你就要做点什么
-- 重要事件用 remember 工具记录（第一人称，永不遗忘）
-- 如果觉得指令不合适（不符合角色性格），可以拒绝行动但要说出来（用 speak 解释）
-
-─── 重要事项记忆规则 ───
-如果发生了以下类型的事件，你必须用 remember 工具记录（第一人称，永不遗忘）：
-- 关系里程碑：第一次对话、成为朋友、开始约会、结婚、生子
-- 重大事件：一起战斗、一起冒险、收到特别重要的礼物、生死时刻
-- 情感转折：从讨厌到喜欢、从陌生到信任、重要的承诺或约定
-- 创伤经历：被怪物击败、失去重要的人、极度恐惧的时刻
-记录格式：第一人称短句，如"我和{farmer_nickname}第一次一起战斗了"、"他送了我最爱的向日葵"
-
-─── 我是谁 ───
-{phase_prompt}
-
-─── 我永远不会忘记的事 ───
-{significant_memories}
-
-─── 玩家画像摘要 ───
-{player_profile_summary}
-
-─── 游戏世界摘要 ───
-{game_context_summary}
-
-─── 导演指令 ───
-{beat_directive}
-
-导演意图：{beat_reason}
-
-最近记忆：
-{recent_memory}
-
-─── 最近对话 ───
-{conversation_history}
-
-─── 当前场景 ───
-当前：{season} · {time_period} · {weather} · {location_area}
-附近：{nearby_summary}
-你的状态：{npc_state}
-你称呼{farmer_nickname}为：{farmer_nickname}`;
 
 export class PromptBuilder {
   constructor(private readonly loader: NpcPromptLoader) {}
@@ -215,10 +170,21 @@ export class PromptBuilder {
       ? "无"
       : scene.npcWorkingOn;
 
-    // Phase 3 L2: 欠款。null=无欠款 → "无"；有值 → "Ng"。
-    const owedMoney = scene.npcOwedMoney === null || scene.npcOwedMoney === undefined
-      ? "无"
-      : `${scene.npcOwedMoney}g`;
+    // Phase 3 L2: 欠款。null/0=无欠款 → 整行省略（常态噪音，2026-09-12 起条件渲染）；
+    // 有值 → "欠款：Ng"。
+    const owedMoneyLine = scene.npcOwedMoney !== null && scene.npcOwedMoney !== undefined && scene.npcOwedMoney > 0
+      ? `欠款：${scene.npcOwedMoney}g\n`
+      : "";
+
+    // Phase 3 L3: 当前活跃 beat 场景（第三人称）。无 beat 时整段省略（防空头标题）。
+    const beatSection = scene.currentBeat !== null && scene.currentBeat !== undefined
+      ? BEAT_SECTION_TEMPLATE.replace("{beat_scene}", scene.currentBeat)
+      : "";
+
+    // E3-5: NPC 当日求购单（价格锚）。null=未知（旧客户端）/空数组=无求购 → 整行省略。
+    const purchaseOffersLine = scene.npcPurchaseOffers !== null && scene.npcPurchaseOffers !== undefined && scene.npcPurchaseOffers.length > 0
+      ? `你想收购：${scene.npcPurchaseOffers.map((o) => `${o.itemName}×${o.quantity}（出价 ${o.unitPrice}g/个）`).join("、")}——玩家手持该物品时可以主动提收购\n`
+      : "";
 
     // Tool-results section is optional: only included when there is feedback text.
     // When empty, the entire section (title + body) is removed so the prompt stays clean.
@@ -229,6 +195,7 @@ export class PromptBuilder {
     return DIALOGUE_SYSTEM_TEMPLATE
       .replace("{phase_prompt}", fullPhasePrompt)
       .replace("{significant_memories}", significantMemories)
+      .replace("{beat_section}", beatSection)
       .replace("{actual_state_section}", actualStateSection)
       .replace("{recent_memory}", recentMemory)
       .replace("{conversation_history}", conversationHistory)
@@ -243,73 +210,13 @@ export class PromptBuilder {
       .replace("{npc_money_desc}", npcMoneyDesc)
       .replace("{npc_inventory_summary}", npcInventorySummary)
       .replace("{playerHeldItem_desc}", playerHeldItemDesc)
+      .replace("{purchase_offers_line}", purchaseOffersLine)
       .replace("{current_goal_desc}", currentGoalDesc)
       .replace("{mood_tag}", moodTag)
       .replace("{recent_events}", recentEvents)
       .replace("{working_on}", workingOn)
-      .replace("{owed_money}", owedMoney)
+      .replace("{owed_money_line}", owedMoneyLine)
       .replace("{tool_results_section}", toolResultsSection);
   }
-
-  /**
-   * Build the system prompt for beat execution (Task 9).
-   *
-   * Injects the Director's high-level directive, the player profile summary,
-   * and the game context summary into the NPC's persona prompt. The NPC is
-   * expected to act autonomously — call speak + at least one other tool —
-   * to deliver the beat to the player.
-   *
-   * Falls back to the beat.directive as the entire prompt when the player
-   * profile / game context summaries are empty (e.g., early-game).
-   */
-  buildBeatSystemPrompt(
-    memory: AgentMemory,
-    scene: SceneState,
-    npcName: string,
-    beat: Beat,
-    playerProfileSummary: string,
-    gameContextSummary: string,
-    playerId?: string,
-    playerName?: string,
-  ): string {
-    const npcData = this.loader.getNpcData(npcName);
-    // M2a：好感度/记忆按对话发起玩家取（与 buildDialogueSystemPrompt 同口径）。
-    const friendship = playerId ? memory.getFriendship(playerId) : scene.friendship;
-    const phasePrompt = this.loader.getPhasePrompt(npcName, friendship);
-    const attitudeBrief = this.loader.getAttitudeBrief(friendship, playerName);
-
-    const baseMemory = npcData?.base_memory ?? `你是 ${npcName}，一个星露谷的居民。`;
-
-    const fullPhasePrompt = [
-      `你是${npcName}。${attitudeBrief}`,
-      baseMemory,
-      phasePrompt,
-    ].join("\n\n");
-
-    const significantMemories = memory.getSignificantMemoriesText(playerId);
-    const conversationHistory = memory.getConversationContext(8, playerId) || "（今天还没说过话）";
-    const recentMemory = memory.getRecentMemories(5, playerId);
-    const timePeriod = timeToPeriod(scene.timeStr);
-    // E0-6: 位置锚定用 NPC 自己所在地图（防"刚从矿洞出来"式幻觉）；
-    // 旧客户端不携带 npcLocation 时回退玩家地图 scene.location。
-    const locationArea = coarsenLocation(scene.npcLocation ?? scene.location);
-    const nearbySummary = summarizeNearby(scene.nearbyObjects);
-
-    return BEAT_SYSTEM_TEMPLATE
-      .replace("{phase_prompt}", fullPhasePrompt)
-      .replace("{significant_memories}", significantMemories)
-      .replace("{player_profile_summary}", playerProfileSummary || "(无玩家档案)")
-      .replace("{game_context_summary}", gameContextSummary || "(无游戏上下文)")
-      .replace("{beat_directive}", beat.directive)
-      .replace("{beat_reason}", beat.context.reasonGenerated)
-      .replace("{recent_memory}", recentMemory)
-      .replace("{conversation_history}", conversationHistory)
-      .replace("{season}", scene.season)
-      .replace("{time_period}", timePeriod)
-      .replace("{weather}", scene.weather)
-      .replace("{location_area}", locationArea)
-      .replace("{nearby_summary}", nearbySummary)
-      .replace("{npc_state}", scene.npcState ?? "IDLE")
-      .replace(/{farmer_nickname}/g, scene.farmerName);
-  }
 }
+

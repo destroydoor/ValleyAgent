@@ -201,6 +201,9 @@ public class GoalExecutor
         agent.Brain.PendingGoal = goal;
         goal.Start(agent, npc);
         agent.StateMachine.ForceTransition(AgentState.EXECUTING_GOAL, true, fromDecision: true, reason: "set_goal");
+        // 2026-09-12 L2 接线（审计 P0-3）：执行态期间写入 WorkingOn——对话 prompt
+        // 「正在做」从恒"无"变为真实目标描述（worldSnapshot.npcWorkingOn）。
+        agent.Brain.WorkingOn = $"{GoalTypeLabel(type.Value)}（进行中）";
         _monitor.Log(
             $"[Goal] {agent.NpcName}: set_goal({GoalBase.GoalTypeToWire(type.Value)}, qty={quantity}, reportBack={reportBack})",
             LogLevel.Info);
@@ -256,17 +259,25 @@ public class GoalExecutor
             case ExecutingOutcome.FinalizeSuccess:
                 SendGoalResult(goal, success: true);
                 agent.Brain.PendingGoal = null;
+                // 2026-09-12 L2 接线（审计 P0-3）：目标终结 → 清 WorkingOn + 写当日事件。
+                agent.Brain.WorkingOn = null;
+                agent.Brain.AddTodayEvent($"完成了{GoalTypeLabel(goal.Type)}：{goal.DescribeProgress()}", GameDateIso());
                 ForceIdle(agent, "goal_complete");
                 break;
 
             case ExecutingOutcome.FinalizeFailure:
                 SendGoalResult(goal, success: false);
                 agent.Brain.PendingGoal = null;
+                // 2026-09-12 L2 接线：失败同样落一条事件（对话「最近的事」有据可查）。
+                agent.Brain.WorkingOn = null;
+                agent.Brain.AddTodayEvent($"尝试{GoalTypeLabel(goal.Type)}但未完成：{goal.Reason}", GameDateIso());
                 ForceIdle(agent, "goal_failed");
                 break;
 
             case ExecutingOutcome.FinalizeCancel:
                 agent.Brain.PendingGoal = null;
+                // 取消是静默路径：只清状态，不落事件（与 CancelGoal 语义一致）。
+                agent.Brain.WorkingOn = null;
                 ForceIdle(agent, "goal_cancelled");
                 break;
         }
@@ -319,6 +330,8 @@ public class GoalExecutor
     private void BeginReportTravel(AgentInstance agent, NPC npc, IGoal goal)
     {
         _reportStartMinutes[agent.NpcName] = GoalTime.TimeOfDayToMinutes(Game1.timeOfDay);
+        // 2026-09-12 L2 接线：汇报寻路阶段的工作标记（目标本体已完成）。
+        agent.Brain.WorkingOn = "正在去找农场主汇报";
 
         if (npc.currentLocation == Game1.player.currentLocation)
         {
@@ -379,6 +392,9 @@ public class GoalExecutor
     {
         _movementService.Stop(npc, reason);
         agent.Brain.PendingGoal = null;
+        // 汇报道路完成 → 清「正在去找农场主汇报」标记（汇报事件已在 goal_complete
+        // 分支随 FinalizeSuccess 记录；此处到达路径 goal 已成功发结果，不再重复记）。
+        agent.Brain.WorkingOn = null;
         _ = _reportStartMinutes.Remove(agent.NpcName);
         ForceIdle(agent, reason);
     }
@@ -446,5 +462,26 @@ public class GoalExecutor
         _mineHandler?.ClearForcedTarget(npcName);
         _fightHandler?.ClearForcedTarget(npcName);
         _forageHandler?.ClearForcedTarget(npcName);
+    }
+
+    /// <summary>
+    ///     2026-09-12 L2 接线：GoalType → 中文标签（npcWorkingOn / TodayEvents 用）。
+    /// </summary>
+    private static string GoalTypeLabel(GoalType type) => type switch
+    {
+        GoalType.ChopTree => "伐木",
+        GoalType.Mine => "采矿",
+        GoalType.WaterCrops => "浇灌农田",
+        GoalType.Fight => "战斗",
+        GoalType.Forage => "采集",
+        _ => type.ToString().ToLowerInvariant(),
+    };
+
+    /// <summary>
+    ///     2026-09-12 L2 接线：当前游戏日期 ISO（与 TS GetGameDateIso 同格式 "Y{year}_{season}_{day}"）。
+    /// </summary>
+    private static string GameDateIso()
+    {
+        return $"Y{Game1.year}_{Game1.currentSeason}_{Game1.dayOfMonth}";
     }
 }

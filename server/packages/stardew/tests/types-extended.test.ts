@@ -19,14 +19,7 @@ import type {
   NpcStateSnapshot,
   InventorySlot,
   GameContext,
-  ActivityReportMessage,
-  ActivityMilestoneMessage,
   GameContextSyncMessage,
-  BeatDirectiveMessage,
-  BeatActivateMessage,
-  BeatEventMessage,
-  BeatStateMessage,
-  PlayerStateUpdateMessage,
 } from "../src/types";
 
 // Helper for compile-time type checks.
@@ -258,73 +251,12 @@ test("NpcStateSnapshot + InventorySlot + GameContext compile", () => {
   expect(ctx.time.season).toBe("summer");
 });
 
-test("8 message types compile", () => {
-  const activityReport: ActivityReportMessage = {
-    type: "activity_report",
-    requestId: "r1",
-    dailyActivity: null as unknown as DailyActivity,
-    farmSnapshot: [],
-  };
-  const milestone: ActivityMilestoneMessage = {
-    type: "activity_milestone",
-    requestId: "r2",
-    milestone: {
-      type: "FishingStreak",
-      description: "玩家连续第3天去海边钓鱼",
-      detectedAt: "2026-07-21T15:00:00Z",
-    },
-  };
+test("GameContextSyncMessage compiles (dead wire types removed 2026-09-12)", () => {
   const ctxSync: GameContextSyncMessage = {
     type: "game_context_sync",
     requestId: "r3",
     context: null as unknown as GameContext,
   };
-  const beatDirective: BeatDirectiveMessage = {
-    type: "beat_directive",
-    requestId: "r4",
-    beat: null as unknown as Beat,
-  };
-  const beatActivate: BeatActivateMessage = {
-    type: "beat_activate",
-    requestId: "r5",
-    beatId: "beat-001",
-    npcName: "Willy",
-  };
-  const beatEvent: BeatEventMessage = {
-    type: "beat_event",
-    requestId: "r6",
-    beatId: "beat-001",
-    eventType: "tool_result",
-    payload: { tool: "move_to", success: true },
-  };
-  const beatState: BeatStateMessage = {
-    type: "beat_state",
-    requestId: "r7",
-    beatId: "beat-001",
-    status: "completed",
-    toolCall: { tool: "speak", args: { text: "你好" } },
-  };
-  const playerState: PlayerStateUpdateMessage = {
-    type: "player_state_update",
-    requestId: "r8",
-    playerState: {
-      location: "Farm",
-      tile: { x: 32, y: 18 },
-      health: 95,
-      maxHealth: 100,
-      energy: 270,
-      maxEnergy: 300,
-      money: 8500,
-      inventory: [],
-    },
-  };
-  expectType<ActivityReportMessage>(activityReport);
-  expectType<ActivityMilestoneMessage>(milestone);
   expectType<GameContextSyncMessage>(ctxSync);
-  expectType<BeatDirectiveMessage>(beatDirective);
-  expectType<BeatActivateMessage>(beatActivate);
-  expectType<BeatEventMessage>(beatEvent);
-  expectType<BeatStateMessage>(beatState);
-  expectType<PlayerStateUpdateMessage>(playerState);
-  expect([activityReport, milestone, ctxSync, beatDirective, beatActivate, beatEvent, beatState, playerState]).toHaveLength(8);
+  expect(ctxSync.type).toBe("game_context_sync");
 });

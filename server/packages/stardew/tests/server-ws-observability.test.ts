@@ -9,7 +9,7 @@
 //   3. sendToCsharp：无活跃连接时主动消息不再静默丢弃 → dropped 告警（只带 type）。
 //
 // 场景编排：A 连接 → B 连接（顶替 A，REPLACING 告警）→ B 断开（was active，
-// activeWs=null）→ A（stale 但仍开着）发 day_started(prob=1) → morningPlan 产出
+// activeWs=null）→ A（stale 但仍开着）发 day_started(prob=1) → DirectorAgent 产出
 // allocate_agent 经 sendToCsharp 投递 → 无活跃连接 → dropped 告警；ack 仍经
 // 请求级 ws 正常回到 A。
 
@@ -21,11 +21,20 @@ import { tmpdir } from "node:os";
 
 const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
 
-const BEATS_JSON = JSON.stringify([
-  { npcName: "Willy", triggerTime: "10:00", windowEnd: "12:00", directive: "邀请玩家去海边钓鱼", reasonGenerated: "玩家最近常钓鱼" },
-]);
+// DirectorAgent（2026-09-12 工具大脑）：第 1 轮返回 spawn_beat 工具调用，
+// 第 2 轮纯文本收尾。
+let llmTurn = 0;
+const toolCallReply = () =>
+  llmTurn++ === 0
+    ? {
+        content: "（编排中）",
+        toolCalls: [
+          { id: "tc-1", name: "spawn_beat", args: { npc: "Willy", sceneDesc: "他在码头修补渔网", durationMinutes: 120 } },
+        ],
+      }
+    : { content: "今天的编排完成了。", toolCalls: [] };
 
-// morningPlan 无 game context 时直接返回空（"no game context" 分支），
+// DirectorAgent 无 game context 时直接返回空（"no game context" 分支），
 // 发不出 allocate_agent —— 必须先发 game_context_sync（与 e2e 测试一致）。
 function makeContext() {
   return {
@@ -84,7 +93,7 @@ test(
         model: "fake",
         baseUrl: "http://localhost:9999",
       },
-      llmCallOverride: async () => ({ content: BEATS_JSON, toolCalls: [] }),
+      llmCallOverride: async () => toolCallReply(),
       directorTriggerProbability: 1.0,
     });
 
@@ -115,10 +124,10 @@ test(
       await Bun.sleep(100);
       expect(logs().some((s) => s.includes("[server] websocket closed:") && s.includes("(was active connection)"))).toBe(true);
 
-      // --- A（stale 但仍开着）先发 game_context_sync（否则 morningPlan 走
+      // --- A（stale 但仍开着）先发 game_context_sync（否则 DirectorAgent 走
       //     no-game-context 空分支，产不出 allocate_agent），再发 day_started(prob=1)
-      //     → allocate_agent 经 sendToCsharp 投递时无活跃连接 → dropped 告警
-      //     （只带 type）；ack 仍经请求级 ws 回到 A ---
+      //     → director_command/allocate_agent 经 sendToCsharp 投递时无活跃连接
+      //     → dropped 告警（只带 type）；ack 仍经请求级 ws 回到 A ---
       a.send(JSON.stringify({ type: "game_context_sync", requestId: "ws-obs-ctx", context: makeContext() }));
       await Bun.sleep(200);
       a.send(JSON.stringify({ type: "day_started", requestId: "ws-obs-day", dateIso: "Y2_summer_14" }));
@@ -127,11 +136,11 @@ test(
         if (warns().some((s) => s.includes("[sendToCsharp] dropped message") && s.includes("type=allocate_agent"))) break;
         await Bun.sleep(100);
       }
-      const dropped = warns().find((s) => s.includes("[sendToCsharp] dropped message"));
+      // director_command 会先于 allocate_agent 被 dropped——按 type 精确找后者。
+      const dropped = warns().find((s) => s.includes("[sendToCsharp] dropped message") && s.includes("type=allocate_agent"));
       expect(dropped).toBeDefined();
-      expect(dropped).toContain("type=allocate_agent");
       // 只打 type，不打消息全文（大消息防刷爆）
-      expect(dropped).not.toContain("directive");
+      expect(dropped).not.toContain("sceneDesc");
 
       await closeWs(a);
       await handle.stop();

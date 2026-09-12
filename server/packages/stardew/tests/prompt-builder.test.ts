@@ -272,15 +272,14 @@ test("L2 状态段位于 prompt 最前（规则段之前），含 4 个字段标
   // 「## 你的状态」是第一个段：位于 规则 之前
   expect(prompt.indexOf("## 你的状态")).toBeGreaterThan(-1);
   expect(prompt.indexOf("## 你的状态")).toBeLessThan(prompt.indexOf("规则："));
-  // 4 个字段标题都在段内
+  // 字段标题都在段内（欠款 2026-09-12 起条件渲染，无欠款不输出该行）
   expect(prompt).toContain("心情：");
   expect(prompt).toContain("近期事件：");
   expect(prompt).toContain("正在做：");
-  expect(prompt).toContain("欠款：");
   expect(prompt).toContain("当前目标：");
 });
 
-test("L2 状态段：字段缺失（null）时显示默认值 平静/无/无/无", () => {
+test("L2 状态段：字段缺失（null）时显示默认值 平静/无/无，欠款行整体省略", () => {
   const loader = new NpcPromptLoader(DATA_PATH);
   const builder = new PromptBuilder(loader);
   const memory = new AgentMemory("Abigail", "/tmp/x");
@@ -290,7 +289,8 @@ test("L2 状态段：字段缺失（null）时显示默认值 平静/无/无/无
   expect(prompt).toContain("心情：平静");
   expect(prompt).toContain("近期事件：无");
   expect(prompt).toContain("正在做：无");
-  expect(prompt).toContain("欠款：无");
+  // 欠款 null/0 = 无欠款 → 整行省略（2026-09-12 起不再渲染"欠款：无"噪音）
+  expect(prompt).not.toContain("欠款：");
 });
 
 test("L2 状态段：注入心情/事件/工作标记/欠款", () => {
@@ -319,4 +319,62 @@ test("L2 状态段：近期事件空数组显示无（不是空串）", () => {
   const memory = new AgentMemory("Abigail", "/tmp/x");
   const prompt = builder.buildDialogueSystemPrompt(memory, makeScene({ npcRecentEvents: [] }), "Abigail");
   expect(prompt).toContain("近期事件：无");
+});
+
+// === Phase 3 L3：当前 beat 场景段（2026-09-12 接线） ===
+
+test("L3 beat 段：currentBeat 非空时注入「眼下正发生的事」（第三人称，无导演字样）", () => {
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const memory = new AgentMemory("Abigail", "/tmp/x");
+  const prompt = builder.buildDialogueSystemPrompt(
+    memory,
+    makeScene({ currentBeat: "她在湖边画画，颜料快用完了" }),
+    "Abigail",
+  );
+  expect(prompt).toContain("─── 眼下正发生的事 ───");
+  expect(prompt).toContain("她在湖边画画，颜料快用完了");
+  // 职责隔离 P0：NPC 上下文绝不出现导演概念
+  expect(prompt).not.toContain("导演");
+  // 段序：beat 段在「我永远不会忘记的事」之后、「最近记忆」之前
+  expect(prompt.indexOf("眼下正发生的事")).toBeGreaterThan(prompt.indexOf("我永远不会忘记的事"));
+  expect(prompt.indexOf("眼下正发生的事")).toBeLessThan(prompt.indexOf("最近记忆"));
+  // 无残留占位符
+  expect(prompt).not.toMatch(/\{[a-z_]+\}/);
+});
+
+test("L3 beat 段：currentBeat 为 null 时整段省略（无空头标题）", () => {
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const memory = new AgentMemory("Abigail", "/tmp/x");
+  const prompt = builder.buildDialogueSystemPrompt(memory, makeScene({ currentBeat: null }), "Abigail");
+  expect(prompt).not.toContain("眼下正发生的事");
+  expect(prompt).not.toMatch(/\{[a-z_]+\}/);
+});
+
+// === E3-5：求购单价格锚（2026-09-12 接线） ===
+
+test("求购段：有求购单时注入「你想收购」行（含单价）", () => {
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const memory = new AgentMemory("Abigail", "/tmp/x");
+  const prompt = builder.buildDialogueSystemPrompt(
+    memory,
+    makeScene({
+      npcPurchaseOffers: [{ itemId: "(O)388", itemName: "木材", quantity: 1, unitPrice: 12 }],
+    }),
+    "Abigail",
+  );
+  expect(prompt).toContain("你想收购：木材×1（出价 12g/个）");
+  expect(prompt).not.toMatch(/\{[a-z_]+\}/);
+});
+
+test("求购段：无求购（空数组/null）时整行省略", () => {
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const memory = new AgentMemory("Abigail", "/tmp/x");
+  const promptNull = builder.buildDialogueSystemPrompt(memory, makeScene({ npcPurchaseOffers: null }), "Abigail");
+  expect(promptNull).not.toContain("你想收购：");
+  const promptEmpty = builder.buildDialogueSystemPrompt(memory, makeScene({ npcPurchaseOffers: [] }), "Abigail");
+  expect(promptEmpty).not.toContain("你想收购：");
 });

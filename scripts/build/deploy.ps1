@@ -1,16 +1,29 @@
 ﻿# Deploy ValleyAgent to Stardew Valley Mods folder
+# 2026-09-12 D7 门禁修缮：GamePath / ValleyAIDir 参数化（原先硬编码 D:\Source\... 盘符路径）。
+#   -GamePath     游戏根目录（含 StardewModdingAPI.exe），默认取 $env:VALLEY_GAME_PATH，
+#                 未设置时回落旧默认 D:\Source\ValleyTalk\Stardew Valley。
+#   -ValleyAIDir  TS server 仓根（含 packages/stardew），默认 $env:VALLEY_AI_ROOT，
+#                 未设置时回落本仓库的 server/（合并仓布局）。
+#   -StartGame    部署后启动游戏（默认不启动）。
 param(
     [switch]$SkipBuild,
     [switch]$IncludeTests,
+    [switch]$StartGame,
     [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Debug"
+    [string]$Configuration = "Debug",
+    [string]$GamePath = "",
+    [string]$ValleyAIDir = ""
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$GamePath = "D:\Source\ValleyTalk\Stardew Valley"
+if ([string]::IsNullOrWhiteSpace($GamePath)) {
+    $GamePath = if ($env:VALLEY_GAME_PATH) { $env:VALLEY_GAME_PATH } else { "D:\Source\ValleyTalk\Stardew Valley" }
+}
+if ([string]::IsNullOrWhiteSpace($ValleyAIDir)) {
+    $ValleyAIDir = if ($env:VALLEY_AI_ROOT) { $env:VALLEY_AI_ROOT } else { Join-Path $RepoRoot "server" }
+}
 $ModsDir  = Join-Path $GamePath "Mods"
-$ValleyAIDir = "D:\Source\ValleyAI"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $logFile = Join-Path $RepoRoot "scripts\results\deploy-$timestamp.txt"
 
@@ -117,13 +130,13 @@ if (Test-Path $I18nSrc) {
     Write-Log "Copied i18n/" "Info"
 }
 
-# Step 4: Copy RAG folder
-$RagSrc = Join-Path $BuildDir "RAG"
+# Step 4: RAG 数据目录已随 RAGKnowledgeBase 删除（2026-09-12 死代码清除）——
+# 转为清理旧部署残留的 RAG/ 目录。
 $RagDst = Join-Path $TargetModDir "RAG"
-if (Test-Path $RagSrc) {
-    if (-not (Test-Path $RagDst)) { New-Item -ItemType Directory -Path $RagDst -Force | Out-Null }
-    Copy-Item "$RagSrc\*" $RagDst -Force -Recurse
-    Write-Log "Copied RAG/" "Info"
+if (Test-Path $RagDst) {
+    Write-Log "Removing obsolete RAG/ (RAGKnowledgeBase deleted 2026-09-12)..." "Warn"
+    Remove-Item $RagDst -Recurse -Force
+    Write-Log "Removed RAG/" "Success"
 }
 
 # Step 4.5: Copy Data/ (npc_economy.json) and npc-configs/ (Phase 3 人设配置) — 此前一直漏拷
@@ -155,7 +168,7 @@ if (Test-Path $ValleyAIExeSrc) {
     Write-Log "Copied valley-ai-server.exe (${sizeMB} MB)" "Success"
 } else {
     Write-Log "ERROR: valley-ai-server.exe not found at $ValleyAIExeSrc" "Error"
-    Write-Log "       Run bun build --compile in D:\Source\ValleyAI\packages\stardew first." "Error"
+    Write-Log "       Run bun build --compile in $ValleyAIDir\packages\stardew first." "Error"
     exit 1
 }
 

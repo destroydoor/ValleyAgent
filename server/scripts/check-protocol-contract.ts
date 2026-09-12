@@ -24,8 +24,13 @@ import { join, resolve } from "node:path";
 // 常量
 // ============================================================================
 
-const REPO_ROOT = resolve(process.env["VALLEYAI_ROOT"] ?? "D:\\Source\\ValleyAI");
-const CSHARP_ROOT = resolve(process.env["VALLEYTALK_SRC_ROOT"] ?? "D:\\Source\\ValleyTalk\\src");
+// 2026-09-12 D7 门禁修缮：默认路径改为脚本位置相对（合并仓布局开箱即用）——
+// 本脚本位于 <repo>/server/scripts/，TS 包在 <repo>/server/packages，C# 源在 <repo>/src。
+// 环境变量覆盖保留：VALLEYAI_ROOT=server 根（含 packages/ 与 protocol/ 的目录，
+// 兼容旧独立仓语义）、VALLEYTALK_SRC_ROOT=C# src 根（外部 C# 检出）。
+const SERVER_ROOT = resolve(process.env["VALLEYAI_ROOT"] ?? resolve(import.meta.dir, ".."));
+const REPO_ROOT = resolve(SERVER_ROOT, "..");
+const CSHARP_ROOT = resolve(process.env["VALLEYTALK_SRC_ROOT"] ?? join(REPO_ROOT, "src"));
 
 /** C# 发送端源码扫描根目录（递归） */
 const CSHARP_SCAN_DIRS: readonly string[] = [
@@ -37,10 +42,10 @@ const CSHARP_SCAN_DIRS: readonly string[] = [
 const PROTOCOL_V2_CS = join(CSHARP_ROOT, "ValleyAgent", "Protocol", "ProtocolV2.cs");
 
 /** TS 路由端文件 */
-const PROTOCOL_ADAPTER_TS = join(REPO_ROOT, "packages", "stardew", "src", "protocol-adapter.ts");
+const PROTOCOL_ADAPTER_TS = join(SERVER_ROOT, "packages", "stardew", "src", "protocol-adapter.ts");
 
 /** 协议单一事实源 */
-const MESSAGES_JSON = join(REPO_ROOT, "protocol", "messages.json");
+const MESSAGES_JSON = join(SERVER_ROOT, "protocol", "messages.json");
 
 // ============================================================================
 // 类型定义

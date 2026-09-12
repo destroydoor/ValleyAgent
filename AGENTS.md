@@ -52,6 +52,9 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Director（导演智能体，TS 端）                               │
+│ 触发：day_started → DirectorAgent.runDayPlan（工具脑，2026- │
+│   09-12 有效化；旧 morningPlan JSON 管线与 runBeat ReAct    │
+│   接管已退役）                                              │
 │ 视野：全局信息 + 所有 NPC 人设档案 + 所有 NPC 的 L2 状态    │
 │ 职责：编故事、编排事件、创造相遇机会、改 NPC 状态           │
 │ 工具：set_npc_position/inventory/money/mood/recent_events/  │
@@ -109,15 +112,17 @@ L2 todayEvents 保留近 3 天，每天 day_started 清理 3 天前的。判定�
 
 ### 3.3 Wire 协议
 
-单一事实源：`ValleyAI/protocol/messages.json`，check:protocol 追踪。active 的有 `hello` / `ping` / `dialogue`（唯一 LLM 触发）/ `dialogue_response` / `action_result` / `state_changed` / `day_started` / `consolidate_day` / `allocate_agent` / `route_shout_response`（`route_shout` 为 orphan_route 预留）。**四步全部落地（2026-08-15）**：`execute_adjust`（TS→C# 原子批指令，带 instructionId，orphan_route）/ `adjust_result`（C#→TS 回执：每步成败+失败码+新余额，active）/ `reconnect_sync`（C#→TS 重连对账：outbox 补发 + active agent 名单，active）。步骤 2：trade/give_item/give_gift/receive_payment 由 TS 同步编排（账本校验→execute_adjust→回执），不再发 C# 执行；C# 还价单结算链已删除；求购（E3-5）保留 C# 生成，命中时拒绝送礼交接并提示走对话议价。步骤 3：TS 情绪引擎（确定性零 LLM，Director set_npc_mood 覆盖权），C# EmotionAnalyzer/DialogueMemoryAnalyzer 删除，RuleBasedDecisionEngine 瘦身为生存反射。步骤 4：C# 重连发 reconnect_sync（WebSocketClient.OnReconnected），TS 对账 in-flight adjust pending（凭 instructionId 重发，幂等缓存闭环）。旧 Python 时代的 `decision`/`friendship_eval` 等死管道已删除（schema 留档）。
+单一事实源：`server/protocol/messages.json`（本仓合并布局），check:protocol 追踪（2026-09-12 起路径仓库相对、开箱即用；10 条 planned 死 schema——decision/gift_eval/rag_query/state_sync/emotion_sync/memory_sync/beat_plan/beat_start/beat_end/day_end——已删除，两端从未实现）。active 的有 `hello` / `ping` / `dialogue`（唯一 LLM 触发）/ `dialogue_response` / `action_result` / `state_changed` / `day_started` / `consolidate_day` / `allocate_agent` / `route_shout_response`（`route_shout` 为 orphan_route 预留）。**四步全部落地（2026-08-15）**：`execute_adjust`（TS→C# 原子批指令，带 instructionId，orphan_route）/ `adjust_result`（C#→TS 回执：每步成败+失败码+新余额，active）/ `reconnect_sync`（C#→TS 重连对账：outbox 补发 + active agent 名单，active）。步骤 2：trade/give_item/give_gift/receive_payment 由 TS 同步编排（账本校验→execute_adjust→回执），不再发 C# 执行；C# 还价单结算链已删除；求购（E3-5）保留 C# 生成，命中时拒绝送礼交接并提示走对话议价。步骤 3：TS 情绪引擎（确定性零 LLM，Director set_npc_mood 覆盖权），C# EmotionAnalyzer/DialogueMemoryAnalyzer 删除，RuleBasedDecisionEngine 瘦身为生存反射。步骤 4：C# 重连发 reconnect_sync（WebSocketClient.OnReconnected），TS 对账 in-flight adjust pending（凭 instructionId 重发，幂等缓存闭环）。旧 Python 时代的 `decision`/`friendship_eval` 等死管道已删除。
 
 ### 3.4 NPC Agent 工具集
 
 speak / emote / give_item / give_gift / **trade**（新增，阶段 1）/ **set_goal**（新增，阶段 2）/ set_state / show_dialogue / remember / forget / get_info / accept_job / receive_payment（+evaluate_friendship，no-op 记录型）。worldSnapshot 同时携带玩家侧（location/inventory/playerMoney/PlayerHeldItem）与 NPC 侧（npcLocation/npcMoney/npcInventory/npcMood/npcRecentEvents/npcWorkingOn）数据，NPC 认知以 NPC 侧字段为准。
 
-### 3.5 Director 工具集（阶段 3 落地）
+### 3.5 Director 工具集（阶段 3 落地；2026-09-12 端到端接线）
 
 set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_recent_events / set_npc_working_on / spawn_beat / spawn_group_beat / inject_memory。Director **没有** speak/emote/give_item/trade/set_goal —— 这些是 NPC Agent 的角色扮演工具。
+
+**接线（2026-09-12 Director 有效化）**：C# `day_started`（含 directorContext）→ TS `DirectorAgent.runDayPlan`（chatWithTools 工具脑，9 工具全走 `director_command`）→ 逐 beat `allocate_agent`（keepUntilIso）+ C# BeatStore 落库 → 对话时经 L3 场景注入（worldSnapshot.currentBeat）进入 NPC prompt。spawn 预检：NPC 可用性 / 14 天同人冷却 / 每日上限（默认 3）。C# `Director.TriggerProbability` 配置经 `--director-probability` 传给 server（审计 M-7 误判为死旋钮，实为活配置）。
 
 ### 3.6 已知坑（详见旧版参考 §2.1.1）
 

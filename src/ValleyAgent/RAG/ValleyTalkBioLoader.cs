@@ -14,7 +14,7 @@ namespace ValleyAgent.RAG;
 ///     Supports both vanilla ([CP] ValleyTalk Base/assets/bio/) and SVE (ValleyTalk for SVE/assets/bio/) paths.
 ///     Files use Content Patcher format: {Changes:[{Entries:{Biography,Relationships,Traits,...}}]}.
 ///     Provides full personality profiles (biography, relationships, traits, preoccupations)
-///     that are far richer than the flat npcs.json used by RAGKnowledgeBase.
+///     that are far richer than a flat NPC data file (RAGKnowledgeBase 已于 2026-09-12 删除).
 /// </summary>
 public class ValleyTalkBioLoader
 {

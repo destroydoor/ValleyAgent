@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using StardewValley;
 using ValleyAgent.Beats;
 using ValleyAgent.Chat;
+using ValleyAgent.Economy;
 using ValleyAgent.Inventory;
 using ValleyAgent.Services;
 using ValleyAgent.StateMachine;
@@ -97,8 +98,33 @@ public static class WorldSnapshotBuilder
             agent?.Brain.WorkingOn,
             agent?.Brain.OwedMoney,
             // 阶段3 L3: 当前活跃 beat 场景描述（BeatStore 当前实例；无 beat 时为 null）。
-            BeatStore.Current?.GetActiveBeat(npcName)?.SceneDesc
+            BeatStore.Current?.GetActiveBeat(npcName)?.SceneDesc,
+            // E3-5（2026-09-12 接线）: NPC 当日活跃求购单——命中送礼时提示"走对话议价"，
+            // 这里让 NPC 在对话中有价格锚。无求购/服务未接线时为 null（认知缺省≠空单）。
+            BuildPurchaseOffers(npcName)
         );
+
+    /// <summary>
+    ///     E3-5: 采集 NPC 当日活跃求购单（过期即滤除；Registry 单待成交单语义 → 至多 1 条）。
+    /// </summary>
+    private static IReadOnlyList<PurchaseOfferInfo>? BuildPurchaseOffers(string npcName)
+    {
+        var offers = NpcPurchaseRequestService.Current?.PurchaseOffers;
+        if (offers == null || !offers.Snapshot.TryGetValue(npcName, out var offer))
+        {
+            return null;
+        }
+
+        if (offer.IsExpired(DateTime.UtcNow))
+        {
+            return null;
+        }
+
+        return new List<PurchaseOfferInfo>
+        {
+            new(offer.ItemId, offer.ItemName, offer.Quantity, offer.AgreedPrice)
+        };
+    }
     }
 
     /// <summary>

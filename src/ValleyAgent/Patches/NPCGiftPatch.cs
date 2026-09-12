@@ -308,6 +308,12 @@ public static class NPCGiftPatch
         {
             giftAgent!.Brain.AddMemory($"玩家送给我{item.DisplayName}，我的感受是：{tasteLabel}。", 3.0, MemoryEntryType.Event);
 
+            // 2026-09-12 L2 接线（审计 P0-3）：送礼同步落一条当日事件——
+            // worldSnapshot.npcRecentEvents 从恒"无"变为有真实近期行为（近 3 天可见）。
+            giftAgent.Brain.AddTodayEvent(
+                $"收到了玩家送的{item.DisplayName}（{tasteLabel}）",
+                $"Y{Game1.year}_{Game1.currentSeason}_{Game1.dayOfMonth}");
+
             // 2026-08-15 步骤 3：情绪推导已迁 TS 情绪引擎（确定性事件→情绪）；
             // C# 不再机械推导（EmotionAnalyzer 删除），送礼情绪回 baseline。
             Monitor?.Log($"[Gift] {__instance.Name}: gift received (taste={giftTaste})", LogLevel.Debug);
