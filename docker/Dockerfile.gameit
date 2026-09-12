@@ -1,0 +1,72 @@
+# ValleyAgent Integration Test Container
+# Boots Stardew Valley headless via SMAPI on Linux, auto-runs V3TestRunner.
+#
+# Build:  docker build -f docker/Dockerfile.gameit -t valleyagent-gameit .
+# Run:    see scripts/docker/run-it.ps1
+#
+# Key design:
+#   /game      — host game dir, mounted RO at runtime
+#   /data      — host bind mount (docker/data/), writable, persists game copy + SMAPI install
+#   /mods-src  — host prepared mods (docker/mods-cache/), mounted RO
+#   /saves-src — host save files (docker/saves/), mounted RO
+
+ARG SMAPI_VERSION=4.3.2
+
+FROM jlesage/baseimage-gui:debian-13-v4.13
+
+ARG SMAPI_VERSION
+
+ENV APP_NAME="ValleyAgent IT" \
+    USER_ID=0 \
+    GROUP_ID=0 \
+    HOME=/root \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    DISPLAY=:0 \
+    DISPLAY_HEIGHT=720 \
+    DISPLAY_WIDTH=1280 \
+    DEBIAN_FRONTEND=noninteractive \
+    DARK_MODE=1 \
+    SMAPI_VERSION=${SMAPI_VERSION}
+
+# Install runtime dependencies.
+# - .NET 6.0 runtime: SMAPI 4.3.2 is a .NET 6.0 app (apphost 6.0.36).
+#   Debian 13 has libicu76 but .NET 6.0 deb requires libicu74 (conflict).
+#   Use dotnet-install.sh to install as standalone binary (no package deps).
+# - libicu76: .NET globalization (SMAPI FailFasts at startup without it)
+# - libfontconfig1: SkiaSharp native image decoder (Content Patcher EditImage)
+# - libopenal1 + libsdl2-2.0-0: MonoGame audio/window backend
+# - mesa-utils: OpenGL software rendering via llvmpipe
+# - curl/unzip: SMAPI installer download at first container start
+# - locales: UTF-8 locale for SMAPI
+RUN add-pkg \
+    ca-certificates \
+    curl \
+    unzip \
+    libicu76 \
+    libfontconfig1 \
+    libopenal1 \
+    libsdl2-2.0-0 \
+    locales \
+    procps \
+    mesa-utils \
+    && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
+    && locale-gen \
+    && curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+    && chmod +x /tmp/dotnet-install.sh \
+    && /tmp/dotnet-install.sh --channel 6.0 --runtime dotnet --install-dir /usr/share/dotnet \
+    && ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+    && rm /tmp/dotnet-install.sh
+
+# Disable X screensaver / DPMS via base image xset hooks (startapp.sh also does this)
+ENV DISPLAY_WIDTH=1280 \
+    DISPLAY_HEIGHT=720
+
+COPY docker/rootfs/startapp.sh /startapp.sh
+RUN chmod +x /startapp.sh
+
+# /data is a host bind mount — game copy, SMAPI install, mods, results all live here.
+VOLUME ["/data"]
+
+WORKDIR /data

@@ -1,0 +1,58 @@
+# Soak override for the 3-farmhand host-freeze repro (2026-09-10).
+# Adds valley-farmhand2/3 on top of docker-compose.e2e.yml (1 host + 3 farmhands + TS).
+#
+# Usage (from repo root, driven by scripts/docker/run-soak.ps1):
+#   docker compose -f docker/docker-compose.e2e.yml -f docker/docker-compose.soak.yml up -d
+#
+# Prerequisites:
+#   - docker/mods-cache-farmhand2 and -farmhand3 (copies of mods-cache-farmhand,
+#     prepared by run-soak.ps1 from prep-mods.ps1 -Role farmhand output)
+#   - All farmhands use VALLEY_TEST_INSTANCE=farmhand: each container has its own
+#     /data, so per-instance command files (test_commands_farmhand.txt) stay distinct.
+
+services:
+  # Soak-wide watchdog tuning: 3s threshold trips on save-load slow ticks
+  # (container实测 3234ms blip 5s after arming). A real freeze is indefinite,
+  # so 5s still catches it while dodging load-time false positives.
+  valley-host:
+    environment:
+      - VALLEY_WATCHDOG_MS=5000
+  valley-farmhand:
+    environment:
+      - VALLEY_WATCHDOG_MS=5000
+
+  valley-farmhand2:
+    image: valleyagent-gameit
+    container_name: valley-farmhand2
+    depends_on:
+      valley-host:
+        condition: service_started
+    environment:
+      - VALLEY_TEST_INSTANCE=farmhand
+      - VALLEY_WATCHDOG_MS=5000
+    volumes:
+      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      - D:\Source\ValleyTalk\docker\mods-cache-farmhand2:/mods-src:ro
+      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      - D:\Source\ValleyTalk\docker\data-farmhand2:/data
+    networks:
+      - valley-e2e
+
+  valley-farmhand3:
+    image: valleyagent-gameit
+    container_name: valley-farmhand3
+    depends_on:
+      valley-host:
+        condition: service_started
+    environment:
+      - VALLEY_TEST_INSTANCE=farmhand
+      - VALLEY_WATCHDOG_MS=5000
+    volumes:
+      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      - D:\Source\ValleyTalk\docker\mods-cache-farmhand3:/mods-src:ro
+      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      - D:\Source\ValleyTalk\docker\data-farmhand3:/data
+    networks:
+      - valley-e2e

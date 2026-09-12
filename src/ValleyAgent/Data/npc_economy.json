@@ -1,0 +1,126 @@
+[
+  {
+    "name": "Abigail",
+    "initialMoney": 300,
+    "initialItems": [
+      "(O)66",
+      "(O)286"
+    ],
+    "savvy": 0.35,
+    "budgetTier": "normal",
+    "dailyWage": 20,
+    "talkativeness": 0.75,
+    "purchaseItems": [
+      "(O)80",
+      "(O)84",
+      "(O)86"
+    ]
+  },
+  {
+    "name": "Alex",
+    "initialMoney": 200,
+    "initialItems": [
+      "(O)201",
+      "(O)167"
+    ],
+    "savvy": 0.3,
+    "budgetTier": "cautious",
+    "dailyWage": 15,
+    "talkativeness": 0.6,
+    "purchaseItems": [
+      "(O)176",
+      "(O)174",
+      "(O)180"
+    ]
+  },
+  {
+    "name": "Clint",
+    "initialMoney": 1500,
+    "initialItems": [
+      "(O)334",
+      "(O)335",
+      "(O)336"
+    ],
+    "savvy": 0.7,
+    "budgetTier": "cautious",
+    "dailyWage": 50,
+    "talkativeness": 0.3,
+    "purchaseItems": [
+      "(O)378",
+      "(O)380",
+      "(O)382",
+      "(O)384"
+    ]
+  },
+  {
+    "name": "Gus",
+    "initialMoney": 2500,
+    "initialItems": [
+      "(O)303",
+      "(O)346",
+      "(O)348"
+    ],
+    "savvy": 0.8,
+    "budgetTier": "generous",
+    "dailyWage": 60,
+    "talkativeness": 0.65,
+    "purchaseItems": [
+      "(O)304",
+      "(O)256",
+      "(O)192",
+      "(O)184"
+    ]
+  },
+  {
+    "name": "Harvey",
+    "initialMoney": 1200,
+    "initialItems": [
+      "(O)395",
+      "(O)342"
+    ],
+    "savvy": 0.65,
+    "budgetTier": "cautious",
+    "dailyWage": 55,
+    "talkativeness": 0.45,
+    "purchaseItems": [
+      "(O)395",
+      "(O)342",
+      "(O)184"
+    ]
+  },
+  {
+    "name": "Emily",
+    "initialMoney": 400,
+    "initialItems": [
+      "(O)428",
+      "(O)591",
+      "(O)60"
+    ],
+    "savvy": 0.4,
+    "budgetTier": "normal",
+    "dailyWage": 25,
+    "talkativeness": 0.7,
+    "purchaseItems": [
+      "(O)428",
+      "(O)591",
+      "(O)60"
+    ]
+  },
+  {
+    "name": "Willy",
+    "initialMoney": 800,
+    "initialItems": [
+      "(O)685",
+      "(O)131"
+    ],
+    "savvy": 0.75,
+    "budgetTier": "cautious",
+    "dailyWage": 35,
+    "talkativeness": 0.4,
+    "purchaseItems": [
+      "(O)685",
+      "(O)131",
+      "(O)152"
+    ]
+  }
+]

@@ -1,0 +1,115 @@
+{
+  "//_README": "E2E multiplayer override — derived from test_config.container.json with runner=manual and exitOnComplete=false",
+  "//_runner": "manual mode: harness drives commands via test_commands_{instance}.txt, no auto-run, no auto-exit",
+  "runner": "manual",
+  "//_runner_options": "v3=default group tests, legacy=old phase tests, narrative=narrative tests, visual=screenshot tests, orchestrator=new orchestrator, experience=experience tests, manual=hand-driven (no auto test run)",
+  "//_testGroup": "test groups (only effective for runner=v3 or orchestrator)",
+  "testGroup": "Fuzzy|Integration",
+  "//_testGroup_options": "All=everything, Module=module, Fuzzy=fuzzy, Edge=edge, Functional=functional, Real=real, Experience=experience, or combos like 'Fuzzy|Edge'",
+  "//_testFilter": "individual test toggles (optional, omit to run all in group)",
+  "testFilter": {
+    "//_enable": "only run these tests (list). empty=no filter",
+    "enable": [],
+    "//_disable": "skip these tests (list). empty=no filter",
+    "//_disable_note": "F_MineRealCombat: soft-rendered container has slow tick rate, timing-sensitive assertions fail (2026-08-19 measured: mine_stones_removed/npc_state_exits_to_idle failures)",
+    "disable": ["F_MineRealCombat"]
+  },
+  "//_debugFlags": "debug toggles",
+  "debugFlags": {
+    "suppressDecisions": true,
+    "suppressPathfindCooldown": true,
+    "forceMiningLocation": false,
+    "forceForageLocation": false,
+    "gameSpeedMultiplier": 1
+  },
+  "//_scene": "test scene initialization parameters",
+  "scene": {
+    "npcName": "Haley",
+    "playerTileX": 54,
+    "playerTileY": 30,
+    "friendshipHearts": 4,
+    "timeOfDay": 1000,
+    "season": 1,
+    "day": 15,
+    "year": 1
+  },
+  "//_narrativeScenarios": "narrative scenario test toggles (only effective for runner=narrative)",
+  "narrativeScenarios": {
+    "N1_AdventureDeath": true,
+    "N2_MarriageFarm": true,
+    "N3_ProactiveMine": true,
+    "N4_FullFarmDay": true,
+    "N5_ProposalMarriage": false
+  },
+  "//_visualTests": "visual test toggles (only effective for runner=visual)",
+  "visualTests": {
+    "chat": true,
+    "fight": true,
+    "mine": true,
+    "health": true,
+    "hud": true
+  },
+  "//_mockLlm": "Mock LLM service config (for experience tests, simulates LLM responses)",
+  "mockLlm": {
+    "enabled": true,
+    "wsPort": 8766,
+    "responsesFile": "Data/mock_llm_responses.json",
+    "defaultDecision": {
+      "targetState": "IDLE",
+      "reason": "temporarily idle",
+      "thought": "daydreaming...",
+      "parameters": {}
+    },
+    "defaultDialogue": {
+      "text": "hmm...",
+      "action": null
+    }
+  },
+  "//_visual": "visual recording and analysis config",
+  "visual": {
+    "screenshotIntervalTicks": 60,
+    "captureOnKeyMoments": true,
+    "videoEnabled": true,
+    "videoFps": 10,
+    "videoResolution": "1280x720",
+    "kimiAnalysisEnabled": true,
+    "kimiConfig": {
+      "model": "kimi-k3",
+      "maxTokens": 2000,
+      "temperature": 0.1
+    }
+  },
+  "//_input": "input simulation config",
+  "input": {
+    "mode": "simulated",
+    "scriptsPath": "Data/input_scripts/",
+    "defaultWaitTicks": 60,
+    "uiStableTimeoutTicks": 120
+  },
+  "//_auto": "automation mode",
+  "auto": {
+    "//_existing": "fields parsed by existing loader (TestConfig.cs)",
+    "//_exitOnComplete": "CRITICAL: false for E2E — V3TestRunner must NOT auto-exit; harness controls lifecycle",
+    "exitOnComplete": false,
+    "startDelayTicks": 120,
+    "//_new": "experience test runner fields",
+    "enabled": true,
+    "autoStartDelayTicks": 120,
+    "writeCompletionMarker": true
+  },
+  "//_testParams": "test parameter config",
+  "testParams": {
+    "//_existing": "fields parsed by existing loader (TestConfig.cs)",
+    "monitorIntervalTicks": 60,
+    "llmResponseTimeoutTicks": 6000,
+    "defaultTestDurationTicks": 5000,
+    "acceleratedSecondsPerTenMinutes": 3,
+    "defaultSecondsPerTenMinutes": 7,
+    "enableTimeAcceleration": true,
+    "//_new": "experience test runner fields",
+    "npcName": "Haley",
+    "enableCrossMap": true,
+    "enableCombat": true,
+    "enableGift": true
+  }
+}

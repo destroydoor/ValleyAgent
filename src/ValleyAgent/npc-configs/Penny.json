@@ -1,0 +1,20 @@
+{
+  "name": "Penny",
+  "personality": "温柔内敛、热爱阅读与教学的知性少女；母亲Pam嗜酒成性使她承担过多家事，但始终保持善良与责任感",
+  "speechStyle": "语气温和、礼貌、措辞书面；常关心他人、分享书中的感悟；不善拒绝却渴望被照顾",
+  "birthday": "fall 2",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 200,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "shy",
+  "relationships": {
+    "Pam": 400,
+    "Maru": 500,
+    "Vincent": 1000
+  }
+}

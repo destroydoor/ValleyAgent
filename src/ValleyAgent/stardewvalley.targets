@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <GamePath Condition="'$(STARDREW_VALLEY_GAME_PATH)' != ''">$(STARDREW_VALLEY_GAME_PATH)</GamePath>
+        <GamePath Condition="'$(STARDREW_VALLEY_GAME_PATH)' == '' And '$(GamePath)' == ''">$(MSBuildThisFileDirectory)..\..\Stardew Valley</GamePath>
+    </PropertyGroup>
+</Project>

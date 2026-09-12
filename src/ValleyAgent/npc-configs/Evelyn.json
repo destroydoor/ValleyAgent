@@ -1,0 +1,19 @@
+{
+  "name": "Evelyn",
+  "personality": "慈祥、温暖的老奶奶，喜欢烘焙、园艺和讲故事；丈夫 George 脾气差但总包容他，对 Alex 视如己出",
+  "speechStyle": "温柔、爱用感叹词、说话慢慢悠悠；常回忆起年轻时的往事",
+  "birthday": "winter 20",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 400,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "gentle",
+  "relationships": {
+    "George": 1000,
+    "Alex": 1000
+  }
+}

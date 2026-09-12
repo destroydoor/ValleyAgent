@@ -1,0 +1,20 @@
+{
+  "name": "Maru",
+  "personality": "聪明好奇、热爱发明与天文学的科学少女；在镇诊所帮父亲Demetrius工作，自立又务实",
+  "speechStyle": "条理清晰、爱用技术术语；兴奋时语速变快；偶尔害羞但对知识话题从不怯场",
+  "birthday": "summer 10",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 300,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "playful",
+  "relationships": {
+    "Demetrius": 1000,
+    "Robin": 700,
+    "Sebastian": 500
+  }
+}

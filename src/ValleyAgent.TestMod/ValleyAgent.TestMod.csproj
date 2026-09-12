@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyName>ValleyAgent.TestMod</AssemblyName>
+        <RootNamespace>ValleyAgent.TestMod</RootNamespace>
+        <Version>1.0.0</Version>
+        <TargetFramework>net6.0</TargetFramework>
+        <EnableHarmony>false</EnableHarmony>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+    <ItemGroup>
+        <Using Include="ValleyAgent.Api.IValleyAgentApi" Alias="IValleyAgentApi"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0"/>
+        <ProjectReference Include="..\ValleyAgent.Abstractions\ValleyAgent.Abstractions.csproj"/>
+        <ProjectReference Include="..\ValleyAgent\ValleyAgent.csproj" Private="false"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="test_config.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Data\mock_llm_responses.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>
+
+

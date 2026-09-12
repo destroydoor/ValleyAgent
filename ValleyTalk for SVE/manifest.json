@@ -1,0 +1,20 @@
+{
+    "Name": "ValleyTalk for SVE",
+    "Author": "dandm1",
+    "Version": "2.0.0",
+    "Description": "SVE content pack for ValleyTalk - Infinite dialogue",
+    "UniqueID": "dandm1.ValleyTalkSVE",
+    "MinimumApiVersion": "4.1.0",
+    "UpdateKeys": [ "Nexus:34341" ],
+    "ContentPackFor": {
+        "UniqueID": "Pathoschild.ContentPatcher",
+        "MinimumVersion": "2.3.0"
+    },
+    "Dependencies": [
+        {
+            "UniqueID": "dandm1.ValleyTalk",
+            "MinimumVersion": "2.0.0",
+            "IsRequired": true
+        }
+    ]
+}

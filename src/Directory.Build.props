@@ -1,0 +1,32 @@
+<Project>
+    <!-- CA 规则精简配置 — 仅保留真正有功能影响的规则为 warning -->
+
+    <PropertyGroup>
+        <!-- 启用 .NET SDK 自带分析器 -->
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <!-- 使用最新分析器规则集（默认推荐级别，不启用全部） -->
+        <AnalysisLevel>latest</AnalysisLevel>
+        <!-- 默认推荐级别，由 .editorconfig 精细控制 -->
+        <AnalysisMode>default</AnalysisMode>
+        <!-- IDE类别(代码风格)不在构建中强制 -->
+        <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+        <WarningLevel>4</WarningLevel>
+        <!-- 关闭 XML 文档注释警告 — 游戏 mod 不需要完整文档 -->
+        <NoWarn>$(NoWarn);CS1591;CS1570</NoWarn>
+    </PropertyGroup>
+
+    <!-- 游戏路径配置：优先使用环境变量 STARDREW_VALLEY_GAME_PATH，回退到相对路径 -->
+    <PropertyGroup>
+        <GamePath Condition="'$(STARDREW_VALLEY_GAME_PATH)' != ''">$(STARDREW_VALLEY_GAME_PATH)</GamePath>
+        <GamePath Condition="'$(STARDREW_VALLEY_GAME_PATH)' == ''">$(MSBuildThisFileDirectory)..\Stardew Valley</GamePath>
+    </PropertyGroup>
+
+    <!-- .editorconfig 由 SDK 自动发现，无需手动引入 GlobalAnalyzerConfigFiles -->
+
+    <!-- 引入 SonarAnalyzer.CSharp（如果可用） -->
+    <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)packages\SonarAnalyzer.CSharp')">
+        <Analyzer Include="$(MSBuildThisFileDirectory)packages\SonarAnalyzer.CSharp\*.dll"/>
+    </ItemGroup>
+</Project>

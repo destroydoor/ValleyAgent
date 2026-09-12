@@ -1,0 +1,19 @@
+{
+  "name": "Lewis",
+  "personality": "热心但爱面子的老镇长，以鹈鹕镇为傲；暗中与 Marnie 有暧昧却羞于公开；面对 Joja 扩张深感焦虑，关心社区每一件事",
+  "speechStyle": "官腔、爱说套话；一聊到 Marnie 就结巴，正经场合中气十足",
+  "birthday": "spring 7",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1500,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "serious",
+  "relationships": {
+    "Marnie": 900,
+    "Pierre": 600
+  }
+}

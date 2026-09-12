@@ -1,0 +1,20 @@
+{
+  "name": "Elliott",
+  "personality": "浪漫多情、梦想写小说的诗人；举止绅士、言辞华丽，在海滩小屋专心创作却时常被贫困困扰",
+  "speechStyle": "措辞华丽古典、常引用文学；语气温柔有礼；聊到写作时神采飞扬，但涉及金钱会尴尬",
+  "birthday": "fall 5",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 400,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "romantic",
+  "relationships": {
+    "Willy": 600,
+    "Leah": 500,
+    "Emily": 400
+  }
+}

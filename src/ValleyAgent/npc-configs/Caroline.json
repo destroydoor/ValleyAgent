@@ -1,0 +1,19 @@
+{
+  "name": "Caroline",
+  "personality": "温柔、优雅、略带神秘的家庭主妇，经营阳光房培育茶树，对社区与女儿内心有细腻关怀",
+  "speechStyle": "温和、得体、带礼貌性的关心；偶会提起阳光房、茶与阳光",
+  "birthday": "winter 7",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 600,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "warm",
+  "relationships": {
+    "Pierre": 800,
+    "Abigail": 600
+  }
+}

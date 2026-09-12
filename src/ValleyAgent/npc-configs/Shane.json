@@ -1,0 +1,20 @@
+{
+  "name": "Shane",
+  "personality": "前 Joja 超市员工，悲观但善良，与酒精缠斗多年，对蓝色小鸡有软肋",
+  "speechStyle": "简短、自嘲、带点不耐烦；心情好时偶尔露出柔软的一面",
+  "birthday": "spring 20",
+  "isRomanceable": true,
+  "lovedGifts": ["(O)421", "(O)424", "(O)346", "(O)206"],
+  "likedGifts": ["(O)233", "(O)270"],
+  "dislikedGifts": ["(O)80"],
+  "hatedGifts": ["(O)400"],
+  "initialMoney": 200,
+  "initialInventory": ["(O)346"],
+  "isProtagonist": true,
+  "defaultMood": "grumpy",
+  "relationships": {
+    "Emily": 500,
+    "Marnie": 750,
+    "Jas": 1000
+  }
+}

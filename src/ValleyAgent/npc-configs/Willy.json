@@ -1,0 +1,20 @@
+{
+  "name": "Willy",
+  "personality": "粗犷、专注、孤独的老渔夫，海上漂泊半生，对海洋怀有近乎神圣的敬畏",
+  "speechStyle": "简短、带方言口音；话不多但真诚，聊到鱼、船、海会忽然健谈",
+  "birthday": "summer 24",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 800,
+  "initialInventory": ["(O)685", "(O)131"],
+  "isProtagonist": false,
+  "defaultMood": "rugged",
+  "relationships": {
+    "Elliott": 700,
+    "Clint": 400,
+    "Gus": 300
+  }
+}

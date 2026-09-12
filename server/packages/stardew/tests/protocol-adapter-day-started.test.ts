@@ -1,0 +1,181 @@
+// Tests for ProtocolAdapter day_started routing (Task 13).
+// Run: bun test packages/stardew/tests/protocol-adapter-day-started.test.ts
+//
+// Verifies:
+//   1. day_started with directorTriggerProbability=1.0 triggers morningPlan and sends allocate_agent
+//   2. day_started with directorTriggerProbability=0.0 does not trigger morningPlan
+//
+// The ProtocolAdapter constructor accepts an optional ProtocolAdapterOptions
+// parameter with sendToCsharp / director / directorTriggerProbability fields.
+
+import { test, expect, spyOn } from "bun:test";
+import { ProtocolAdapter, type ProtocolAdapterOptions } from "../src/protocol-adapter";
+import { NpcPromptLoader } from "../src/npc-prompt-loader";
+import { PromptBuilder } from "../src/prompt-builder";
+import { VercelAIProvider } from "@valley/core";
+import { StardewAgentRegistry } from "../src/stardew-agent-registry";
+import type { Director } from "../src/director";
+import { mkdtempSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { resolve } from "path";
+
+const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
+
+/**
+ * Minimal director stub: morningPlan returns a fixed beat list and records
+ * how many times it was called. Cast to Director via `unknown` since the
+ * stub only implements the morningPlan() method that handleDayStarted calls.
+ */
+interface DirectorStub {
+  morningPlanCalls: number;
+  morningPlan(): Promise<Array<{ npcName: string; windowEnd: string }>>;
+}
+
+function makeDirectorStub(beats: Array<{ npcName: string; windowEnd: string }>): DirectorStub {
+  return {
+    morningPlanCalls: 0,
+    async morningPlan() {
+      this.morningPlanCalls++;
+      return beats;
+    },
+  };
+}
+
+function makeRegistry(dir: string): StardewAgentRegistry {
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const provider = new VercelAIProvider({
+    provider: "minimax",
+    apiKey: "fake",
+    model: "fake",
+    baseUrl: "http://localhost:9999",
+  });
+  return new StardewAgentRegistry({
+    promptBuilder: builder,
+    llmProvider: provider,
+    agentsDir: dir,
+  });
+}
+
+test("day_started with probability=1.0 triggers morningPlan and sends allocate_agent for each beat", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-day-started-trigger-"));
+  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    const registry = makeRegistry(dir);
+    const beats = [
+      { npcName: "Abigail", windowEnd: "16:00" },
+      { npcName: "Sebastian", windowEnd: "18:00" },
+    ];
+    const director = makeDirectorStub(beats);
+    const sent: unknown[] = [];
+    const options: ProtocolAdapterOptions = {
+      sendToCsharp: (msg: unknown) => { sent.push(msg); },
+      director: director as unknown as Director,
+      directorTriggerProbability: 1.0,
+    };
+    const adapter = new ProtocolAdapter(registry, options);
+
+    const resp = await adapter.routeMessage({
+      type: "day_started",
+      requestId: "req-day-1",
+      dateIso: "Y2_summer_14",
+    });
+
+    expect(resp).toEqual({ type: "ack", requestId: "req-day-1" });
+    expect(director.morningPlanCalls).toBe(1);
+    expect(sent.length).toBe(2);
+    expect(sent[0]).toMatchObject({
+      type: "allocate_agent",
+      npcName: "Abigail",
+      keepUntilIso: "16:00",
+    });
+    expect(sent[1]).toMatchObject({
+      type: "allocate_agent",
+      npcName: "Sebastian",
+      keepUntilIso: "18:00",
+    });
+    // Each allocate_agent must carry a non-empty requestId.
+    for (const msg of sent) {
+      const m = msg as { requestId?: string };
+      expect(typeof m.requestId).toBe("string");
+      expect(m.requestId!.length).toBeGreaterThan(0);
+    }
+  } finally {
+    logSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("day_started with probability=0.0 does not trigger morningPlan and sends nothing", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-day-started-skip-"));
+  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  try {
+    const registry = makeRegistry(dir);
+    const director = makeDirectorStub([
+      { npcName: "Abigail", windowEnd: "16:00" },
+    ]);
+    const sent: unknown[] = [];
+    const options: ProtocolAdapterOptions = {
+      sendToCsharp: (msg: unknown) => { sent.push(msg); },
+      director: director as unknown as Director,
+      directorTriggerProbability: 0.0,
+    };
+    const adapter = new ProtocolAdapter(registry, options);
+
+    const resp = await adapter.routeMessage({
+      type: "day_started",
+      requestId: "req-day-2",
+      dateIso: "Y2_summer_15",
+    });
+
+    expect(resp).toEqual({ type: "ack", requestId: "req-day-2" });
+    expect(director.morningPlanCalls).toBe(0);
+    expect(sent.length).toBe(0);
+  } finally {
+    logSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 2026-09-11 观测补强：联机下同一游戏日多条 day_started 此前无重复标记
+// （"每玩家一个导演"误读的直接来源）。只加告警不去重——首次不告警，
+// 第二次起 console.warn 带 count，行为不变（仍正常路由返回 ack）。
+test("duplicate day_started for the same date warns from the second occurrence onward (no behavior change)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-day-started-dup-"));
+  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+  const dupWarns = () => warnSpy.mock.calls.map((c) => c.join(" ")).filter((s) => s.includes("duplicate day_started"));
+  try {
+    const registry = makeRegistry(dir);
+    const adapter = new ProtocolAdapter(registry, {
+      sendToCsharp: () => {},
+      directorTriggerProbability: 0.0,
+    });
+
+    // 第一次：不告警，正常 ack
+    const resp1 = await adapter.routeMessage({ type: "day_started", requestId: "req-dup-1", dateIso: "Y2_fall_03" });
+    expect(resp1).toEqual({ type: "ack", requestId: "req-dup-1" });
+    expect(dupWarns().length).toBe(0);
+
+    // 第二次：告警 count=2，仍正常 ack（不去重、不改行为）
+    const resp2 = await adapter.routeMessage({ type: "day_started", requestId: "req-dup-2", dateIso: "Y2_fall_03" });
+    expect(resp2).toEqual({ type: "ack", requestId: "req-dup-2" });
+    expect(dupWarns().length).toBe(1);
+    expect(dupWarns()[0]).toContain("date=Y2_fall_03");
+    expect(dupWarns()[0]).toContain("count=2");
+
+    // 第三次：count=3（计数递增，非布尔标记）
+    await adapter.routeMessage({ type: "day_started", requestId: "req-dup-3", dateIso: "Y2_fall_03" });
+    expect(dupWarns().length).toBe(2);
+    expect(dupWarns()[1]).toContain("count=3");
+
+    // 不同日期：独立计数，首次不告警
+    await adapter.routeMessage({ type: "day_started", requestId: "req-dup-4", dateIso: "Y2_fall_04" });
+    expect(dupWarns().length).toBe(2);
+  } finally {
+    warnSpy.mockRestore();
+    logSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

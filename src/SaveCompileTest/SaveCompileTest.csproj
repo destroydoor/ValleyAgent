@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="../ValleyAgent.Abstractions/StateMachine/AgentState.cs"/>
+        <Compile Include="../ValleyAgent.Abstractions/Save/Models/DialogueExchangeData.cs"/>
+        <Compile Include="../ValleyAgent/Save/Models/SaveData.cs"/>
+        <Compile Include="../ValleyAgent/Save/SaveDataManager.cs"/>
+        <Compile Include="Program.cs"/>
+    </ItemGroup>
+</Project>

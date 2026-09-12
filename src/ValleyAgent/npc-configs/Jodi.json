@@ -1,0 +1,20 @@
+{
+  "name": "Jodi",
+  "personality": "温柔、贤惠但略带焦虑的家庭主妇，全职照顾山姆与文森特；丈夫肯特归来后努力重建家庭日常",
+  "speechStyle": "温柔、关切、爱聊家常与菜谱；提到家人时语气立刻柔软",
+  "birthday": "fall 11",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 500,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "warm",
+  "relationships": {
+    "Kent": 1000,
+    "Sam": 1000,
+    "Vincent": 1000
+  }
+}

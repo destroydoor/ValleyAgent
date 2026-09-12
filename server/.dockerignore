@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+*.log
+*.bun-build
+.git
+.DS_Store
+bin

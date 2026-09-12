@@ -1,0 +1,114 @@
+{
+  "//_README": "Container override — derived from src/ValleyAgent.TestMod/test_config.json with exitOnComplete=true",
+  "//_runner": "哪个测试引擎运行（同时只建议开一个）",
+  "runner": "v3",
+  "//_runner_options": "v3=默认分组测试, legacy=旧版顺序Phase测试, narrative=叙事场景测试, visual=截图测试, orchestrator=新版编排器, experience=体验测试, manual=手动模式（不自动运行测试）",
+  "//_testGroup": "运行哪些测试组（仅在 runner=v3 或 orchestrator 时有效）",
+  "testGroup": "Fuzzy|Integration",
+  "//_testGroup_options": "All=全部, Module=模块, Fuzzy=Fuzzy组, Edge=边界, Functional=功能, Real=真实场景, Experience=体验测试, 也可组合如 'Fuzzy|Edge'",
+  "//_testFilter": "单个测试的开关（可选，不配置则按分组全部运行）",
+  "testFilter": {
+    "//_enable": "只运行这些测试（列表），其他全部跳过。空列表=不过滤",
+    "enable": [],
+    "//_disable": "跳过这些测试（列表）。空列表=不过滤",
+    "//_disable_note": "F_MineRealCombat: 容器软渲染(llvmpipe)下 tick 速率慢，时序敏感断言不稳定（2026-08-19 实测 mine_stones_removed/npc_state_exits_to_idle 失败）",
+    "disable": ["F_MineRealCombat"]
+  },
+  "//_debugFlags": "调试开关",
+  "debugFlags": {
+    "suppressDecisions": true,
+    "suppressPathfindCooldown": true,
+    "forceMiningLocation": false,
+    "forceForageLocation": false,
+    "gameSpeedMultiplier": 1
+  },
+  "//_scene": "测试场景初始化参数",
+  "scene": {
+    "npcName": "Haley",
+    "playerTileX": 54,
+    "playerTileY": 30,
+    "friendshipHearts": 4,
+    "timeOfDay": 1000,
+    "season": 1,
+    "day": 15,
+    "year": 1
+  },
+  "//_narrativeScenarios": "叙事场景测试开关（仅在 runner=narrative 时有效）",
+  "narrativeScenarios": {
+    "N1_AdventureDeath": true,
+    "N2_MarriageFarm": true,
+    "N3_ProactiveMine": true,
+    "N4_FullFarmDay": true,
+    "N5_ProposalMarriage": false
+  },
+  "//_visualTests": "截图测试开关（仅在 runner=visual 时有效）",
+  "visualTests": {
+    "chat": true,
+    "fight": true,
+    "mine": true,
+    "health": true,
+    "hud": true
+  },
+  "//_mockLlm": "Mock LLM 服务配置（体验测试用，模拟 LLM 响应）",
+  "mockLlm": {
+    "enabled": true,
+    "wsPort": 8766,
+    "responsesFile": "Data/mock_llm_responses.json",
+    "defaultDecision": {
+      "targetState": "IDLE",
+      "reason": "暂时没什么事做",
+      "thought": "发呆中...",
+      "parameters": {}
+    },
+    "defaultDialogue": {
+      "text": "嗯...",
+      "action": null
+    }
+  },
+  "//_visual": "视觉记录与分析配置",
+  "visual": {
+    "screenshotIntervalTicks": 60,
+    "captureOnKeyMoments": true,
+    "videoEnabled": true,
+    "videoFps": 10,
+    "videoResolution": "1280x720",
+    "kimiAnalysisEnabled": true,
+    "kimiConfig": {
+      "model": "kimi-k3",
+      "maxTokens": 2000,
+      "temperature": 0.1
+    }
+  },
+  "//_input": "输入模拟配置",
+  "input": {
+    "mode": "simulated",
+    "scriptsPath": "Data/input_scripts/",
+    "defaultWaitTicks": 60,
+    "uiStableTimeoutTicks": 120
+  },
+  "//_auto": "自动化模式",
+  "auto": {
+    "//_existing": "以下为现有 loader 解析的字段（TestConfig.cs）",
+    "exitOnComplete": true,
+    "startDelayTicks": 120,
+    "//_new": "以下为体验测试 runner 新增字段",
+    "enabled": true,
+    "autoStartDelayTicks": 120,
+    "writeCompletionMarker": true
+  },
+  "//_testParams": "测试参数配置",
+  "testParams": {
+    "//_existing": "以下为现有 loader 解析的字段（TestConfig.cs）",
+    "monitorIntervalTicks": 60,
+    "llmResponseTimeoutTicks": 6000,
+    "defaultTestDurationTicks": 5000,
+    "acceleratedSecondsPerTenMinutes": 3,
+    "defaultSecondsPerTenMinutes": 7,
+    "enableTimeAcceleration": true,
+    "//_new": "以下为体验测试 runner 新增字段",
+    "npcName": "Haley",
+    "enableCrossMap": true,
+    "enableCombat": true,
+    "enableGift": true
+  }
+}

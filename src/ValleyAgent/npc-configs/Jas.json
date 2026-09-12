@@ -1,0 +1,20 @@
+{
+  "name": "Jas",
+  "personality": "害羞、内向的孤儿小女孩，喜欢音乐和奶酪；怕生但在熟悉的人面前会慢慢打开心扉，常和 Vincent 在 Marnie 牧场一起玩",
+  "speechStyle": "稚气、轻声细语；害羞时吞吞吐吐，聊到音乐和奶酪会眼睛发亮",
+  "birthday": "spring 4",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 50,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "shy",
+  "relationships": {
+    "Marnie": 1000,
+    "Vincent": 1000,
+    "Shane": 850
+  }
+}

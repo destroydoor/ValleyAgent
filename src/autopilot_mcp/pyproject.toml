@@ -1,0 +1,12 @@
+[project]
+name = "autopilot-mcp"
+version = "1.0.0"
+description = "MCP Server for AI-driven Stardew Valley autopilot"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+autopilot-mcp = "autopilot_mcp.server:main"

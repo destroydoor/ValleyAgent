@@ -1,0 +1,164 @@
+# ── Logs ──
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Node / Frontend ──
+node_modules
+dist
+dist-ssr
+*.local
+
+# ── Editor directories ──
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.DotSettings.user
+
+# ── .NET build artifacts ──
+**/bin/
+**/obj/
+*.dll
+*.pdb
+*.deps.json
+*.xml
+
+# ── Python artifacts ──
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# ── Stardew Valley game (NOT tracked — too large) ──
+Stardew Valley/
+
+# ── Reference / third-party projects (NOT tracked) ──
+NpcAdventures-master/
+mempalace-3.3.5/
+可借鉴模组/
+可借鉴项目/
+_removed_mods/
+
+# ── Project-specific ignores ──
+src/ValleyAgent/config.json
+secrets.local.*
+
+# ── AI tool directories ──
+.qoder/
+.vite/
+.trae/
+.claude/
+.sisyphus/
+.codex/
+
+# ── Build / test output (root level) ──
+bin/
+obj/
+smapi_err.txt
+smapi_out.txt
+test_output.txt
+git_history.json
+export_git.py
+
+# ── Temp diff / debug files (root level) ──
+*_diff.txt
+*_diff_out.txt
+*_full.txt
+build*.txt
+build*.log
+ca*.txt
+ca*.log
+modentry*.txt
+testrunner*.txt
+infra*.txt
+dialogue_diff.txt
+full_build.txt
+temp_diff.txt
+nul
+
+# ── Test screenshots & recordings ──
+docs/test-screenshots/
+test-recordings/
+logs/screenshots/
+logs/test_results/
+
+# ── Scripts results ──
+scripts/results/
+scripts/test/results/
+
+# ── Stardew Valley game configs (user-specific) ──
+Stardew Valley/Mods/*/config.json
+Stardew Valley/smapi-internal/config.json
+Stardew Valley/Folder.DotSettings.user
+
+# ── Docker IT container runtime artifacts ──
+docker/mods-cache/
+docker/saves/
+docker/data/
+docker/results/
+docker/smapi-cache/
+docker/linux-game/
+
+# ── Docker E2E multiplayer runtime artifacts ──
+docker/mods-cache-host/
+docker/mods-cache-farmhand/
+docker/data-host/
+docker/data-farmhand/
+docker/mods-cache-farmhand2/
+docker/mods-cache-farmhand3/
+docker/data-farmhand2/
+docker/data-farmhand3/
+docker/.mimosa/
+docker/docker-compose.e2e.vnc.yml
+.mimosa/
+
+# ── Release archives / binary artifacts ──
+*.zip
+ValleyAgent_Release_*.zip
+
+# ── Temp / scratch directories (NOT tracked) ──
+.tmp/
+AutoLoadGame-backup/
+DecompileHelper/out/
+inspect_farmer/
+.tmp/decomp*/
+.tmp/decomp_*/
+
+# ── Local databases ──
+data/supersearch-*.db
+data/*.db
+
+# ── Stray root-level scratch files (prevent re-tracking) ──
+/t
+/ter..*
+/workbenchcontrib*
+/ui_proto_*.html
+/ui_layout_diagram.png
+/问题.md
+/参考网页结构.txt
+/TS服务器重写-上下文交接.md
+
+# ── TS Agent Server (server/) runtime artifacts ──
+server/node_modules/
+server/**/node_modules/
+server/**/bin/
+server/**/dist/
+server/**/coverage/
+server/agents/
+server/.mimosa/
+*.bun-build
+
+# ── Secrets: 真实 key 文件绝不入库，模板文件例外 ──
+!secrets.local.ps1.template
+*.runtime.json

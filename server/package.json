@@ -1,0 +1,18 @@
+{
+  "name": "valleyai",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check:imports": "depcruise --config .dependency-cruiser.cjs packages/core/src",
+    "check:protocol": "bun run scripts/check-protocol-contract.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "dependency-cruiser": "^16.0.0",
+    "typescript": "^5.7.0"
+  }
+}

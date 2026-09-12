@@ -1,0 +1,25 @@
+# ValleyAI TS Agent Server image (Linux).
+# Build-time bun install avoids Docker Desktop bind-mount symlink issues
+# (workspace links @valley/* cannot be created on mounted volumes).
+#
+# NOTE: workspace source (packages/*/src) must be present BEFORE bun install --
+# bun skips @valley/* symlinks when workspace dirs contain only package.json.
+#
+# Build:  docker build -f Dockerfile.server -t valleyai-server .
+# Run:    docker run --rm -p 8765:8765 -e LLM_API_KEY=... valleyai-server \
+#           --hostname 0.0.0.0 --port 8765 ...
+
+FROM oven/bun:1.3.11-slim
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY packages packages
+RUN bun install --frozen-lockfile
+
+# Data files must be provided at runtime:
+#   --data-path <dir>/npc_prompts.json   (writable dir for director sqlite)
+#   --agents-dir <dir>                   (agent memory)
+EXPOSE 8765
+
+CMD ["bun", "run", "packages/stardew/src/cli.ts", "--hostname", "0.0.0.0", "--port", "8765"]

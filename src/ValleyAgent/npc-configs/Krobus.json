@@ -1,0 +1,18 @@
+{
+  "name": "Krobus",
+  "personality": "下水道中的暗影商人，谦逊、诚实、略带忧伤；服务于森林的暗灵族，对人类的热情既渴望又保持距离",
+  "speechStyle": "柔和、谨慎；自嘲口气中带一丝孤独，喜欢谈论下水道生态与暗影珍珠",
+  "birthday": "winter 1",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1500,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "shadowy",
+  "relationships": {
+    "Wizard": 300
+  }
+}

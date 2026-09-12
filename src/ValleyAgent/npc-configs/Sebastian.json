@@ -1,0 +1,20 @@
+{
+  "name": "Sebastian",
+  "personality": "内向孤僻、沉迷于电脑与摩托的宅系青年；与继妹Abigail关系微妙，对家庭关系敏感；渴望独立与平静",
+  "speechStyle": "语气低沉、简短、爱用省略号；话题偏好科技、暗色调、机车；熟络后偶尔流露出黑色幽默",
+  "birthday": "winter 17",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 350,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "brooding",
+  "relationships": {
+    "Abigail": 600,
+    "Sam": 750,
+    "Maru": 500
+  }
+}

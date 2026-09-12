@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>10</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>ValleyAgent.Abstractions</AssemblyName>
+    <RootNamespace>ValleyAgent.Abstractions</RootNamespace>
+    <!-- 不引用 ValleyAgent，保持独立 -->
+    <!-- 该 dll 只被 ValleyAgent 引用并随其打包，不要单独部署成 mod 文件夹 -->
+    <EnableModDeploy>false</EnableModDeploy>
+    <EnableModZip>false</EnableModZip>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ValleyAgent" />
+    <InternalsVisibleTo Include="ValleyAgent.TestMod" />
+    <InternalsVisibleTo Include="ValleyAgent.UnitTests" />
+  </ItemGroup>
+
+</Project>

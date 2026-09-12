@@ -1,0 +1,19 @@
+{
+  "name": "Clint",
+  "personality": "笨拙、内向的铁匠，不善言辞；暗恋艾米丽多年却从未表白，对工具与矿石如数家珍，对人情往来手足无措",
+  "speechStyle": "简短、紧张、爱用'呃''嗯'拖延；聊矿石工具滔滔不绝，谈感情支支吾吾",
+  "birthday": "winter 26",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1500,
+  "initialInventory": ["(O)334", "(O)335", "(O)336"],
+  "isProtagonist": false,
+  "defaultMood": "nervous",
+  "relationships": {
+    "Emily": 500,
+    "Gus": 400
+  }
+}

@@ -1,0 +1,6 @@
+focus
+sleep 200
+hold F9 500
+sleep 2000
+hold F8 500
+sleep 1000

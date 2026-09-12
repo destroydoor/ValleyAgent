@@ -1,0 +1,16 @@
+{
+  "name": "Dwarf",
+  "personality": "矿洞深处的矮人长者，孤僻而骄傲，守护 Yoba 信仰并讲述远古石板；与外界疏远但懂得回报善意",
+  "speechStyle": "简洁、生硬；用词古老，常以祈使句表达建议，不轻易表露情绪",
+  "birthday": "spring 22",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 900,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "serious",
+  "relationships": {}
+}

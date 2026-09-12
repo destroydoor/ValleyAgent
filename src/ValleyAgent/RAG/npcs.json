@@ -1,0 +1,1432 @@
+[
+  {
+    "Name": "Abigail",
+    "DisplayName": "Abigail",
+    "Birthday": "Fall 13",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Adventurous, rebellious, and introspective. Loves the supernatural and exploring the mines.",
+    "Traits": [
+      "Adventurous",
+      "Independent",
+      "Introspective",
+      "Creative",
+      "Empathetic"
+    ],
+    "LovedGifts": [
+      "Amethyst",
+      "Banana Pudding",
+      "Blackberry Cobbler",
+      "Chocolate Cake",
+      "Pufferfish",
+      "Pumpkin",
+      "Spicy Eel",
+      "Ruby"
+    ],
+    "LikedGifts": [
+      "Aquamarine",
+      "Coffee",
+      "Daffodil",
+      "Emerald",
+      "Jade",
+      "Pale Ale",
+      "Sashimi",
+      "Topaz"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "Clay",
+      "Coral",
+      "Holly",
+      "Nautilus Shell",
+      "Seaweed"
+    ],
+    "HatedGifts": [
+      "Dandelion",
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Sebastian": "Close friend, shared interests in the occult and video games",
+      "Pierre": "Father, strained relationship",
+      "Caroline": "Mother, complicated relationship",
+      "Wizard": "Intrigued by his mysterious nature"
+    },
+    "Description": "The daughter of Pierre and Caroline, Abigail has a rebellious streak and loves the outdoors. She enjoys exploring the mines and has an adventurous spirit."
+  },
+  {
+    "Name": "Alex",
+    "DisplayName": "Alex",
+    "Birthday": "Summer 3",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Athletic and confident on the surface, but insecure underneath. Dreams of becoming a professional athlete.",
+    "Traits": [
+      "Athletic",
+      "Confident",
+      "Insecure",
+      "Ambitious"
+    ],
+    "LovedGifts": [
+      "Complete Breakfast",
+      "Salmon Dinner",
+      "Perfect Breakfast"
+    ],
+    "LikedGifts": [
+      "Coffee",
+      "Egg",
+      "All Eggs",
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Evelyn": "Grandmother, very close",
+      "George": "Grandfather, lives with",
+      "Haley": "Friends, share similar social circles"
+    },
+    "Description": "A former high school football star with dreams of becoming a professional athlete. He lives with his grandparents, Evelyn and George."
+  },
+  {
+    "Name": "Caroline",
+    "DisplayName": "Caroline",
+    "Birthday": "Winter 7",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Kind and caring mother who runs the tea room behind the General Store.",
+    "Traits": [
+      "Kind",
+      "Caring",
+      "Domestic"
+    ],
+    "LovedGifts": [
+      "Fish Taco",
+      "Tropical Curry"
+    ],
+    "LikedGifts": [
+      "Daffodil",
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Pierre": "Husband, co-owns General Store",
+      "Abigail": "Daughter, complicated relationship"
+    },
+    "Description": "Married to Pierre, Caroline is a kind and caring mother. She sees herself as co-owner of the General Store and enjoys spending time in her garden."
+  },
+  {
+    "Name": "Clint",
+    "DisplayName": "Clint",
+    "Birthday": "Winter 26",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Shy and introverted blacksmith with a crush on Emily.",
+    "Traits": [
+      "Shy",
+      "Introverted",
+      "Lonely"
+    ],
+    "LovedGifts": [
+      "Amethyst",
+      "Aquamarine",
+      "Emerald",
+      "Gold Bar",
+      "Iridium Bar",
+      "Jade",
+      "Ruby",
+      "Topaz"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Emily": "Has a crush on her",
+      "Willy": "Friend, fellow saloon regular"
+    },
+    "Description": "The local blacksmith, Clint is shy and has a crush on Emily. He spends most of his days in the blacksmith shop, and evenings at the Stardrop Saloon."
+  },
+  {
+    "Name": "Demetrius",
+    "DisplayName": "Demetrius",
+    "Birthday": "Summer 19",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Mountain",
+    "Personality": "Passionate scientist and father, focused on research and ecology.",
+    "Traits": [
+      "Scientific",
+      "Passionate",
+      "Protective"
+    ],
+    "LovedGifts": [
+      "Bean Hotpot",
+      "Ice Cream",
+      "Rice Pudding",
+      "Strawberry"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Robin": "Wife",
+      "Maru": "Daughter, very proud of",
+      "Sebastian": "Stepson, strained relationship"
+    },
+    "Description": "A scientist and father, Demetrius is married to Robin and father to Sebastian and Maru. He is often found working on experiments in his home."
+  },
+  {
+    "Name": "Elliott",
+    "DisplayName": "Elliott",
+    "Birthday": "Fall 5",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Beach",
+    "Personality": "Elegant and well-read writer who dreams of writing a great novel.",
+    "Traits": [
+      "Elegant",
+      "Romantic",
+      "Creative",
+      "Introspective"
+    ],
+    "LovedGifts": [
+      "Crab Cakes",
+      "Duck Feather",
+      "Lobster",
+      "Pomegranate",
+      "Squid Ink",
+      "Tom Kha Soup"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Leah": "Fellow artist, close friend"
+    },
+    "Description": "A writer who lives in a cabin on the beach, Elliott is elegant and well-read. He dreams of writing a great novel."
+  },
+  {
+    "Name": "Emily",
+    "DisplayName": "Emily",
+    "Birthday": "Spring 27",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Colorful and vibrant, loves sewing, meditation, and crystal healing.",
+    "Traits": [
+      "Creative",
+      "Spiritual",
+      "Vibrant",
+      "Caring"
+    ],
+    "LovedGifts": [
+      "Aquamarine",
+      "Cloth",
+      "Survival Burger",
+      "Amethyst",
+      "Jade"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Haley": "Sister, lives with",
+      "Clint": "Clint has a crush on her, she is friendly but oblivious",
+      "Sandy": "Best friend, communicates by mail"
+    },
+    "Description": "Known for her colorful personality and vibrant clothing, Emily works part-time at the Stardrop Saloon. She enjoys sewing and meditation."
+  },
+  {
+    "Name": "Evelyn",
+    "DisplayName": "Evelyn",
+    "Birthday": "Winter 18",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Sweet elderly woman who loves gardening and baking.",
+    "Traits": [
+      "Sweet",
+      "Traditional",
+      "Caring"
+    ],
+    "LovedGifts": [
+      "Beet",
+      "Chocolate Cake",
+      "Fairy Rose",
+      "Rice Pudding",
+      "Tulip"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "George": "Husband",
+      "Alex": "Grandson, very proud of"
+    },
+    "Description": "A sweet, elderly woman who loves gardening and baking. She is married to George and is often seen tending to her flowers."
+  },
+  {
+    "Name": "George",
+    "DisplayName": "George",
+    "Birthday": "Fall 8",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Gruff elderly man in a wheelchair, stubborn but caring underneath.",
+    "Traits": [
+      "Gruff",
+      "Stubborn",
+      "Caring underneath"
+    ],
+    "LovedGifts": [
+      "Fried Mushroom",
+      "Leek"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Evelyn": "Wife",
+      "Alex": "Grandson"
+    },
+    "Description": "An elderly man with a gruff exterior, George uses a wheelchair. He is married to Evelyn and spends most of his time watching TV."
+  },
+  {
+    "Name": "Gus",
+    "DisplayName": "Gus",
+    "Birthday": "Summer 8",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Friendly and warm owner of the Stardrop Saloon who loves cooking.",
+    "Traits": [
+      "Friendly",
+      "Warm",
+      "Culinary"
+    ],
+    "LovedGifts": [
+      "Diamond",
+      "Fish Taco",
+      "Orange",
+      "Tropical Curry"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Pam": "Regular customer, friendly with",
+      "Emily": "Employee at the Saloon"
+    },
+    "Description": "The owner of the Stardrop Saloon, Gus is friendly and enjoys cooking. His saloon is a popular hangout for the townspeople."
+  },
+  {
+    "Name": "Haley",
+    "DisplayName": "Haley",
+    "Birthday": "Spring 14",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Initially shallow and fashion-focused, but has a deeper caring side that emerges over time.",
+    "Traits": [
+      "Fashionable",
+      "Photography",
+      "Initially shallow",
+      "Caring underneath"
+    ],
+    "LovedGifts": [
+      "Coconut",
+      "Fruit Salad",
+      "Pink Cake",
+      "Sunflower"
+    ],
+    "LikedGifts": [
+      "Daffodil",
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Emily": "Sister, lives with"
+    },
+    "Description": "A fashionable young woman who loves photography and socializing. She can initially seem shallow but has a deeper, caring side."
+  },
+  {
+    "Name": "Harvey",
+    "DisplayName": "Harvey",
+    "Birthday": "Winter 14",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Dedicated town doctor with a gentle demeanor and a passion for aviation.",
+    "Traits": [
+      "Dedicated",
+      "Gentle",
+      "Health-conscious",
+      "Aviation enthusiast"
+    ],
+    "LovedGifts": [
+      "Coffee",
+      "Pickles",
+      "Super Meal",
+      "Truffle Oil",
+      "Wine"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Maru": "Employee at his clinic"
+    },
+    "Description": "The town doctor, Harvey is dedicated to his work and has a gentle demeanor. He is passionate about healthcare and aviation."
+  },
+  {
+    "Name": "Jas",
+    "DisplayName": "Jas",
+    "Birthday": "Summer 4",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Cindersap Forest",
+    "Personality": "Young girl living with her aunt Marnie, friends with Vincent.",
+    "Traits": [
+      "Young",
+      "Curious",
+      "Playful"
+    ],
+    "LovedGifts": [
+      "Fairy Rose",
+      "Pink Cake",
+      "Plum Pudding",
+      "Raspberry"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Marnie": "Aunt and guardian",
+      "Shane": "Godfather, lives with",
+      "Vincent": "Best friend"
+    },
+    "Description": "A young girl living with her aunt Marnie after her parents' passing. She is friends with Vincent and enjoys playing outside."
+  },
+  {
+    "Name": "Jodi",
+    "DisplayName": "Jodi",
+    "Birthday": "Fall 11",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Devoted mother and wife who manages the household while Kent is away.",
+    "Traits": [
+      "Devoted",
+      "Domestic",
+      "Caring"
+    ],
+    "LovedGifts": [
+      "Fried Eel",
+      "Kale",
+      "Pancakes",
+      "Pumpkin Soup",
+      "Rhubarb Pie"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Kent": "Husband, deployed military",
+      "Sam": "Older son",
+      "Vincent": "Younger son"
+    },
+    "Description": "A devoted mother and wife, Jodi takes care of her sons Sam and Vincent. She manages the household while her husband Kent is away in the military."
+  },
+  {
+    "Name": "Kent",
+    "DisplayName": "Kent",
+    "Birthday": "Spring 21",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Soldier who returns in Year 2, struggling to adjust to civilian life.",
+    "Traits": [
+      "Military",
+      "Struggling",
+      "Family-oriented"
+    ],
+    "LovedGifts": [
+      "Fried Eel",
+      "Roasted Hazelnuts"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Jodi": "Wife",
+      "Sam": "Older son",
+      "Vincent": "Younger son"
+    },
+    "Description": "A soldier who returns home in year 2 after being deployed, Kent struggles with adjusting back to civilian life. He is married to Jodi and is the father of Sam and Vincent."
+  },
+  {
+    "Name": "Krobus",
+    "DisplayName": "Krobus",
+    "Birthday": "Winter 1",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Sewers",
+    "Personality": "A friendly shadow creature who lives in the sewers and sells rare items.",
+    "Traits": [
+      "Mysterious",
+      "Friendly",
+      "Misunderstood"
+    ],
+    "LovedGifts": [
+      "Diamond",
+      "Iridium Bar",
+      "Pumpkin",
+      "Void Egg",
+      "Void Mayonnaise",
+      "Wild Horseradish"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Wizard": "Has some connection to",
+      "Farmer": "Can become roommate"
+    },
+    "Description": "A shadow creature who lives in the sewers. He is a friend of the player, but is not known to the other townsfolk. He is the only friendly monster in the valley."
+  },
+  {
+    "Name": "Leah",
+    "DisplayName": "Leah",
+    "Birthday": "Fall 23",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Cindersap Forest",
+    "Personality": "Artistic and nature-loving sculptor who moved to the valley to pursue her passion.",
+    "Traits": [
+      "Artistic",
+      "Nature-loving",
+      "Independent",
+      "Creative"
+    ],
+    "LovedGifts": [
+      "Goat Cheese",
+      "Poppyseed Muffin",
+      "Salad",
+      "Stir Fry",
+      "Truffle",
+      "Vegetable Medley",
+      "Wine"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Elliott": "Fellow artist, close friend",
+      "Kel": "Ex-partner (mentioned in backstory)"
+    },
+    "Description": "An artist who lives in a cabin in Cindersap Forest, Leah enjoys sculpting and foraging. She moved to Stardew Valley recently to pursue her passion for art."
+  },
+  {
+    "Name": "Lewis",
+    "DisplayName": "Lewis",
+    "Birthday": "Spring 7",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Long-time mayor of Pelican Town, dedicated to the community.",
+    "Traits": [
+      "Dedicated",
+      "Community-minded",
+      "Secretive"
+    ],
+    "LovedGifts": [
+      "Autumn's Bounty",
+      "Glazed Yams",
+      "Hot Pepper",
+      "Maki Roll",
+      "Pizza"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Marnie": "Secret romantic relationship"
+    },
+    "Description": "The mayor of Pelican Town, Lewis has been in office for many years. He is dedicated to the town and its prospering. He has a longstanding, secret relationship with Marnie."
+  },
+  {
+    "Name": "Linus",
+    "DisplayName": "Linus",
+    "Birthday": "Fall 3",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Mountain",
+    "Personality": "Solitary man who lives in a tent and prefers living off the land.",
+    "Traits": [
+      "Solitary",
+      "Nature-loving",
+      "Independent",
+      "Misunderstood"
+    ],
+    "LovedGifts": [
+      "Blueberry Tart",
+      "Coconut",
+      "Cranberry Candy",
+      "Dish O' The Sea",
+      "Sashimi",
+      "Yam"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Farmer": "Can become friends, appreciates kindness"
+    },
+    "Description": "A solitary man who lives in a tent near the mountains. He prefers living off the land and values his independence."
+  },
+  {
+    "Name": "Marnie",
+    "DisplayName": "Marnie",
+    "Birthday": "Fall 18",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Cindersap Forest",
+    "Personality": "Caring ranch owner who raises Jas and Shane.",
+    "Traits": [
+      "Caring",
+      "Domestic",
+      "Animal-loving"
+    ],
+    "LovedGifts": [
+      "Diamond",
+      "Farmer's Lunch",
+      "Pumpkin Pie",
+      "Pink Cake"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Lewis": "Secret romantic relationship",
+      "Shane": "Nephew, lives with",
+      "Jas": "Niece and ward, lives with"
+    },
+    "Description": "The owner of the local ranch. She is caring and raising Jas and Shane. She has a secret relationship with Mayor Lewis."
+  },
+  {
+    "Name": "Maru",
+    "DisplayName": "Maru",
+    "Birthday": "Summer 10",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Mountain",
+    "Personality": "Intelligent and inventive, works part-time at Harvey's Clinic.",
+    "Traits": [
+      "Intelligent",
+      "Inventive",
+      "Curious",
+      "Scientific"
+    ],
+    "LovedGifts": [
+      "Battery Pack",
+      "Cauliflower",
+      "Cheese Cauliflower",
+      "Diamond",
+      "Gold Bar",
+      "Iridium Bar",
+      "Miner's Treat",
+      "Pepper Poppers",
+      "Radioactive Bar",
+      "Ruby",
+      "Strawberry"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Demetrius": "Father, very close",
+      "Robin": "Mother",
+      "Sebastian": "Half-brother, sometimes tense"
+    },
+    "Description": "The daughter of Demetrius and Robin, Maru is intelligent and enjoys working with electronics and gadgets. She works part-time at Harvey's Clinic."
+  },
+  {
+    "Name": "Pam",
+    "DisplayName": "Pam",
+    "Birthday": "Spring 18",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Bus driver who loves a drink, lives with her daughter Penny.",
+    "Traits": [
+      "Hard-drinking",
+      "Protective",
+      "Working-class"
+    ],
+    "LovedGifts": [
+      "Beer",
+      "Cactus Fruit",
+      "Glazed Yams",
+      "Mead",
+      "Pale Ale",
+      "Parsnip"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Penny": "Daughter, complicated relationship",
+      "Gus": "Friend, regular at the Saloon"
+    },
+    "Description": "A bus driver who loves a drink, Pam lives with her daughter Penny in a trailer. She drives bus to the desert once it is repaired."
+  },
+  {
+    "Name": "Penny",
+    "DisplayName": "Penny",
+    "Birthday": "Fall 2",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Kind-hearted tutor who dreams of a better life, gentle and charitable.",
+    "Traits": [
+      "Kind",
+      "Gentle",
+      "Charitable",
+      "Dreamer"
+    ],
+    "LovedGifts": [
+      "Diamond",
+      "Emerald",
+      "Melon",
+      "Poppy",
+      "Red Plate",
+      "Roots Platter",
+      "Sandfish",
+      "Survival Burger"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Pam": "Mother, complicated relationship",
+      "Jas": "Tutors",
+      "Vincent": "Tutors"
+    },
+    "Description": "A kind-hearted young woman who lives with her mother Pam in their trailer. She is gentle, loving and charitable. She tutors Jas and Vincent and dreams of a better life."
+  },
+  {
+    "Name": "Pierre",
+    "DisplayName": "Pierre",
+    "Birthday": "Spring 26",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Business-minded store owner stressed by JojaMart competition.",
+    "Traits": [
+      "Business-minded",
+      "Stressed",
+      "Family-oriented"
+    ],
+    "LovedGifts": [
+      "Fried Calamari",
+      "Sashimi"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Caroline": "Wife",
+      "Abigail": "Daughter, strained relationship"
+    },
+    "Description": "The owner of the General Store, Pierre is dedicated to his business and very stressed by the competition from JojaMart. He is married to Caroline and father to Abigail."
+  },
+  {
+    "Name": "Robin",
+    "DisplayName": "Robin",
+    "Birthday": "Summer 21",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Mountain",
+    "Personality": "Energetic carpenter who builds and upgrades farm buildings.",
+    "Traits": [
+      "Energetic",
+      "Practical",
+      "Creative"
+    ],
+    "LovedGifts": [
+      "Carp Soup",
+      "Goat Cheese",
+      "Peach",
+      "Spaghetti"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Demetrius": "Husband",
+      "Maru": "Daughter",
+      "Sebastian": "Son from previous relationship"
+    },
+    "Description": "The local carpenter, Robin is married to Demetrius and mother to Maru and Sebastian. She builds and upgrades farm buildings for the player."
+  },
+  {
+    "Name": "Sam",
+    "DisplayName": "Sam",
+    "Birthday": "Summer 17",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Laid-back music lover who dreams of becoming a rock star.",
+    "Traits": [
+      "Laid-back",
+      "Music-loving",
+      "Skateboarding",
+      "Fun"
+    ],
+    "LovedGifts": [
+      "Cactus Fruit",
+      "Maple Bar",
+      "Pizza",
+      "Tigerseye"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Sebastian": "Best friend, bandmate",
+      "Jodi": "Mother",
+      "Kent": "Father, returns in Year 2",
+      "Vincent": "Younger brother"
+    },
+    "Description": "A laid-back, music-loving young man who dreams of becoming a rock star. He lives with his mother Jodi and brother Vincent. Enjoys skateboarding."
+  },
+  {
+    "Name": "Sandy",
+    "DisplayName": "Sandy",
+    "Birthday": "Fall 15",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Desert",
+    "Personality": "Cheerful and friendly owner of the Oasis shop in the desert.",
+    "Traits": [
+      "Cheerful",
+      "Friendly",
+      "Lonely"
+    ],
+    "LovedGifts": [
+      "Crocus",
+      "Daffodil",
+      "Sweet Gem Berry"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Emily": "Best friend, communicates by mail"
+    },
+    "Description": "The owner of the Oasis shop in the desert, Sandy is cheerful and friendly. She is best friend to Emily, communicating by post until the bus is repaired."
+  },
+  {
+    "Name": "Sebastian",
+    "DisplayName": "Sebastian",
+    "Birthday": "Winter 10",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Mountain",
+    "Personality": "Introverted programmer and gamer who lives in the basement, loves motorcycles.",
+    "Traits": [
+      "Introverted",
+      "Intelligent",
+      "Moody",
+      "Dry wit",
+      "Caring underneath"
+    ],
+    "LovedGifts": [
+      "Frozen Tear",
+      "Obsidian",
+      "Pumpkin Soup",
+      "Sashimi",
+      "Void Egg"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Robin": "Mother, sometimes feels smothered",
+      "Demetrius": "Stepfather, tense relationship",
+      "Maru": "Stepsister, sometimes jealous",
+      "Sam": "Best friend, bandmate",
+      "Abigail": "Close friend, shared interests"
+    },
+    "Description": "A programmer and the son of Robin, Sebastian is introverted and enjoys gaming and working on his motorcycle. He lives in the basement of his family's house."
+  },
+  {
+    "Name": "Shane",
+    "DisplayName": "Shane",
+    "Birthday": "Summer 7",
+    "IsRomanceable": true,
+    "IsDatable": true,
+    "HomeLocation": "Cindersap Forest",
+    "Personality": "Initially gruff and depressed, opens up over time. Loves chickens.",
+    "Traits": [
+      "Cynical",
+      "Depressed",
+      "Guarded",
+      "Caring underneath",
+      "Loves chickens"
+    ],
+    "LovedGifts": [
+      "Beer",
+      "Hot Pepper",
+      "Pepper Poppers",
+      "Pizza"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Marnie": "Aunt, lives with",
+      "Jas": "Goddaughter, very protective",
+      "Emily": "Friend at the Saloon"
+    },
+    "Description": "Initially gruff and unfriendly, Shane works at JojaMart and struggles with depression. At higher heart levels he opens up to the player and has a fondness for chickens."
+  },
+  {
+    "Name": "Vincent",
+    "DisplayName": "Vincent",
+    "Birthday": "Spring 10",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Pelican Town",
+    "Personality": "Energetic young boy, friends with Jas.",
+    "Traits": [
+      "Young",
+      "Energetic",
+      "Curious"
+    ],
+    "LovedGifts": [
+      "Grape",
+      "Pink Cake",
+      "Snail"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Jodi": "Mother",
+      "Kent": "Father, away in military",
+      "Sam": "Older brother",
+      "Jas": "Best friend"
+    },
+    "Description": "A young boy with a lot of energy, Vincent is Jodi and Kent's son and is friends with Jas. He is curious and loves playing outside."
+  },
+  {
+    "Name": "Willy",
+    "DisplayName": "Willy",
+    "Birthday": "Summer 24",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Beach",
+    "Personality": "Friendly local fisherman who runs the Fish Shop and loves the sea.",
+    "Traits": [
+      "Friendly",
+      "Seafaring",
+      "Hardworking"
+    ],
+    "LovedGifts": [
+      "Catfish",
+      "Diamond",
+      "Gold Bar",
+      "Iridium Bar",
+      "Mead",
+      "Octopus",
+      "Pumpkin",
+      "Sea Cucumber",
+      "Sturgeon"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Gus": "Friend, regular at the Saloon"
+    },
+    "Description": "The local fisherman, Willy runs the Fish Shop by the beach. He loves the sea and is often seen around town fishing, as well as spending his evenings in the Stardrop Saloon."
+  },
+  {
+    "Name": "Wizard",
+    "DisplayName": "Wizard",
+    "Birthday": "Winter 17",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Cindersap Forest",
+    "Personality": "Mysterious figure knowledgeable about magic and the supernatural.",
+    "Traits": [
+      "Mysterious",
+      "Magical",
+      "Knowledgeable",
+      "Reclusive"
+    ],
+    "LovedGifts": [
+      "Solar Essence",
+      "Void Essence",
+      "Purple Mushroom",
+      "Super Cucumber"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Abigail": "Intrigued by her interest in the supernatural"
+    },
+    "Description": "Proper name is Magnus Rasmodius. A mysterious figure who lives in the Wizard's Tower. He is knowledgeable about magic and the supernatural elements of Stardew Valley."
+  },
+  {
+    "Name": "Dwarf",
+    "DisplayName": "Dwarf",
+    "Birthday": "Summer 22",
+    "IsRomanceable": false,
+    "IsDatable": false,
+    "HomeLocation": "Mines",
+    "Personality": "A dwarf who lives in the mines, speaks Dwarvish initially.",
+    "Traits": [
+      "Mysterious",
+      "Knowledgeable",
+      "Merchant"
+    ],
+    "LovedGifts": [
+      "Aquamarine",
+      "Emerald",
+      "Jade",
+      "Ruby",
+      "Topaz",
+      "Amethyst"
+    ],
+    "LikedGifts": [
+      "All Universal Likes"
+    ],
+    "NeutralGifts": [
+      "All Universal Neutrals"
+    ],
+    "DislikedGifts": [
+      "All Universal Dislikes"
+    ],
+    "HatedGifts": [
+      "Hated Gifts"
+    ],
+    "UniversalLoves": [],
+    "UniversalLikes": [],
+    "UniversalDislikes": [],
+    "UniversalHates": [],
+    "Relationships": {
+      "Krobus": "Ancient enemy (shadow people vs dwarves)"
+    },
+    "Description": "A dwarf who lives in the mines. Initially speaks Dwarvish until the player obtains the Dwarvish Translation Guide. Sells rare items."
+  }
+]

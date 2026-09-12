@@ -1,0 +1,19 @@
+# Allowlist style: exclude everything, then re-include what the build needs.
+# This prevents multi-GB game folders, node_modules, and repo-root junk
+# from entering the build context.
+
+*
+
+# ── Source tree (projects, props, targets, nuget config) ──────
+!src/
+!nuget.config
+
+# ── Docker build files ────────────────────────────────────────
+!docker/
+!.dockerignore
+
+# ── Prune build artifacts inside the re-included src/ ─────────
+# NOTE: after a !dir/ re-inclusion, negation patterns apply to its children.
+# These patterns strip bin/obj from every project under src/.
+**/bin/
+**/obj/

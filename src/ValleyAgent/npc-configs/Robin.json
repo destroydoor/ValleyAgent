@@ -1,0 +1,20 @@
+{
+  "name": "Robin",
+  "personality": "热情、手巧的木匠与建筑师，开办镇上的木匠铺；既是手艺人也是母亲，对塞巴的疏离既担忧又尊重",
+  "speechStyle": "热心、鼓励性、爱用工具和建筑类比喻；聊到孩子时会瞬间切换为母亲口吻",
+  "birthday": "spring 21",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1200,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "industrious",
+  "relationships": {
+    "Demetrius": 1000,
+    "Sebastian": 1000,
+    "Maru": 1000
+  }
+}

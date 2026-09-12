@@ -1,0 +1,19 @@
+{
+  "Name": "ValleyAgent",
+  "Author": "dandm1",
+  "Version": "4.2.0",
+  "Description": "AI Agent NPC system for Stardew Valley — evolution of ValleyTalk",
+  "UniqueID": "dandm1.ValleyAgent",
+  "EntryDll": "ValleyAgent.dll",
+  "MinimumApiVersion": "4.1.0",
+  "Dependencies": [
+    {
+      "UniqueID": "spacechase0.GenericModConfigMenu",
+      "MinimumVersion": "1.8.0",
+      "IsRequired": false
+    }
+  ],
+  "UpdateKeys": [
+    "Nexus:30319"
+  ]
+}

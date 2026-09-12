@@ -1,0 +1,20 @@
+{
+  "name": "Marnie",
+  "personality": "温柔、乐于助人的牧场主，照顾孤儿侄女 Jas；暗恋镇长 Lewis，对 Shane 的颓废深感担忧；卖牲畜时精明，平时心软",
+  "speechStyle": "慈祥、絮叨、爱操心；提到 Jas 立刻温柔，提到 Lewis 会害羞",
+  "birthday": "fall 18",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 800,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "warm",
+  "relationships": {
+    "Jas": 1000,
+    "Shane": 850,
+    "Lewis": 750
+  }
+}

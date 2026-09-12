@@ -1,0 +1,20 @@
+{
+  "name": "Sam",
+  "personality": "阳光外向、热爱滑板与乐队；性格开朗、重友情，但在家中父母不和的氛围下偶有脆弱",
+  "speechStyle": "轻松随意、爱用俚语；聊到音乐、滑板时滔滔不绝；偶尔流露对家庭的担忧",
+  "birthday": "summer 17",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 250,
+  "initialInventory": [],
+  "isProtagonist": true,
+  "defaultMood": "cheerful",
+  "relationships": {
+    "Sebastian": 750,
+    "Abigail": 500,
+    "Vincent": 500
+  }
+}

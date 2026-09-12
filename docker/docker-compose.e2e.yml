@@ -1,0 +1,118 @@
+# Docker Compose for multiplayer E2E tests (Phase 3).
+# Three services: TS server + host game container + farmhand game container.
+#
+# Usage (from repo root):
+#   docker compose -f docker/docker-compose.e2e.yml up -d
+#   docker compose -f docker/docker-compose.e2e.yml down
+#
+# Prerequisites:
+#   1. Run prep-mods.ps1 -Role host and -Role farmhand first
+#   2. Run prep-mods.ps1 (default -Role it) for saves
+#   3. Set LLM_API_KEY env var (run-e2e.ps1 reads it from config.json)
+#
+# See docs/plan/2026-08-19-docker-multiplayer-e2e-plan.md for design details.
+
+services:
+  # ── TS Agent Server ──
+  # Runs valleyai-server image (built from ValleyAI Dockerfile.server).
+  # Notes:
+  #   - Deps installed at build time; bind-mount bun install breaks workspace
+  #     symlinks (@valley/*) on Docker Desktop
+  #   - npc_prompts.json + director db must live on a WRITABLE path (/data-host),
+  #     so command copies prompts from the read-only mods mount first
+  valley-ts:
+    image: valleyai-server
+    container_name: valley-ts
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - mkdir -p /data-host/Mods/ValleyAgent/Data && cp /mods-src/ValleyAgent/Data/npc_prompts.json /data-host/Mods/ValleyAgent/Data/npc_prompts.json && bun run packages/stardew/src/cli.ts --hostname 0.0.0.0 --port 8765 --data-path /data-host/Mods/ValleyAgent/Data/npc_prompts.json --agents-dir /data-host/Mods/ValleyAgent/agents --llm-api-key "$${LLM_API_KEY}" --llm-model "$${LLM_MODEL:-MiniMax-M3}" --llm-base-url "$${LLM_BASE_URL:-https://api.minimax.chat/v1}" --llm-provider "$${LLM_PROVIDER:-minimax}"
+    environment:
+      - NODE_ENV=development
+      # Injected by run-e2e.ps1 (reads ValleyAgent config.json); compose
+      # interpolates from the HOST process env, then the container shell
+      # expands $$LLM_* at runtime.
+      - LLM_API_KEY=${LLM_API_KEY:?run-e2e.ps1 must set LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-MiniMax-M3}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.minimax.chat/v1}
+      - LLM_PROVIDER=${LLM_PROVIDER:-minimax}
+    volumes:
+      # Prepared mods (read-only source for npc_prompts.json)
+      - D:\Source\ValleyTalk\docker\mods-cache-host:/mods-src:ro
+      # Shared with host container: agents memory, transcript, C5 assertion files
+      - D:\Source\ValleyTalk\docker\data-host:/data-host:rw
+    networks:
+      - valley-e2e
+    # TS server needs no GUI ports
+    # Health check: WebSocket-only server returns 200 on HTTP GET
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8765/').then(r => process.exit(r.status === 200 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  # ── Host Game Container ──
+  # Runs SMAPI with UseAgentServer=true, connects to valley-ts via WebSocket.
+  # Hosts the multiplayer server (Lidgren port 24642).
+  valley-host:
+    image: valleyagent-gameit
+    container_name: valley-host
+    depends_on:
+      valley-ts:
+        condition: service_healthy
+    environment:
+      - VALLEY_TEST_INSTANCE=host
+    volumes:
+      # Game files (shared, read-only)
+      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      # Mods for host role (read-only, prepared by prep-mods.ps1 -Role host)
+      - D:\Source\ValleyTalk\docker\mods-cache-host:/mods-src:ro
+      # Save files (shared with farmhand, read-only)
+      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      # SMAPI installer cache (shared, read-only)
+      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      # Host data directory (writable: game copy, SMAPI install, logs, agents)
+      - D:\Source\ValleyTalk\docker\data-host:/data
+    networks:
+      - valley-e2e
+    # Lidgren multiplayer port (exposed on bridge network for farmhand to connect)
+    expose:
+      - "24642"
+    # VNC ports (default commented out; use -Vnc flag to expose)
+    # ports:
+    #   - "5801:5800"  # VNC web
+    #   - "5901:5900"  # VNC native
+
+  # ── Farmhand Game Container ──
+  # Runs SMAPI in ThinClient mode, joins valley-host multiplayer server.
+  valley-farmhand:
+    image: valleyagent-gameit
+    container_name: valley-farmhand
+    depends_on:
+      valley-host:
+        condition: service_started
+    environment:
+      - VALLEY_TEST_INSTANCE=farmhand
+    volumes:
+      # Game files (shared, read-only)
+      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      # Mods for farmhand role (read-only, prepared by prep-mods.ps1 -Role farmhand)
+      - D:\Source\ValleyTalk\docker\mods-cache-farmhand:/mods-src:ro
+      # Save files (shared with host, read-only)
+      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      # SMAPI installer cache (shared, read-only)
+      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      # Farmhand data directory (writable: game copy, SMAPI install, logs)
+      - D:\Source\ValleyTalk\docker\data-farmhand:/data
+    networks:
+      - valley-e2e
+    # VNC ports (default commented out; use -Vnc flag to expose)
+    # ports:
+    #   - "5802:5800"  # VNC web
+    #   - "5902:5900"  # VNC native
+
+networks:
+  valley-e2e:
+    driver: bridge

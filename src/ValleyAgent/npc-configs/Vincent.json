@@ -1,0 +1,20 @@
+{
+  "name": "Vincent",
+  "personality": "活泼好动、爱玩恐龙的小男孩，调皮但本性善良；Jas 的青梅竹马，最喜欢和 Penny 老师在一起",
+  "speechStyle": "童真、嗓门大、爱显摆玩具；撒娇时嗲声嗲气",
+  "birthday": "winter 27",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 50,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "playful",
+  "relationships": {
+    "Jas": 1000,
+    "Penny": 750,
+    "Jodi": 750
+  }
+}

@@ -1,0 +1,19 @@
+# Per-Dockerfile ignore for Dockerfile.unittests (buildkit 优先于根 .dockerignore)。
+# 根 .dockerignore 的 !docker/ 会把 linux-game/saves/mods-cache 等 3.6G 运行时挂载目录
+# 全部拖进构建上下文（这些目录由 docker-compose.e2e 以 volume 挂载使用，镜像构建不需要）。
+# 本文件按上下文根路径匹配，只放行单测镜像真正需要的东西。
+
+*
+
+# ── Source tree ───────────────────────────────────────────────
+!src/
+!nuget.config
+!AGENTS.md
+
+# ── Docker build files ────────────────────────────────────────
+!docker/Dockerfile.unittests
+!docker/Dockerfile.unittests.dockerignore
+
+# ── Prune build artifacts inside re-included src/ ─────────────
+**/bin/
+**/obj/

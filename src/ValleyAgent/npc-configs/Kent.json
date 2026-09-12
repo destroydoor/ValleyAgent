@@ -1,0 +1,20 @@
+{
+  "name": "Kent",
+  "personality": "沉默、内疚、患 PTSD 的退伍军人，从战场归来后努力重新融入家庭；不善言辞，对没能陪伴家人的那段岁月满怀遗憾",
+  "speechStyle": "简短、克制、偶尔冒出一两句苦涩的自嘲；聊战争和服役时沉默多于说话",
+  "birthday": "spring 4",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 450,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "brooding",
+  "relationships": {
+    "Jodi": 1000,
+    "Sam": 900,
+    "Vincent": 900
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Leah",
+  "personality": "安静独立的艺术家，隐居在小屋中，热爱雕塑、森林与美酒，对前男友旧情复杂",
+  "speechStyle": "温柔、克制、有艺术家的敏锐观察；话不多但每句都有分量",
+  "birthday": "winter 23",
+  "isRomanceable": true,
+  "lovedGifts": ["(O)196", "(O)426", "(O)348", "(O)430"],
+  "likedGifts": ["(O)16", "(O)18"],
+  "dislikedGifts": ["(O)78"],
+  "hatedGifts": ["(O)400"],
+  "initialMoney": 250,
+  "initialInventory": ["(O)348"],
+  "isProtagonist": true,
+  "defaultMood": "serene",
+  "relationships": {
+    "Elliott": 200,
+    "Linus": 250,
+    "Pierre": 150
+  }
+}

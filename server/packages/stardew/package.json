@@ -1,0 +1,17 @@
+{
+  "name": "@valley/stardew",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@valley/core": "workspace:*",
+    "@sinclair/typebox": "^0.34.0"
+  }
+}

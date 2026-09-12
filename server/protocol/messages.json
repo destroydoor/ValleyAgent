@@ -1,0 +1,1054 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "ValleyAI wire 协议单一事实源。所有 C#(ValleyAgent) ↔ TS(ValleyAI) WebSocket 消息类型在此声明。修改本文件前必须运行 `bun run check:protocol` 验证两端实现一致。字段基于代码实证（C# WebSocketClient.cs / EventHandlerInitializer.cs / CommandExecutor.cs / ProtocolV2.cs，TS protocol-adapter.ts / types.ts）。",
+  "status_enum": {
+    "active": "两端都接线（C# 发送且 TS 路由，或 TS 响应且 C# 接收）",
+    "dead_pipeline": "C# 发送但 TS routeMessage 不路由（前 5 类会卡 60s 超时，后 3 类 fire-and-forget ack 被静默丢弃）",
+    "orphan_route": "TS routeMessage 路由但 C# 从不发（可疑，警告不失败）",
+    "planned": "设计文档规划但两端均未实现"
+  },
+  "direction_enum": {
+    "csharp_to_ts": "C# 发往 TS",
+    "ts_to_csharp": "TS 发往 C#",
+    "bidirectional": "双向（C# 发起，TS 响应同 type）"
+  },
+  "transport_enum": {
+    "request_response": "C# 注册 pending request 等响应（60s 超时抛 TimeoutException）",
+    "fire_and_forget": "发送不等响应（ack 被静默处理或丢弃）"
+  },
+  "messages": [
+    {
+      "type": "hello",
+      "direction": "bidirectional",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "连接握手。C# 连上 WS 后立即发 hello（含 npcName），TS 返回 hello ack（含 serverVersion）。注意：TS HelloRequest 期望 modVersion 字段，但 C# 实际发的是 npcName - 协议不一致待修。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "hello"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true,
+          "sent_by": "csharp",
+          "description": "C# 发送时携带的 NPC 标识"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "sent_by": "ts",
+          "value": "ok",
+          "description": "TS 响应时为 'ok'"
+        },
+        {
+          "name": "serverVersion",
+          "type": "string",
+          "required": false,
+          "sent_by": "ts",
+          "description": "TS 响应时携带，当前 '0.1.0'"
+        },
+        {
+          "name": "modVersion",
+          "type": "string",
+          "required": false,
+          "sent_by": "ts_expected",
+          "description": "TS HelloRequest 期望但 C# 未发 - 协议不一致"
+        }
+      ]
+    },
+    {
+      "type": "ping",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "心跳。WebSocketClient 每 30 秒发送一次，TS 返回 pong。失败时 Abort 当前连接触发重连。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "ping"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        }
+      ]
+    },
+    {
+      "type": "pong",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "ping 的响应。C# HandleMessage 按 requestId 完成_pending request（实际 ping 走 SendUnsafeAsync 未注册 pending，pong 被静默丢弃）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "pong"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    {
+      "type": "dialogue",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "玩家与 NPC 对话请求。C# SendRequestAsync 注册 pending 等 60s 响应，TS 返回 dialogue_response。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "dialogue"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "playerInput",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "worldSnapshot",
+          "type": "WorldSnapshot",
+          "required": true,
+          "description": "复合对象：season/day/time/weather/location（玩家所在地图）/npcTile/nearbyObjects/friendship/npcState/inventory（玩家背包）/farmerName；可选 playerMoney/npcLocation（NPC 所在地图）/npcMoney（NPC 钱包）/npcInventory（NPC 真背包）/playerHeldItem（玩家手持物，NPC 买家的交易标的）/currentGoal（NPC 当前执行目标）/npcMood（NPC 心情标签）/npcRecentEvents（NPC 近期事件）/npcWorkingOn（NPC 工作标记）/npcOwedMoney（NPC 欠款），旧 C# 客户端不携带"
+        },
+        {
+          "name": "playerId",
+          "type": "string",
+          "required": false,
+          "description": "2026-08-16 联机：发起对话的玩家 ID（UniqueMultiplayerID 字符串）。可选，旧客户端缺省回落 Game1.player。"
+        }
+      ]
+    },
+    {
+      "type": "dialogue_response",
+      "direction": "ts_to_csharp",
+      "transport": "request_response",
+      "status": "active",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "dialogue 的响应。TS handleDialogue 返回，C# MessageProtocol.Deserialize<DialogueResponse> 解析。方案 B：friendshipDelta/friendshipReason 并回此消息，消灭 friendship_eval 死管道。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "dialogue_response"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "speech",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "actions",
+          "type": "ToolAction[]",
+          "required": true,
+          "description": "工具调用数组：{tool, args, callId?}"
+        },
+        {
+          "name": "emotion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "friendshipDelta",
+          "type": "integer",
+          "required": false,
+          "description": "方案 B：LLM 评估的好感度变化，C# 端 ApplyWithExternalDeltaAsync 消费；未输出时为 null（默认 0）"
+        },
+        {
+          "name": "friendshipReason",
+          "type": "string",
+          "required": false,
+          "description": "方案 B：好感度变化理由，随 friendshipDelta 携带"
+        },
+        {
+          "name": "memorySideEffect",
+          "type": "string",
+          "required": false,
+          "value": "recorded"
+        },
+        {
+          "name": "fallback",
+          "type": "boolean",
+          "required": false,
+          "description": "true 表示规则引擎降级响应"
+        },
+        {
+          "name": "playerId",
+          "type": "string",
+          "required": false,
+          "description": "2026-08-16 联机：发起对话的玩家 ID 原样 echo，C# 据此记录 LastDialoguePlayerId（FOLLOW 目标解析）。可选。"
+        }
+      ]
+    },
+    {
+      "type": "action_result",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "工具执行结果反馈。C# CommandExecutor 通过 SendMessageAsync 发送 ProtocolV2.ActionResultMessage（默认 Type='action_result'），TS handleActionResult 路由到 NPC 反馈队列。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "action_result"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": false,
+          "description": "缺失时 TS 静默丢弃（legacy 兼容）"
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "required": true,
+          "description": "工具名（与 tool 镜像）"
+        },
+        {
+          "name": "callId",
+          "type": "string",
+          "required": true,
+          "description": "LLM 工具调用 ID（C3 反馈环匹配）；旧路径为空"
+        },
+        {
+          "name": "tool",
+          "type": "string",
+          "required": false,
+          "description": "工具名，TS routeToolResult 优先读此字段"
+        },
+        {
+          "name": "success",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "result",
+          "type": "object|string",
+          "required": false,
+          "description": "新路径 string（人类可读反馈），旧路径 Dictionary"
+        }
+      ]
+    },
+    {
+      "type": "decision",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] LLM 决策管道。原 DecideAsync 通过 SendRequestAsync 发送并等 60s 响应，TS routeMessage 无 case -> 60s 超时。批次A已删除 C# 发送端，决策路径改为 RuleBasedDecisionEngine 唯一路径。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "decision"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "SendRequestAsync 自动注入"
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（DecisionRequest 类字段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "gift_eval",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] 礼物评估管道。原 EvaluateGiftAsync 通过 SendRequestAsync 发送并等 60s 响应，TS 不路由 -> 60s 超时。批次A已删除 C# 发送端，HostGiftTransport 改用本地 GiftReactionResult 兜底反应文本。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "gift_eval"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（GiftEvalRequest 类字段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "rag_query",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] RAG 查询管道。原 QueryRagAsync 通过 SendRequestAsync 发送并等 60s 响应，TS 不路由 -> 60s 超时。批次A已删除 C# 发送端。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "rag_query"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（RagQueryRequest 类字段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "state_sync",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] 游戏状态同步管道。原 EventHandlerInitializer 通过 SendTestMessageAsync 发送并等响应，TS 不路由 -> 60s 超时（Task.Run 包裹吞异常）。批次A已删除 C# 发送端及 StateSyncSender 类。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "state_sync"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "SendTestMessageAsync 自动注入"
+        },
+        {
+          "name": "timestamp",
+          "type": "long",
+          "required": true,
+          "description": "Unix 毫秒时间戳"
+        },
+        {
+          "name": "npcs",
+          "type": "NpcState[]",
+          "required": true,
+          "description": "NPC 状态列表：name/location/position/health/maxHealth/state/inventory/friendship/emotion/nearbyObjects/memory/structuredMemory"
+        },
+        {
+          "name": "gameState",
+          "type": "GameState",
+          "required": true,
+          "description": "游戏状态：time/season/day/year/weather/playerPosition/playerLocation"
+        }
+      ]
+    },
+    {
+      "type": "consolidate_day",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "日终记忆凝练。C# EventHandlerInitializer 在 OnDayEnding 和 OnDayStarted（跳睡眠补跑）通过 SendMessageAsync 发送；TS routeMessage 路由到幂等日志处理并返回 ack，Phase 1 接入实际 LLM 日结。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "consolidate_day"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "dateIso",
+          "type": "string",
+          "required": true,
+          "description": "ISO 日期，如 '2024-05-12'"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": false,
+          "description": "Guid N 格式；可选，向后兼容旧客户端"
+        }
+      ]
+    },
+    {
+      "type": "route_shout",
+      "direction": "csharp_to_ts",
+      "transport": "request_response",
+      "status": "orphan_route",
+      "routed_by_ts": true,
+      "sent_by_csharp": false,
+      "description": "E5-2 喊话歧义兜底路由。TS MorningShoutRouter 已接线（轻量路由 LLM，最多 1 次调用，断线走确定性兜底）。C# 当前 4 层确定性路由（名字提及→当前会话→跟随/雇佣者→已醒来+关系最近）已覆盖全部场景暂不发送——预留歧义兜底扩展点。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "route_shout"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true,
+          "description": "喊话的 NPC"
+        },
+        {
+          "name": "playerShout",
+          "type": "string",
+          "required": true,
+          "description": "喊话内容"
+        },
+        {
+          "name": "candidates",
+          "type": "array",
+          "required": true,
+          "description": "候选 NPC 列表：{name, awake, friendship, location}，location=远方表示不在同场景"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": false,
+          "description": "Guid N 格式；可选，向后兼容旧客户端"
+        }
+      ]
+    },
+    {
+      "type": "route_shout_response",
+      "direction": "ts_to_csharp",
+      "transport": "request_response",
+      "status": "active",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "route_shout 的响应。TS handleRouteShout 返回，C# 解析。targetName=选中的目标 NPC（null=无人可听/全员未醒），reason=机器可读选择原因（deterministic_closest_friendship / no_awake_candidate / llm_*）。随 route_shout 一起预留——C# 当前不发 route_shout 请求故该响应实际不会被接收。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "route_shout_response"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "targetName",
+          "type": "string|null",
+          "required": true,
+          "description": "选中目标 NPC 名；null=无人可听"
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true,
+          "description": "选择原因（机器可读）"
+        }
+      ]
+    },
+    {
+      "type": "emotion_sync",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] NPC 情绪同步管道。原 Brain.OnEmotionSynced 事件触发 SendMessageAsync 发送，TS 不路由 -> 静默丢弃。批次A已删除 C# 订阅与发送端。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "emotion_sync"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "emotion",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "intensity",
+          "type": "unknown",
+          "required": true,
+          "description": "unknown - 待补（实际类型未实证）"
+        },
+        {
+          "name": "source",
+          "type": "unknown",
+          "required": true,
+          "description": "unknown - 待补（实际类型未实证）"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        }
+      ]
+    },
+    {
+      "type": "memory_sync",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[已删除] NPC 记忆同步管道。原 Brain.OnMemorySynced 事件触发 SendMessageAsync 发送，TS 不路由 -> 静默丢弃。批次A已删除 C# 订阅与发送端。保留 schema 条目作为历史记录。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "memory_sync"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "importance",
+          "type": "unknown",
+          "required": true,
+          "description": "unknown - 待补（实际类型未实证）"
+        },
+        {
+          "name": "entryType",
+          "type": "unknown",
+          "required": true,
+          "description": "unknown - 待补（实际类型未实证）"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        }
+      ]
+    },
+    {
+      "type": "state_changed",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "NPC 状态机转换通知，TS 端据此维护 actualState 镜像。C# StateChangedSender 订阅 AgentStateMachine.OnStateChanged，转换后通过 SendMessageAsync 发送（fire-and-forget）。TS routeMessage 路由到 registry.updateActualState。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "state_changed"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "previousState",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "newState",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "wasForced",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "previousStateDurationMs",
+          "type": "number",
+          "required": true,
+          "description": "前一状态持续毫秒数"
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": false,
+          "description": "自由字符串原因（如 travel_failed/evicted/task_completed/llm_decision/manual），可选向后兼容"
+        }
+      ]
+    },
+    {
+      "type": "day_started",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "C# DayStarted 时通知 TS 新的一天开始。TS 触发导演 morningPlan（10% 概率产出 beat → allocate_agent）。设计文档 §4.2.2。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "day_started"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "dateIso",
+          "type": "string",
+          "required": true,
+          "description": "游戏日期 ISO key（如 Y1_spring_1）"
+        },
+        {
+          "name": "directorContext",
+          "type": "string",
+          "required": false,
+          "description": "阶段 3: DirectorContextBuilder 拼装的导演上下文（压缩结构化文本，800-1500 token 预算）。可空向后兼容；当前 TS 端 morningPlan 走 game_context_sync 结构化通道，本字段供工具型 Director 消费。"
+        }
+      ]
+    },
+    {
+      "type": "game_context_sync",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "C# 推送游戏世界上下文快照给 TS GameContextManager（时间/进度/玩家状态/NPC 状态）。Director.morningPlan 依赖该上下文，缺失时直接返回空计划（2026-08-09 发现 C# 从未发送 → 导演 LLM 从未运行）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "game_context_sync"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "context",
+          "type": "object",
+          "required": true,
+          "description": "GameContext 对象（见 narrative-types.ts 的 GameContext 接口）"
+        }
+      ]
+    },
+    {
+      "type": "allocate_agent",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "导演请求 C# 把某 NPC 分配为 Agent。C# ForceAllocate 并设置 keepUntil 豁免互动空闲淘汰。回 action_result { reason: allocated | max_capacity_reached }。设计文档 §4.2.2。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "allocate_agent"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true,
+          "description": "待分配的 NPC 名"
+        },
+        {
+          "name": "keepUntilIso",
+          "type": "string",
+          "required": false,
+          "description": "ISO 8601 豁免截止时间，对应 beat.windowEnd"
+        }
+      ]
+    },
+    {
+      "type": "director_command",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "orphan_route",
+      "routed_by_ts": true,
+      "sent_by_csharp": false,
+      "description": "Director 工具调用（TS→C#）：9 个 Director 工具统一入口（set_npc_position/set_npc_inventory/set_npc_money/set_npc_mood/set_npc_recent_events/set_npc_working_on/spawn_beat/spawn_group_beat/inject_memory）。TS 端 Director agent 的工具调用经 routeMessage 转发 sendToCsharp，C# CommandExecutor 对 type=director_command 特殊路由到 DirectorTools.Execute（不走 NPC Agent switch）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "director_command"
+        },
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "Director 工具名：set_npc_position|set_npc_inventory|set_npc_money|set_npc_mood|set_npc_recent_events|set_npc_working_on|spawn_beat|spawn_group_beat|inject_memory"
+        },
+        {
+          "name": "args",
+          "type": "object",
+          "required": true,
+          "description": "工具参数（工具相关，如 set_npc_position 的 {npc, location, tile}）"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式，C# 回执可回带"
+        }
+      ]
+    },
+    {
+      "type": "beat_plan",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "Director 节拍计划推送（设计文档规划）。TS Director 制定当日节拍序列后推送给 C#。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "beat_plan"
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（设计阶段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "beat_start",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "节拍开始（Director 相关，设计文档规划）。TS Director 通知 C# 某个节拍开始执行。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "beat_start"
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（设计阶段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "beat_end",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "节拍结束（Director 相关，设计文档规划）。TS Director 通知 C# 某个节拍执行结束。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "beat_end"
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（设计阶段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "day_end",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "日终汇总（Director 相关，设计文档规划）。TS Director 推送当日叙事汇总给 C#。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "day_end"
+        },
+        {
+          "name": "payload",
+          "type": "unknown",
+          "required": false,
+          "description": "unknown - 待补（设计阶段未实证）"
+        }
+      ]
+    },
+    {
+      "type": "execute_adjust",
+      "direction": "ts_to_csharp",
+      "transport": "request_response",
+      "status": "orphan_route",
+      "routed_by_ts": true,
+      "sent_by_csharp": false,
+      "description": "原子批经济指令（TS→C#，2026-08-15 账本迁移设计 §4.1）。TS 账本业务校验后经 sendAdjust/sendToCsharp 下发：money/item 操作列表 + instructionId（幂等键）。C# AdjustExecutor 物理校验并原子执行（全量预校验→按序提交→失败回滚），回 adjust_result。C# 永不主动发送（routed_by_ts=true 且 sent_by_csharp=false → orphan_route，与 director_command 同型）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "execute_adjust"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "instructionId",
+          "type": "string",
+          "required": true,
+          "description": "幂等键（TS 生成）。C# 缓存已执行结果，重复指令直接返回缓存回执"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true,
+          "description": "账本所属 NPC"
+        },
+        {
+          "name": "ops",
+          "type": "array",
+          "required": true,
+          "description": "AdjustOp[]：{kind: money|item, target: player|npc, amount?, itemId?, itemName?, quantity?, reason?}"
+        },
+        {
+          "name": "playerId",
+          "type": "string",
+          "required": false,
+          "description": "2026-08-16 联机：指令发起玩家（UniqueMultiplayerID 字符串）。可选，缺省回落 Game1.player（单机/旧客户端）。"
+        }
+      ]
+    },
+    {
+      "type": "adjust_result",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "原子批经济指令回执（C#→TS）。C# AdjustExecutor 通过 SendMessageAsync 发送 ProtocolV2.AdjustResultMessage（默认 Type='adjust_result'），TS handleAdjustResult 按 instructionId 解析 sendAdjust 挂的回执 Promise 并驱动账本 pending→committed/rolled_back。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "adjust_result"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "instructionId",
+          "type": "string",
+          "required": true,
+          "description": "幂等键（echo execute_adjust）"
+        },
+        {
+          "name": "npcName",
+          "type": "string",
+          "required": true,
+          "description": "账本所属 NPC"
+        },
+        {
+          "name": "success",
+          "type": "boolean",
+          "required": true,
+          "description": "整批是否成功"
+        },
+        {
+          "name": "steps",
+          "type": "array",
+          "required": true,
+          "description": "AdjustStepResult[]：{index, kind, target, success, failureCode, detail?}，只含已执行步+首个失败步"
+        },
+        {
+          "name": "failureCode",
+          "type": "string",
+          "required": false,
+          "description": "失败码：insufficientFunds|inventoryFull|itemNotFound|agentMissing|invalidOp|internalError（camelCase）"
+        },
+        {
+          "name": "playerMoney",
+          "type": "integer",
+          "required": false,
+          "description": "执行后玩家余额（Game1.player.Money 镜像）"
+        },
+        {
+          "name": "npcMoney",
+          "type": "integer",
+          "required": false,
+          "description": "执行后 NPC 余额（AgentInventory 镜像）"
+        },
+        {
+          "name": "playerId",
+          "type": "string",
+          "required": false,
+          "description": "2026-08-16 联机：指令发起玩家（echo execute_adjust.playerId）。可选。"
+        }
+      ]
+    },
+    {
+      "type": "reconnect_sync",
+      "direction": "csharp_to_ts",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": true,
+      "sent_by_csharp": true,
+      "description": "重连对账消息（C#→TS，2026-08-15 步骤 4）。C# WebSocketClient 断线重连成功补发 outbox 后，EventHandlerInitializer 发送 ProtocolV2.ReconnectSyncMessage（默认 Type=reconnect_sync）：outbox 补发条数 + active agent 名单 + 游戏日期。TS handleReconnectSync 据此对账 in-flight adjust pending（凭 instructionId 重发，C# 幂等返回缓存回执）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "reconnect_sync"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": true,
+          "description": "Guid N 格式"
+        },
+        {
+          "name": "replayedOutbox",
+          "type": "integer",
+          "required": true,
+          "description": "本次重连补发的 outbox 消息条数"
+        },
+        {
+          "name": "agents",
+          "type": "array",
+          "required": true,
+          "description": "当前 active agent 名单（对账遍历范围）"
+        },
+        {
+          "name": "gameDate",
+          "type": "string",
+          "required": false,
+          "description": "游戏日期 Y{year}_{season}_{day}"
+        }
+      ]
+    }
+  ]
+}

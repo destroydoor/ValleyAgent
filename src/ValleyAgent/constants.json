@@ -1,0 +1,492 @@
+{
+  "_meta": {
+    "description": "ValleyAgent hardcoded constants and magic numbers consolidated for easier tuning",
+    "version": "1.0.0",
+    "note": "This file catalogs all hardcoded constants found in the C# codebase. It is a READ-ONLY reference - do not modify .cs files based on this alone.",
+    "sources": [
+      "Handlers/*.cs",
+      "Navigation/*.cs",
+      "Core/*.cs",
+      "AI/*.cs",
+      "ModEntry.cs",
+      "Config/ModConfig.cs",
+      "Patches/*.cs"
+    ]
+  },
+  "ai": {
+    "decisionIntervalMinutes": {
+      "value": 0.5,
+      "default": 0.5,
+      "description": "Interval between LLM decision calls (in minutes). Converted to ticks at 60fps.",
+      "config_field": "DecisionIntervalMinutes",
+      "source_files": [
+        "ModEntry.cs:175",
+        "ModConfig.cs:69"
+      ]
+    },
+    "taskCompleteDecisionCooldownTicks": {
+      "value": 300,
+      "description": "Prevents closing-ritual loop after task completion (~5s at 60fps)",
+      "source_files": [
+        "ModEntry.cs:90"
+      ]
+    },
+    "circuitBreakerThreshold": {
+      "value": 5,
+      "default": 5,
+      "description": "Consecutive LLM failures before circuit breaker opens",
+      "config_field": "CircuitBreakerThreshold",
+      "source_files": [
+        "ModConfig.cs:81"
+      ]
+    },
+    "tokenBudget": {
+      "value": 0,
+      "default": 0,
+      "description": "Max tokens per LLM session (0 = unlimited)",
+      "config_field": "TokenBudget",
+      "source_files": [
+        "ModConfig.cs:51"
+      ]
+    },
+    "llmTimeoutSeconds": {
+      "value": 60,
+      "default": 60,
+      "description": "LLM API timeout in seconds",
+      "config_field": "LLMTimeoutSeconds",
+      "source_files": [
+        "ModConfig.cs:63"
+      ]
+    },
+    "maxRetries": {
+      "value": 3,
+      "default": 3,
+      "description": "Max retry attempts for failed LLM calls",
+      "config_field": "MaxRetries",
+      "source_files": [
+        "ModConfig.cs:66"
+      ]
+    },
+    "aiDailyTopicCount": {
+      "value": 3,
+      "default": 3,
+      "description": "Number of AI-initiated daily conversation topics per NPC",
+      "config_field": "AIDailyTopicCount",
+      "source_files": [
+        "ModConfig.cs:117"
+      ]
+    }
+  },
+  "dialogue": {
+    "cooldownMs": {
+      "value": 5000,
+      "default": 5000,
+      "description": "Cooldown between dialogue messages (milliseconds)",
+      "config_field": "DialogueCooldownMs",
+      "source_files": [
+        "ModConfig.cs:72"
+      ]
+    },
+    "temperature": {
+      "value": 0.7,
+      "default": 0.7,
+      "description": "LLM temperature for dialogue generation (0.0-1.0)",
+      "config_field": "DialogueTemperature",
+      "source_files": [
+        "ModConfig.cs:75"
+      ]
+    },
+    "fallbackAIMixProbability": {
+      "value": 0.5,
+      "default": 0.5,
+      "description": "Probability of using AI vs vanilla fallback when AI fails",
+      "config_field": "FallbackAIMixProbability",
+      "source_files": [
+        "ModConfig.cs:102"
+      ]
+    },
+    "fallbackLiveGenerationProbability": {
+      "value": 0.15,
+      "default": 0.15,
+      "description": "Probability of live generation vs cached fallback",
+      "config_field": "FallbackLiveGenerationProbability",
+      "source_files": [
+        "ModConfig.cs:105"
+      ]
+    },
+    "maxGreetingLines": {
+      "value": 7,
+      "description": "Number of random greeting lines available for TalkHandler",
+      "source_files": [
+        "TalkHandler.cs:53"
+      ]
+    }
+  },
+  "handlers": {
+    "farm": {
+      "actionCooldownTicks": {
+        "value": 48,
+        "description": "~0.8s at 60fps - throttle between farming actions"
+      },
+      "scanRadius": {
+        "value": 15,
+        "description": "Tile radius for scanning crops and soil"
+      },
+      "debugLogCooldownTicks": {
+        "value": 60,
+        "description": "1s at 60fps - throttle handler debug logs"
+      }
+    },
+    "fight": {
+      "actionCooldownTicks": {
+        "value": 48,
+        "description": "~0.8s at 60fps - throttle between attacks"
+      },
+      "swingThreshold": {
+        "value": 36,
+        "description": "Effective swing frames for attack animation"
+      },
+      "searchRadius": {
+        "value": 12,
+        "description": "Tile radius for searching nearby monsters"
+      },
+      "debugLogCooldownTicks": {
+        "value": 60,
+        "description": "1s at 60fps - throttle handler debug logs"
+      },
+      "combatDialogueChance": {
+        "value": 0.1,
+        "description": "10% chance for combat dialogue line"
+      }
+    },
+    "mine": {
+      "actionCooldownTicks": {
+        "value": 48,
+        "description": "~0.8s at 60fps - throttle between mining actions"
+      },
+      "swingThreshold": {
+        "value": 36,
+        "description": "Effective swing frames for swing animation"
+      },
+      "scanRadius": {
+        "value": 12,
+        "description": "Tile radius for scanning mineable rocks"
+      },
+      "debugLogCooldownTicks": {
+        "value": 60,
+        "description": "1s at 60fps - throttle handler debug logs"
+      },
+      "shakeDurationMs": {
+        "value": 300,
+        "description": "NPC shake duration after mining (ms)"
+      }
+    },
+    "forage": {
+      "actionCooldownTicks": {
+        "value": 48,
+        "description": "~0.8s at 60fps - throttle between foraging actions"
+      },
+      "scanRadius": {
+        "value": 15,
+        "description": "Tile radius for scanning forageables"
+      },
+      "debugLogCooldownTicks": {
+        "value": 60,
+        "description": "1s at 60fps - throttle handler debug logs"
+      }
+    },
+    "talk": {
+      "talkCooldownTicks": {
+        "value": 180,
+        "description": "~3s at 60fps - throttle between talk interactions"
+      },
+      "debugLogCooldownTicks": {
+        "value": 60,
+        "description": "1s at 60fps - throttle handler debug logs"
+      },
+      "exitDistance": {
+        "value": 5,
+        "description": "Tiles - if player moves farther, stop talking"
+      }
+    }
+  },
+  "movement": {
+    "shortRangeCooldownTicks": {
+      "value": 5,
+      "description": "Short-range movement cooldown"
+    },
+    "longRangeCooldownTicks": {
+      "value": 30,
+      "description": "Long-range movement cooldown"
+    },
+    "immediateCooldownTicks": {
+      "value": 0,
+      "description": "No cooldown for immediate movements"
+    },
+    "stuckDistanceThreshold": {
+      "value": 2.5,
+      "description": "Tiles - considered stuck if distance > this"
+    },
+    "stuckTimeThresholdTicks": {
+      "value": 120,
+      "description": "~2s at 60fps - considered stuck if not moved for this long"
+    },
+    "defaultPathfindSpeed": {
+      "value": 2,
+      "description": "Default NPC pathfinding speed"
+    },
+    "frozenSpeed": {
+      "value": 0,
+      "description": "Speed value to freeze NPC movement"
+    },
+    "maxSameTargetRetries": {
+      "value": 2,
+      "description": "Max retries when path to same target fails"
+    },
+    "pathDestroyedQuicklyTicks": {
+      "value": 2,
+      "description": "Ticks - detect premature path destruction"
+    },
+    "alreadyAtTargetThreshold": {
+      "value": 0.5,
+      "description": "Tiles - consider at target if distance < this"
+    },
+    "staleControllerAge": {
+      "value": 30,
+      "description": "Ticks - consider controller stale if age > this"
+    },
+    "longDistanceTeleportThreshold": {
+      "value": 10.0,
+      "description": "Tiles - teleport if path is longer than this"
+    },
+    "pathfindingHashConstant1": {
+      "value": 73856093,
+      "description": "First hash constant for pathfinding seed"
+    },
+    "pathfindingHashConstant2": {
+      "value": 19349663,
+      "description": "Second hash constant for pathfinding seed"
+    },
+    "lastResortFallbackOffset": {
+      "value": 1,
+      "description": "Tile offset for last-resort pathfinding fallback"
+    },
+    "followDistance": {
+      "value": 3,
+      "default": 3,
+      "description": "Target distance for FOLLOW state (configurable)",
+      "config_field": "FollowDistance",
+      "source_files": [
+        "ModConfig.cs:96"
+      ]
+    }
+  },
+  "combat": {
+    "monsterAttackCooldown": {
+      "value": 90,
+      "description": "~1.5s at 60fps - cooldown between monster attacks"
+    },
+    "monsterDamage": {
+      "value": 8,
+      "description": "Damage dealt by monster per hit"
+    },
+    "monsterAggroRange": {
+      "value": 10.0,
+      "description": "Tiles - monster aggro detection range"
+    },
+    "monsterChaseSpeed": {
+      "value": 1.5,
+      "description": "Monster chase speed multiplier"
+    },
+    "monsterAttackRange": {
+      "value": 1.5,
+      "description": "Tiles - monster attack range"
+    },
+    "emergencyFightRange": {
+      "value": 5.0,
+      "description": "Tiles - emergency FIGHT trigger range"
+    },
+    "healthBarWidth": {
+      "value": 32,
+      "description": "Pixels - NPC health bar width"
+    },
+    "healthBarHeight": {
+      "value": 4,
+      "description": "Pixels - NPC health bar height"
+    },
+    "lowHealthFleeThreshold": {
+      "value": 0.3,
+      "description": "30% health - below this NPC may flee"
+    }
+  },
+  "stateDurations": {
+    "description": "Minimum durations for each state (seconds). Defined in AgentStateMachine.GetMinimumStateDuration and ModEntry.GetMinimumStateDuration - consolidate recommended.",
+    "fight": {
+      "value": 15.0,
+      "description": "Minimum seconds for FIGHT state"
+    },
+    "farm": {
+      "value": 8.0,
+      "description": "Minimum seconds for FARM state"
+    },
+    "mine": {
+      "value": 10.0,
+      "description": "Minimum seconds for MINE state"
+    },
+    "forage": {
+      "value": 8.0,
+      "description": "Minimum seconds for FORAGE state"
+    },
+    "follow": {
+      "value": 3.0,
+      "description": "Minimum seconds for FOLLOW state"
+    }
+  },
+  "relationships": {
+    "friendshipToHeartsDivisor": {
+      "value": 250,
+      "description": "Divide friendship.Points by this to get heart count (Points/250 = hearts)"
+    },
+    "maxFriendship": {
+      "value": 2500,
+      "description": "Maximum friendship points"
+    },
+    "maxConsecutiveIdleBeforeRelease": {
+      "value": 3,
+      "description": "Consecutive IDLE decisions before releasing to vanilla AI"
+    }
+  },
+  "rendering": {
+    "layerDepthDenominator": {
+      "value": 10000.0,
+      "description": "Divider for sprite layer depth calculation"
+    },
+    "deadPosition": {
+      "x": -10000,
+      "y": -10000,
+      "description": "Off-screen position for dead/despawned NPCs"
+    },
+    "shakeDurationMs": {
+      "value": 300,
+      "description": "Default NPC shake duration (ms)"
+    }
+  },
+  "ui": {
+    "thoughtBubbleDurationMs": {
+      "value": 3000,
+      "description": "Duration for thought bubble display (ms)"
+    },
+    "thinkingIndicatorDurationMs": {
+      "value": 2000,
+      "description": "Duration for ... thinking indicator (ms)"
+    },
+    "thinkingIndicatorInterval": {
+      "value": 180,
+      "description": "Ticks - interval for updating thinking indicator"
+    },
+    "healthBarBackgroundColor": {
+      "value": [
+        60,
+        60,
+        60,
+        180
+      ],
+      "description": "RGBA - health bar background color"
+    },
+    "healthBarHighColor": {
+      "value": [
+        60,
+        220,
+        60,
+        220
+      ],
+      "description": "RGBA - health bar high (>50%) color"
+    },
+    "healthBarMediumColor": {
+      "value": [
+        220,
+        180,
+        60,
+        220
+      ],
+      "description": "RGBA - health bar medium (>25%) color"
+    },
+    "healthBarLowColor": {
+      "value": [
+        220,
+        60,
+        60,
+        220
+      ],
+      "description": "RGBA - health bar low (<25%) color"
+    },
+    "playerInDangerRange": {
+      "value": 7.0,
+      "description": "Tiles - detection range for PlayerInDanger event"
+    }
+  },
+  "system": {
+    "closeDistanceThreshold": {
+      "value": 2.0,
+      "description": "Tiles - threshold for closing distance in FollowController"
+    },
+    "tickRate": {
+      "value": 60,
+      "description": "Frames per second (used for tick calculations)"
+    },
+    "minuteToTickConversion": {
+      "value": 3600,
+      "description": "60 * 60 - converts minutes to ticks at 60fps"
+    },
+    "cleanupInterval": {
+      "value": 1000,
+      "description": "Ticks - interval for periodic cleanup tasks"
+    },
+    "debugThrottleInterval": {
+      "value": 10,
+      "description": "Ticks - throttle for non-critical debug logs"
+    },
+    "emoteStretchId": {
+      "value": 24,
+      "description": "Emote ID for stretch animation (farm closing ritual)"
+    }
+  },
+  "gameItems": {
+    "rustySwordItemId": {
+      "value": "0",
+      "description": "Item ID for Rusty Sword"
+    },
+    "plainStoneItemId": {
+      "value": "343",
+      "description": "Item ID for plain stone (mineable)"
+    },
+    "stoneItemId": {
+      "value": "390",
+      "description": "Item ID for Stone (drop)"
+    },
+    "oreItemIds": {
+      "value": [
+        "75",
+        "76",
+        "77"
+      ],
+      "description": "Item IDs for ore nodes"
+    },
+    "texture16x16": {
+      "value": [
+        16,
+        16
+      ],
+      "description": "Standard sprite texture size"
+    },
+    "pickaxeSourceRect": {
+      "value": [
+        80,
+        32,
+        16,
+        16
+      ],
+      "description": "Source rectangle for pickaxe sprite"
+    }
+  }
+}

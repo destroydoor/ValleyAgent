@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+    <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" id="root"
+                xmlns="">
+        <xsd:element name="root" msdata:IsDataSet="true">
+            <xsd:complexType>
+                <xsd:choice maxOccurs="unbounded">
+                    <xsd:element name="data">
+                        <xsd:complexType>
+                            <xsd:sequence>
+                                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
+                                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2"/>
+                            </xsd:sequence>
+                            <xsd:attribute name="name" type="xsd:string" use="required"/>
+                            <xsd:attribute name="type" type="xsd:string"/>
+                            <xsd:attribute name="mimetype" type="xsd:string"/>
+                        </xsd:complexType>
+                    </xsd:element>
+                </xsd:choice>
+            </xsd:complexType>
+        </xsd:element>
+    </xsd:schema>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>2.0</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+    </resheader>
+    <data name="BannerSeparator" xml:space="preserve"><value>========================================</value></data>
+    <data name="BannerTitle" xml:space="preserve"><value>  ValleyTalk LLM Provider API Test</value></data>
+    <data name="BannerEnd" xml:space="preserve"><value>======================================== </value></data>
+    <data name="Test1Label" xml:space="preserve"><value>Test 1 - ValidateConnection... </value></data>
+    <data name="Pass" xml:space="preserve"><value>PASS</value></data>
+    <data name="FailNoResponse" xml:space="preserve"><value>FAIL (no response)</value></data>
+    <data name="Test2Label" xml:space="preserve"><value>Test 2 - ChatCompletion... </value></data>
+    <data name="Test3Label" xml:space="preserve"><value>Test 3 - StreamCompletion... </value></data>
+    <data name="StreamPass" xml:space="preserve"><value>   PASS</value></data>
+    <data name="FooterSeparator" xml:space="preserve"><value> ========================================</value></data>
+    <data name="TestComplete" xml:space="preserve"><value>  Test Complete</value></data>
+    <data name="FailPrefix" xml:space="preserve"><value>FAIL: </value></data>
+</root>

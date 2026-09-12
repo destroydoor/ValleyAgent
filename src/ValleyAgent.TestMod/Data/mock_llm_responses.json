@@ -1,0 +1,158 @@
+{
+  "decisionResponses": [
+    {
+      "id": "farm_decision",
+      "trigger": "first_decision",
+      "response": {
+        "targetState": "FARM",
+        "reason": "看到农场里有成熟的作物，我想去帮忙收菜。",
+        "thought": "好多成熟的作物，玩家一个人收不完。",
+        "parameters": {}
+      }
+    },
+    {
+      "id": "follow_decision",
+      "trigger": "after_farm_complete",
+      "response": {
+        "targetState": "FOLLOW",
+        "reason": "农场的活干完了，我去跟着玩家看看有什么能帮忙的。",
+        "thought": "收完菜了，看看玩家接下来要去哪里。",
+        "parameters": {}
+      }
+    },
+    {
+      "id": "fight_decision",
+      "trigger": "monster_nearby",
+      "response": {
+        "targetState": "FIGHT",
+        "reason": "附近出现了怪物，我得保护玩家！",
+        "thought": "小心，有怪物靠近了。",
+        "parameters": {}
+      }
+    },
+    {
+      "id": "talk_decision",
+      "trigger": "player_clicked",
+      "response": {
+        "targetState": "TALK",
+        "reason": "玩家主动来找我说话，我应该回应。",
+        "thought": "玩家点击了我，来打个招呼吧。",
+        "parameters": {}
+      }
+    },
+    {
+      "id": "idle_decision",
+      "trigger": "default",
+      "response": {
+        "targetState": "IDLE",
+        "reason": "暂时没什么事做，先休息一下。",
+        "thought": "周围看起来很平静，发发呆也好。",
+        "parameters": {}
+      }
+    },
+    {
+      "id": "mine_decision",
+      "trigger": "nth_decision:3",
+      "response": {
+        "targetState": "MINE",
+        "reason": "听说矿洞里有不少矿石，去挖点回来。",
+        "thought": "前面几次都在农场忙，这次去矿洞看看吧。",
+        "parameters": {}
+      }
+    }
+  ],
+  "dialogueResponses": [
+    {
+      "id": "greeting",
+      "trigger": "greeting",
+      "response": {
+        "emotion": "Happy",
+        "speech": "嗨！今天天气真不错呢。"
+      }
+    },
+    {
+      "id": "hello_reply",
+      "trigger": "player_says:你好",
+      "response": {
+        "emotion": "Happy",
+        "speech": "你好呀！最近怎么样？"
+      }
+    },
+    {
+      "id": "gift_reply",
+      "trigger": "gift_received",
+      "response": {
+        "emotion": "Excited",
+        "speech": "哇，谢谢你！我很喜欢这个！"
+      }
+    },
+    {
+      "id": "farm_chat",
+      "trigger": "player_says:收菜",
+      "response": {
+        "emotion": "Happy",
+        "speech": "一起帮忙收菜吧！",
+        "actions": [
+          {
+            "tool": "set_state",
+            "args": {
+              "state": "FARM"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "default_dialogue",
+      "trigger": "default",
+      "response": {
+        "emotion": "Neutral",
+        "speech": "嗯..."
+      }
+    }
+  ],
+  "toolCalls": [
+    {
+      "id": "give_gift_tulip",
+      "trigger": "after_dialogue:gift",
+      "tool": "give_gift",
+      "args": {
+        "item_id": 16,
+        "quantity": 1
+      }
+    },
+    {
+      "id": "speak_sunny",
+      "trigger": "idle_speech",
+      "tool": "speak",
+      "args": {
+        "text": "今天阳光真好！"
+      }
+    },
+    {
+      "id": "emote_happy",
+      "trigger": "after_gift_given",
+      "tool": "emote",
+      "args": {
+        "emote_id": 20,
+        "duration_ms": 2000
+      }
+    },
+    {
+      "id": "show_inventory",
+      "trigger": "player_says:背包",
+      "tool": "show_inventory",
+      "args": {}
+    }
+  ],
+  "defaultDecision": {
+    "targetState": "IDLE",
+    "reason": "暂时没什么事做",
+    "thought": "发呆中...",
+    "parameters": {}
+  },
+  "defaultDialogue": {
+    "emotion": "Neutral",
+    "speech": "嗯..."
+  }
+}

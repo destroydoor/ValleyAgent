@@ -1,0 +1,60 @@
+# ValleyAgent TestMod manual scene test script
+# Build scenes with TestMod hotkeys, then exercise them through player-level input.
+# F8=clear, F9=fight+tools, F10=farm, F11=mine, F12=forage
+
+focus
+sleep 500
+
+# --- Combat scene ---
+hold F9 500
+sleep 1500
+move s 700
+hold c 250
+sleep 700
+hold c 250
+sleep 700
+hold c 250
+sleep 1000
+hold F8 500
+sleep 1200
+
+# --- Farming scene ---
+hold F10 500
+sleep 1500
+move s 700
+hold c 450
+sleep 900
+hold c 450
+sleep 900
+hold F8 500
+sleep 1200
+
+# --- Mining scene ---
+hold F11 500
+sleep 1500
+move s 700
+hold 2 300
+sleep 400
+hold c 450
+sleep 900
+hold c 450
+sleep 900
+hold F8 500
+sleep 1200
+
+# --- Foraging scene ---
+hold F12 500
+sleep 1500
+move s 700
+sleep 600
+hold x 200
+sleep 500
+hold x 200
+sleep 500
+hold x 200
+sleep 1000
+hold F8 500
+sleep 1200
+
+# Return to roughly original spot
+move w 700

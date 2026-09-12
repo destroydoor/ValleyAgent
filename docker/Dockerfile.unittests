@@ -1,0 +1,35 @@
+# ValleyAgent unit-test runner image.
+# No game DLLs baked in -- the game folder is mounted read-only at runtime.
+# Build+test happen at `docker run` time, not at image build time.
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+# .NET 6 runtime: ValleyAgent.csproj targets net6.0 and its assemblies
+# execute at test time (UnitTests has InternalsVisibleTo and loads the mod).
+# The Microsoft package repo must be added explicitly (not in default Debian bookworm).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget apt-transport-https && \
+    wget -qO /etc/apt/trusted.gpg.d/microsoft.asc https://packages.microsoft.com/keys/microsoft.asc && \
+    echo "deb [arch=amd64] https://packages.microsoft.com/debian/12/prod bookworm main" \
+         > /etc/apt/sources.list.d/microsoft.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends dotnet-runtime-6.0 && \
+    apt-get purge -y --auto-remove wget apt-transport-https && \
+    rm -rf /var/lib/apt/lists/*
+
+# GamePath consumed by src/Directory.Build.props and ModBuildConfig .targets.
+ENV STARDREW_VALLEY_GAME_PATH=/game
+
+WORKDIR /src
+
+# Source tree (game DLLs excluded by .dockerignore; mounted at /game at runtime).
+COPY . .
+
+# Default: restore + build + test in one shot.
+# EnableModDeploy/EnableModZip disabled via CLI override (highest MSBuild precedence)
+# to prevent DeployModTask from writing into the read-only /game mount.
+CMD ["dotnet", "test", \
+     "src/ValleyAgent.UnitTests/ValleyAgent.UnitTests.csproj", \
+     "-c", "Release", \
+     "/p:EnableModDeploy=false", \
+     "/p:EnableModZip=false"]

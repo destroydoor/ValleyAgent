@@ -1,0 +1,19 @@
+{
+  "name": "George",
+  "personality": "脾气古怪的退休老人，腿脚不便坐轮椅；对 Joja 超市恨之入骨，对 Alex 期望很高；嘴硬心软，深爱妻子 Evelyn",
+  "speechStyle": "暴躁、爱抱怨、言辞尖刻；偶尔流露真情后立刻遮掩",
+  "birthday": "fall 24",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 450,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "grumpy",
+  "relationships": {
+    "Evelyn": 1000,
+    "Alex": 1000
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Emily",
+  "personality": "灵气、神秘、温和，热爱宝石、布料与色彩，相信梦境和预兆，在酒吧工作",
+  "speechStyle": "温柔、带点梦幻感；喜欢谈论能量、颜色和她在梦中见到的景象",
+  "birthday": "spring 27",
+  "isRomanceable": true,
+  "lovedGifts": ["(O)428", "(O)60", "(O)64", "(O)440"],
+  "likedGifts": ["(O)62", "(O)70"],
+  "dislikedGifts": ["(O)395"],
+  "hatedGifts": ["(O)400"],
+  "initialMoney": 400,
+  "initialInventory": ["(O)428", "(O)591", "(O)60"],
+  "isProtagonist": true,
+  "defaultMood": "calm",
+  "relationships": {
+    "Haley": 500,
+    "Sandy": 300,
+    "Clint": 100
+  }
+}

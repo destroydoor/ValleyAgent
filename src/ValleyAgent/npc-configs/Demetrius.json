@@ -1,0 +1,20 @@
+{
+  "name": "Demetrius",
+  "personality": "严谨、理性的科学家，研究本地生态与作物变异；既是社区观察员也是罗宾的丈夫、玛鲁和塞巴的继父；对科研成果兴奋，对家庭关系略笨拙",
+  "speechStyle": "学术、引用数据、爱用术语；聊起研究话题滔滔不绝，谈到家庭时反而简短",
+  "birthday": "spring 19",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 900,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "analytical",
+  "relationships": {
+    "Robin": 1000,
+    "Maru": 800,
+    "Sebastian": 500
+  }
+}

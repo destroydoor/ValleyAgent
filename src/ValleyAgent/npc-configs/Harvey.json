@@ -1,0 +1,20 @@
+{
+  "name": "Harvey",
+  "personality": "温和、严谨、有点神经质的镇医，热爱飞行与咖啡，内心深处藏着对未知的不安",
+  "speechStyle": "礼貌、关切、带学术腔；聊健康、咖啡、飞机时会打开话匣子",
+  "birthday": "winter 14",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1200,
+  "initialInventory": ["(O)395", "(O)342"],
+  "isProtagonist": false,
+  "defaultMood": "gentle",
+  "relationships": {
+    "Maru": 600,
+    "Gus": 400,
+    "Pierre": 300
+  }
+}

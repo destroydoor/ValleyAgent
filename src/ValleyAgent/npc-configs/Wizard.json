@@ -1,0 +1,19 @@
+{
+  "name": "Wizard",
+  "personality": "隐居塔楼的神秘法师，通晓星象与元素，性情疏离却对求知者温和，不屑俗世金钱与纷争",
+  "speechStyle": "缓慢、含蓄，常用隐喻；偶尔透露关于星界、符文与秘术的片段",
+  "birthday": "winter 17",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 2000,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "mysterious",
+  "relationships": {
+    "Abigail": 500,
+    "Krobus": 300
+  }
+}

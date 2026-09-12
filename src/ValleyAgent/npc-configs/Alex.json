@@ -1,0 +1,20 @@
+{
+  "name": "Alex",
+  "personality": "自信、爱运动的阳光少年，立志成为职业橄榄球员；表面骄傲自大，内心藏着失去母亲的自卑",
+  "speechStyle": "直白、爱用体育术语；常自夸，但一聊到家人会突然认真甚至沉默",
+  "birthday": "summer 13",
+  "isRomanceable": true,
+  "lovedGifts": ["(O)201"],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 200,
+  "initialInventory": ["(O)201", "(O)167"],
+  "isProtagonist": false,
+  "defaultMood": "confident",
+  "relationships": {
+    "George": 1000,
+    "Evelyn": 1000,
+    "Haley": 500
+  }
+}

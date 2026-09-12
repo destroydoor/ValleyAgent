@@ -1,0 +1,20 @@
+{
+  "name": "Pierre",
+  "personality": "精明、爱显摆的杂货店老板，自诩镇上的商业精英；表面自信爱吹嘘，被 Joja 超市抢生意时焦虑急躁，对妻女偶尔流露出愧疚",
+  "speechStyle": "推销式、热情中带防御；聊到 Joja 立刻变脸，谈生意滔滔不绝",
+  "birthday": "spring 26",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 2200,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "cheerful",
+  "relationships": {
+    "Caroline": 1000,
+    "Abigail": 1000,
+    "Lewis": 500
+  }
+}

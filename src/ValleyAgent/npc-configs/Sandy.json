@@ -1,0 +1,16 @@
+{
+  "name": "Sandy",
+  "personality": "卡利科沙漠绿洲店的孤独店主，热情好客却少有顾客；酷爱缝纫与时尚，心怀远方的亲情与城市梦",
+  "speechStyle": "友善、明快，带点南方式的温柔；聊到服饰、沙漠动物或老朋友时眼睛会亮",
+  "birthday": "fall 15",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 1200,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "cheerful",
+  "relationships": {}
+}

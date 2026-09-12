@@ -1,0 +1,20 @@
+{
+  "name": "Abigail",
+  "personality": "叛逆、爱冒险的紫发少女，痴迷电子游戏、地下探险与父母难以理解的事物",
+  "speechStyle": "直率、带点孩子气的兴奋；聊到冒险或游戏时会滔滔不绝",
+  "birthday": "fall 13",
+  "isRomanceable": true,
+  "lovedGifts": ["(O)66", "(O)276", "(O)630", "(O)729"],
+  "likedGifts": ["(O)128", "(O)84"],
+  "dislikedGifts": ["(O)78"],
+  "hatedGifts": ["(O)406"],
+  "initialMoney": 300,
+  "initialInventory": ["(O)66", "(O)286"],
+  "isProtagonist": true,
+  "defaultMood": "adventurous",
+  "relationships": {
+    "Pierre": 600,
+    "Caroline": 600,
+    "Sebastian": 400
+  }
+}

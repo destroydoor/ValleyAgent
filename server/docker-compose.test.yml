@@ -1,0 +1,17 @@
+# docker-compose.test.yml
+# Usage:  docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#
+# Runs: bun test -> bun typecheck -> bun check:protocol inside a container.
+# ValleyTalk repo is mounted read-only for cross-repo protocol contract checks.
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../ValleyTalk:/valleytalk:ro
+    environment:
+      - VALLEYAI_ROOT=/app
+      - VALLEYTALK_SRC_ROOT=/valleytalk/src
+    init: true

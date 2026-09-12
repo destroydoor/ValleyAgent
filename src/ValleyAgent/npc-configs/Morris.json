@@ -1,0 +1,18 @@
+{
+  "name": "Morris",
+  "personality": "Joja 超市的经理，自以为是、唯利是图，对小镇的'低效经营'嗤之以鼻，却极力维系自己的职位与面子",
+  "speechStyle": "圆滑、爱套用公司术语；笑容职业化、恭维词廉价，常流露对 Pierre 等独立商人的轻蔑",
+  "birthday": "spring 16",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 3000,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "confident",
+  "relationships": {
+    "Pierre": -200
+  }
+}

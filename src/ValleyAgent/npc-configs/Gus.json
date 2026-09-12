@@ -1,0 +1,20 @@
+{
+  "name": "Gus",
+  "personality": "热心、稳重、略带圆滑的酒馆老板，关心镇上每个人，是镇上的消息中心与倾诉对象",
+  "speechStyle": "友善、热情、爱用\"老朋友\"称呼；聊到酒馆生意和菜谱时会滔滔不绝",
+  "birthday": "summer 8",
+  "isRomanceable": false,
+  "lovedGifts": ["(O)303"],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 2500,
+  "initialInventory": ["(O)303", "(O)346", "(O)348"],
+  "isProtagonist": false,
+  "defaultMood": "jovial",
+  "relationships": {
+    "Emily": 600,
+    "Pam": 500,
+    "Clint": 400
+  }
+}

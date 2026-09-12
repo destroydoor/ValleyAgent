@@ -1,0 +1,20 @@
+{
+  "name": "Haley",
+  "personality": "外貌至上、略带公主病的金发少女，热衷摄影与时尚；看似肤浅，实则内心善良、渴望被真正理解",
+  "speechStyle": "语气娇气、词汇偏华丽时尚；话题围绕外型、穿搭、照片；熟络后会变得柔软坦诚",
+  "birthday": "fall 14",
+  "isRomanceable": true,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 350,
+  "initialInventory": ["(O)458"],
+  "isProtagonist": true,
+  "defaultMood": "romantic",
+  "relationships": {
+    "Emily": 1000,
+    "Alex": 500,
+    "Penny": 250
+  }
+}

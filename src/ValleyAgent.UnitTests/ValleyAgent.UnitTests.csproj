@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>11.0</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!-- 联机并发测试套件的例外：ConfigureAwait 建议不适用于测试断言路径（CA2007）；
+             记录消息含数组属性/测试桩 Random/测试内 new 可弃对象/常量数组参数均属测试噪音。 -->
+        <NoWarn>$(NoWarn);CA2007;CA1819;CA5394;CA2000;CA1861</NoWarn>
+        <RootNamespace>ValleyAgent.UnitTests</RootNamespace>
+        <AssemblyName>ValleyAgent.UnitTests</AssemblyName>
+        <!-- ModBuildConfig 拉入游戏 dll（StardewModdingAPI/StardewValley）供 StubMonitor 实现 IMonitor；
+             禁用 mod deploy/zip，单测项目不是 mod；
+             BundleExtraAssemblies=Game 确保游戏 dll 被复制到输出目录（运行时需要加载） -->
+        <EnableModDeploy>false</EnableModDeploy>
+        <EnableModZip>false</EnableModZip>
+        <BundleExtraAssemblies>Game</BundleExtraAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1"/>
+        <PackageReference Include="xunit" Version="2.9.2"/>
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"/>
+        <PackageReference Include="coverlet.collector" Version="6.0.2"/>
+        <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ValleyAgent\ValleyAgent.csproj"/>
+    </ItemGroup>
+
+    <!-- 联机测试引用 SMAPI Context/门控（AgentSyncBroadcaster 经 MultiplayerHelper 读 Context），
+         Context 静态构造与 0Harmony 的运行时依赖在 smapi-internal，需显式复制到测试输出 -->
+    <ItemGroup>
+        <None Include="$(GamePath)\smapi-internal\SMAPI.Toolkit*.dll">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Visible>false</Visible>
+        </None>
+    </ItemGroup>
+
+</Project>

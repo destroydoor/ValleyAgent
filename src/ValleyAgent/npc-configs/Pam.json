@@ -1,0 +1,19 @@
+{
+  "name": "Pam",
+  "personality": "疲倦、邋遢、酗酒的巴士司机与单亲妈妈，对女儿佩妮心怀愧疚却难以改变，被酒馆与沙发困住",
+  "speechStyle": "粗哑、自嘲、夹杂脏话；聊工作和酒时话多，提到女儿时声音突然变轻",
+  "birthday": "spring 18",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 350,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "weary",
+  "relationships": {
+    "Penny": 800,
+    "Gus": 500
+  }
+}

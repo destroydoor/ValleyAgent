@@ -1,0 +1,16 @@
+{
+  "name": "Linus",
+  "personality": "退隐山林的流浪汉与隐士，靠野果和拾荒过活；外表粗粝孤僻，内心柔软慈悲，对真诚的善意既渴望又害怕",
+  "speechStyle": "简短、谦卑、自嘲；聊到自然时温柔，独处太久的人情味从字缝透出",
+  "birthday": "winter 3",
+  "isRomanceable": false,
+  "lovedGifts": [],
+  "likedGifts": [],
+  "dislikedGifts": [],
+  "hatedGifts": [],
+  "initialMoney": 120,
+  "initialInventory": [],
+  "isProtagonist": false,
+  "defaultMood": "resigned",
+  "relationships": {}
+}
