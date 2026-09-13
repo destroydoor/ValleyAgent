@@ -28,8 +28,8 @@ namespace ValleyAgent.Chat;
 ///     M3 多玩家化（2026-09-13）：支持 farmhand（ThinClient）形态——
 ///     房客没有本地 AgentServerProvider/AgentService，但同样需要在聊天栏跟在场 NPC 说话。
 ///     房客形态的差异只有三处：
-///     - 在场候选只取主机广播的 Agent 名单（RemoteRenderer），而不是全部村民；
 ///     - 对话请求经 IDialogueTransport（FarmhandDialogueTransport）转发主机，不直连 LLM；
+///     - 在场候选与主机同语义：全部在场村民（对话不需要身体，广播名单只用于远程状态渲染）；
 ///     - 远程喊话（依赖 AgentService 的全员候选）在房客侧静默跳过。
 ///     主机形态一条代码路径不变（transport/renderer 为 null）。
 /// </summary>
@@ -41,10 +41,9 @@ public static class ChatBarRouter
     private static CommandExecutor? _commandExecutor;
     private static ModConfig? _config;
 
-    // M3：房客（ThinClient）形态依赖——对话转发到主机的传输层 + 主机广播的 Agent 名单缓存。
-    // 两者都只在 InitializeFarmhand 注入；主机形态恒为 null，走原路径。
+    // M3：房客（ThinClient）形态依赖——对话转发到主机的传输层。
+    // 只在 InitializeFarmhand 注入；主机形态恒为 null，走原路径。
     private static IDialogueTransport? _dialogueTransport;
-    private static AgentRemoteRenderer? _remoteRenderer;
 
     // E5-2: 远程喊话调度器（玩家喊到不在场 NPC 时安排延迟回应）与 4 层确定性路由。
     private static ShoutReplyScheduler? _shoutReplyScheduler;
@@ -91,6 +90,7 @@ public static class ChatBarRouter
         ProactiveSpeechQuota? proactiveSpeechQuota = null,
         NpcScheduleService? scheduleService = null,
         IDialogueTransport? dialogueTransport = null,
+        // remoteRenderer 参数保留（M3 房客初始化调用形态不变）；路由器不再按广播名单过滤在场候选。
         AgentRemoteRenderer? remoteRenderer = null)
     {
         _monitor = monitor;
@@ -99,7 +99,6 @@ public static class ChatBarRouter
         _commandExecutor = commandExecutor;
         _config = config;
         _dialogueTransport = dialogueTransport;
-        _remoteRenderer = remoteRenderer;
 
         if (config != null)
         {
@@ -117,7 +116,7 @@ public static class ChatBarRouter
 
     /// <summary>
     ///     M3：房客（ThinClient）形态初始化。房客没有本地 LLM 通道与 AgentService，
-    ///     对话经 transport 转发主机，在场候选取主机广播的 Agent 名单。
+    ///     对话经 transport 转发主机，在场候选为全部在场村民。
     ///     由 ModEntry.InitializeThinClientMode 调用（此前房客完全不初始化路由器 →
     ///     聊天栏输入被 ChatBoxInputPatch 捕获后静默丢弃，即"客户端没有主机的功能"）。
     /// </summary>
@@ -437,14 +436,8 @@ public static class ChatBarRouter
                 continue;
             }
 
-            // M3：房客只看主机广播过的 Agent NPC——房客本地没有 AgentService，
-            // 给非 Agent 村民发请求会在主机侧被拒（TryGenerateDialogue 返回 false），
-            // 玩家侧表现为"说了话没人理"，不如一开始就不进候选。
-            if (IsFarmhand && _remoteRenderer?.GetRemoteState(npc.Name) == null)
-            {
-                continue;
-            }
-
+            // 对话不需要身体：全部在场村民都是对话候选（房客经 transport 转发主机，同语义）。
+            // 身体只影响动作执行——回复里的身体类动作由主机侧 promote 兜底，不在此过滤。
             var distance = (int)(Math.Abs(npc.Tile.X - player.Tile.X) + Math.Abs(npc.Tile.Y - player.Tile.Y));
             var isFollowing = IsFollowing(npc.Name);
             var lastInteraction = _lastInteractionTimes.TryGetValue(npc.Name, out var ts) ? ts : DateTime.MinValue;

@@ -83,6 +83,21 @@ public static class DialogueBoxInputPatch
     /// </summary>
     public static void SetDialogueTransport(IDialogueTransport? transport) => _dialogueTransport = transport;
 
+    /// <summary>
+    ///     房客侧对话通道存在性：房客没有 AgentServerProvider（恒 null），
+    ///     CloseDialoguePostfix 的放行判定要按 transport 判——否则房客播完原版台词后
+    ///     AI 输入框永不弹出。主机形态恒为 false（provider 判定足够）。
+    /// </summary>
+    internal static bool HasDialogueTransport => _dialogueTransport != null;
+
+    /// <summary>
+    ///     身体类工具判定（s_promotionTriggerTools 清单的单一事实源只读入口）：
+    ///     非身体 NPC 的回复动作命中此类工具时需先建身体才能执行。
+    ///     HostRequestHandlers 中继回包的动作分发复用同一清单，不复制列表。
+    /// </summary>
+    internal static bool IsPromotionTriggerTool(string tool)
+        => !string.IsNullOrEmpty(tool) && s_promotionTriggerTools.Contains(tool);
+
     public static void SetActiveAgentNpc(string npcName)
     {
         _activeAgentNpc = npcName;

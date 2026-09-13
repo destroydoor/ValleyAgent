@@ -151,7 +151,8 @@ public class HostRequestHandlers
     }
 
     /// <summary>
-    ///     主线程应用对话响应：好感度 → Brain 记录 → 执行 actions → 回包 Farmhand。
+    ///     主线程应用对话响应：好感度 → 动作分发（身体类先 promote）→ Brain 记录发起玩家
+    ///     → 优先级指标刷新 → 回包 Farmhand。
     ///     只能经 MainThreadActions 调用（写 friendshipData NetInt 与 NPC 状态机）。
     /// </summary>
     private void ApplyDialogueResponse(DialogueRequestMessage msg, DialogueResponse response)
@@ -175,22 +176,48 @@ public class HostRequestHandlers
                 LogLevel.Info);
         }
 
-        // 记录对话发起玩家到 NPC Brain（FOLLOW 等行为的目标玩家解析，AgentNavigator 消费）。
-        if (_agentService != null && _agentService.TryGetBrain(msg.NpcName, out var brain) && brain?.Brain != null)
-        {
-            brain.Brain.LastDialoguePlayerId = msg.PlayerId.ToString();
-        }
-
         // C3 修复：在主机侧执行 response.Actions（实体在主机权威）。
         // farmhand 不执行 actions（_commandExecutor 为 null），仅通过 broadcaster 接收视觉广播。
         // speak/emote 等视觉动作通过 CommandExecutor 内部已有的 BroadcastNpcAction 自然广播到客机。
         // 这避免了 farmhand 玩家"说挖矿但 NPC 不动"的"说到做不到"问题。
+        // 房客聊到的村民可能没有身体——回复里的身体类动作先按本地 DispatchDialogueActions
+        // 同款 promote 语义建身体（设计 §3.2.4）；失败只跳过该动作，不中断整个回包。
         if (_commandExecutor != null && response.Actions != null && response.Actions.Count > 0)
         {
+            // Game1 访问在主线程队列里执行（本方法只经 EnqueueMainThread 调用）。
+            // getCharacterFromName 的 try/catch 与 CommandExecutor.ExecuteEmote 同模式：
+            // 游戏状态未就绪时抛 NRE，此时取不到 NPC 就不建身体（防幽灵身体占名额）。
+            NPC? relayNpc;
+            try
+            {
+                relayNpc = Game1.getCharacterFromName(msg.NpcName);
+            }
+            catch (NullReferenceException ex)
+            {
+                _monitor.Log(
+                    $"[HostRequestHandlers] game state not initialized for NPC '{msg.NpcName}': {ex.Message}",
+                    LogLevel.Warn);
+                relayNpc = null;
+            }
+
             foreach (var action in response.Actions)
             {
                 try
                 {
+                    if (relayNpc != null
+                        && _agentService != null
+                        && !_agentService.HasAgent(msg.NpcName)
+                        && DialogueBoxInputPatch.IsPromotionTriggerTool(action.Tool ?? ""))
+                    {
+                        if (!DialogueBoxInputPatch.PromoteToAgent(msg.NpcName))
+                        {
+                            _monitor.Log(
+                                $"[HostRequestHandlers] {msg.NpcName}: action '{action.Tool}' skipped — promotion to Agent failed",
+                                LogLevel.Warn);
+                            continue;
+                        }
+                    }
+
                     _commandExecutor.ExecuteAction(action, msg.NpcName);
                 }
                 catch (Exception ex)
@@ -200,6 +227,30 @@ public class HostRequestHandlers
                         LogLevel.Warn);
                 }
             }
+        }
+
+        // 记录对话发起玩家到 NPC Brain（FOLLOW 等行为的目标玩家解析，AgentNavigator 消费）。
+        // 必须在动作分发（含 promote 建身体）之后：本轮回复刚建的身体才能记到 FOLLOW 目标。
+        if (_agentService != null && _agentService.TryGetBrain(msg.NpcName, out var brain) && brain?.Brain != null)
+        {
+            brain.Brain.LastDialoguePlayerId = msg.PlayerId.ToString();
+        }
+
+        // 优先级指标刷新（设计 §3.2.4 约束③）：正在被房客对话的身体持续刷新活跃度指标，
+        // 保证空闲淘汰（ReevaluateAllocations）不会裁掉活跃对话者。
+        // hearts 取发起玩家的 friendshipData——房客对话的好感基线在发起方，不能用主机本地玩家。
+        if (_agentService != null && _agentService.HasAgent(msg.NpcName))
+        {
+            var requester = Game1.GetPlayer(msg.PlayerId);
+            double hearts = 0;
+            if (requester?.friendshipData != null
+                && requester.friendshipData.TryGetValue(msg.NpcName, out var priorityFriendship))
+            {
+                hearts = priorityFriendship.Points / 250.0;
+            }
+
+            _ = _agentService.AllocationManager.UpdatePriority(
+                msg.NpcName, NPCDialoguePatch.GetConversationCount(msg.NpcName), 0, hearts);
         }
 
         // 序列化 actions（保留传递给 farmhand 用于参考/日志，farmhand 端不会重复执行）

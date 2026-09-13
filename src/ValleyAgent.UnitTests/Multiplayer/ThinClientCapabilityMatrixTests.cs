@@ -127,6 +127,8 @@ public class ThinClientCapabilityMatrixTests
     /// <summary>
     ///     房客形态的对话请求必须经 FarmhandDialogueTransport 转发主机（房客没有本地 LLM 通道）。
     ///     审计 ChatBarRouter：存在 transport 分支，且房客不重复执行 actions（实体在主机权威）。
+    ///     2026-09-14 PR2（B2）：BuildPresence 的房客名单过滤已拆除（对话不需要身体，
+    ///     全部在场村民都是候选）——候选过滤断言移入 FarmhandBodyLinkTests（反向守卫）。
     /// </summary>
     [Fact]
     public void ChatBarRouter_Farmhand_ForwardsViaTransport()
@@ -135,8 +137,6 @@ public class ThinClientCapabilityMatrixTests
 
         Assert.Contains("IDialogueTransport? _dialogueTransport", src);
         Assert.Contains("InitializeFarmhand", src);
-        // 房客：在场候选只取主机广播的 Agent 名单（房客没有 AgentService）
-        Assert.Contains("IsFarmhand && _remoteRenderer?.GetRemoteState(npc.Name) == null", src);
         // 主机已执行过 actions（含广播同步），房客重复执行会造成双份效果
         Assert.Contains("if (!IsFarmhand)", src);
     }
