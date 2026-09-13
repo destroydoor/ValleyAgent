@@ -132,6 +132,13 @@ public class HostRequestHandlers
             {
                 try
                 {
+                    // B5.5 补遗（B3 已知盲区）：房客中继对话在主机侧补记对话计数。
+                    // 本地路径 SubmitInput 在发送前主线程计数，中继路径此前无人计数 →
+                    // ApplyDialogueResponse 刷出的 ConversationFrequency 对纯中继恒为 0，
+                    // 空闲淘汰的优先级比较失真。放在主线程队列块内、读数（UpdatePriority）之前，
+                    // 与本地路径的计数时机一致（计数器本身是 ConcurrentDictionary，线程安全）。
+                    NPCDialoguePatch.IncrementConversationCount(msg.NpcName);
+
                     ApplyDialogueResponse(msg, response);
                 }
                 catch (Exception ex)

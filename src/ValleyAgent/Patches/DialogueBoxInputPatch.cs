@@ -487,8 +487,9 @@ public static class DialogueBoxInputPatch
     ///     动态分配：把对话中的非 Agent NPC 升级为 Agent。
     ///     满员时 AgentAllocationManager 自动淘汰最低优先级的现有 Agent（记忆保留在服务端记忆文件）。
     ///     E2-2：internal 供聊天栏路由（ChatBarRouter）复用。
+    ///     B4：source 标注 promote 来源（dialogue/director），仅影响日志措辞不误导排查。
     /// </summary>
-    internal static bool PromoteToAgent(string npcName)
+    internal static bool PromoteToAgent(string npcName, string source = "dialogue")
     {
         if (_agentService == null)
         {
@@ -560,31 +561,12 @@ public static class DialogueBoxInputPatch
 
         if (replacedNpc != null)
         {
-            // F5 修复：满员淘汰时先显式 ForceTransition(IDLE, reason="evicted")
-            // 让 StateChangedSender 发出带 reason 的 state_changed，TS 端可据此渲染 prompt。
-            // 必须在 RemoveAgent 之前调用（RemoveAgent 会从 _agents 字典移除该实例）。
-            // 注意：RemoveAgent 内部的 Reset() 会再发一次空 reason 的 state_changed，
-            // TS 端 updateActualState 已调整为仅在 reason 非空时更新 lastTransitionReason，
-            // 因此 evicted reason 不会被覆盖。
-            if (_agentService.TryGetAgent(replacedNpc, out var evictedAgent) && evictedAgent != null)
-            {
-                _ = evictedAgent.StateMachine.ForceTransition(
-                    AgentState.IDLE, true, reason: "evicted");
-            }
-
-            // 销毁被淘汰者的 Agent 实例，交还原版日程（淘汰≠删除记忆，服务端记忆文件保留）
-            _ = _agentService.RemoveAgent(replacedNpc);
-            var oldNpc = Game1.getCharacterFromName(replacedNpc);
-            if (oldNpc != null)
-            {
-                oldNpc.controller = null;
-                oldNpc.Halt();
-                oldNpc.followSchedule = true;
-                oldNpc.ignoreScheduleToday = false;
-            }
-
-            // F5: 玩家可见通知 — 聊天栏提示被淘汰的 NPC 已离开
-            Game1.chatBox?.addMessage($"{replacedNpc} 告别离开了", Color.White);
+            // B5.4 收编（设计 §3.4 步骤 4）：被挤者的完整拆除（ForceTransition(IDLE, reason="evicted")
+            // → RemoveAgent 降级休眠 → controller/Halt/日程还原 → 玩家可见"告别"提示）统一由常驻
+            // OnAgentDeallocated 订阅（EventHandlerInitializer.OnAgentDeallocatedTeardown）执行——
+            // 它与本处捕获的是同一次 ForceAllocate 触发的事件，四条淘汰路径
+            // （TryAllocate 挤出/换日裁剪/空闲淘汰/promote 挤人）由此行为一致，
+            // 且 evicted state_changed 与告别提示恰好各发生一次（订阅方幂等：agent 已不在直接返回）。
             _monitor?.Log($"[Chat] {replacedNpc} deallocated — replaced by {npcName}", LogLevel.Info);
         }
 
@@ -598,7 +580,7 @@ public static class DialogueBoxInputPatch
         _bioLoader?.InjectBio(agent.Brain);
         _wireAgentEvents?.Invoke(agent);
         _monitor?.Log(
-            $"[Chat] {npcName} promoted to Agent via dialogue (conversations={conversations}, hearts={hearts:F1})",
+            $"[Chat] {npcName} promoted to Agent via {source} (conversations={conversations}, hearts={hearts:F1})",
             LogLevel.Info);
         return true;
     }

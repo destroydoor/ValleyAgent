@@ -328,6 +328,20 @@ public static class NPCDialoguePatch
             ClearPreDialogueState(npcName);
         }
 
+        // PR2 B5.1（设计 §3.4 步骤 1）：对话结束释放该身体的 manual override，让身体从
+        // "玩家手动挤出来的槽位"回到空闲淘汰候选——否则 override 会一直占位到换日。
+        // 判定模式照抄 PromoteToAgent：KeepUntil 未到期不释放（导演 beat 进行中的身体不动）。
+        // 释放 ≠ 拆除：池位裁剪由 ReevaluateAllocations 按容量执行，身体拆除走常驻订阅。
+        if (AgentService != null && AgentService.HasAgent(npcName))
+        {
+            var allocation = AgentService.AllocationManager.GetAllocation(npcName);
+            if (allocation is { IsManuallyOverridden: true }
+                && !(allocation.KeepUntil.HasValue && DateTime.UtcNow < allocation.KeepUntil.Value))
+            {
+                _ = AgentService.AllocationManager.ReleaseManualOverride(npcName);
+            }
+        }
+
         Monitor?.Log($"[Dialogue] Agent {npcName}: conversation ended", LogLevel.Debug);
     }
 

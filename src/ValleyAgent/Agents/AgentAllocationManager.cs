@@ -183,6 +183,14 @@ public class AgentAllocationManager
     }
 
     /// <summary>
+    ///     KeepUntil 豁免是否仍然生效（导演 beat 窗口内）。单一判定源：
+    ///     IsForceReplaceable / ReevaluateAllocations / ReleaseIdleManualOverrides 共用，
+    ///     避免"替换豁免了、裁剪没豁免"的口径漂移。
+    /// </summary>
+    private static bool IsKeepUntilActive(AgentAllocationInfo info, DateTime now) =>
+        info.KeepUntil.HasValue && now < info.KeepUntil.Value;
+
+    /// <summary>
     ///     可被强制替换的槽位候选：非手动覆盖，且不在导演 KeepUntil 豁免期内。
     ///     2026-08-23 审计 P1：KeepUntil 此前只豁免空闲淘汰——beat 进行中的 NPC 仍会被
     ///     优先级替换/ForceAllocate 挤掉，导致导演编排中断；这里与 IdleEviction 对齐。
@@ -190,8 +198,7 @@ public class AgentAllocationManager
     private static bool IsForceReplaceable(KeyValuePair<string, AgentAllocationInfo> kvp)
     {
         var info = kvp.Value;
-        return !info.IsManuallyOverridden
-            && !(info.KeepUntil.HasValue && DateTime.UtcNow < info.KeepUntil.Value);
+        return !info.IsManuallyOverridden && !IsKeepUntilActive(info, DateTime.UtcNow);
     }
 
     /// <summary>
@@ -268,6 +275,23 @@ public class AgentAllocationManager
     }
 
     /// <summary>
+    ///     取单个 NPC 的分配信息（活跃引用，未分配返回 null）。
+    ///     供调用方读取 KeepUntil / manual 标记做释放前判定（如对话结束释放 override）。
+    /// </summary>
+    public AgentAllocationInfo? GetAllocation(string npcName)
+    {
+        if (string.IsNullOrWhiteSpace(npcName))
+        {
+            return null;
+        }
+
+        lock (_lock)
+        {
+            return _allocations.TryGetValue(npcName, out var info) ? info : null;
+        }
+    }
+
+    /// <summary>
     ///     Releases a manual override, allowing the NPC to be deallocated by priority rules.
     /// </summary>
     /// <param name="npcName">The NPC name.</param>
@@ -295,6 +319,56 @@ public class AgentAllocationManager
             info.LastUpdated = DateTime.UtcNow;
             return true;
         }
+    }
+
+    /// <summary>
+    ///     周期空闲回收（PR2 B5，设计 docs/design/2026-09-13-agent-body-refactor.md §3.4 步骤 3②）：
+    ///     把同时满足以下条件的 manual override 释放为普通分配——
+    ///     ① 无 KeepUntil 或已过期（导演 beat 进行中的身体豁免）；
+    ///     ② 不在活跃对话中（由调用方经 <paramref name="isConversationActive" /> 判定，
+    ///     本类是纯 C# 池表，不得依赖 Patches/Game1 层）；
+    ///     ③ 距 <see cref="AgentAllocationInfo.LastUpdated" /> 超过 <paramref name="idleThreshold" />
+    ///     （对话与房客中继路径每轮经 UpdatePriority 刷新 LastUpdated，超时即视为无人在聊）。
+    ///     释放 ≠ 淘汰：本方法只让身体进入空闲淘汰候选，池位裁剪仍由 <see cref="ReevaluateAllocations" />
+    ///     按容量执行，身体拆除由 OnAgentDeallocated 订阅方完成。
+    ///     释放会刷新 LastUpdated（与 <see cref="ReleaseManualOverride" /> 语义一致）——
+    ///     刚结束对话的身体至少再存活一个阈值周期，避免"聊完立刻被拆"。
+    ///     该方法同时兜住房客中继对话的盲区：房客关闭对话框主机无感知
+    ///     （EndTopicConversation 不触发），只能靠空闲超时回收。
+    /// </summary>
+    /// <param name="now">当前 UTC 时间（参数化便于测试与批量一致性）。</param>
+    /// <param name="idleThreshold">空闲阈值。</param>
+    /// <param name="isConversationActive">NPC 是否正在活跃对话中（调用方判定）。</param>
+    /// <returns>本次释放的 manual override 数量。</returns>
+    internal int ReleaseIdleManualOverrides(DateTime now, TimeSpan idleThreshold,
+        Func<string, bool> isConversationActive)
+    {
+        if (isConversationActive == null)
+        {
+            throw new ArgumentNullException(nameof(isConversationActive));
+        }
+
+        var released = 0;
+        lock (_lock)
+        {
+            // 快照后逐个释放：释放只改 info 字段不增删字典，但快照避免"遍历中被并发分配表改动"的脆弱性
+            foreach (var info in _allocations.Values.ToList())
+            {
+                if (!info.IsManuallyOverridden
+                    || IsKeepUntilActive(info, now)
+                    || isConversationActive(info.NpcName)
+                    || now - info.LastUpdated < idleThreshold)
+                {
+                    continue;
+                }
+
+                info.IsManuallyOverridden = false;
+                info.LastUpdated = now;
+                released++;
+            }
+        }
+
+        return released;
     }
 
     /// <summary>
@@ -509,14 +583,19 @@ public class AgentAllocationManager
                 return;
             }
 
-            // Sort by priority ascending, manual overrides last
-            var sorted = _allocations
+            var excess = _allocations.Count - MaxAgents;
+
+            // PR2 B5 显式规则①（设计 §3.4 步骤 3①）：淘汰候选显式跳过 KeepUntil 未到期者。
+            // 此前只靠 manual 标记排序垫底的巧合保护，override 释放（对话结束/空闲回收）后
+            // 该保护失效；beat 进行中的身体必须始终豁免。候选全部处于豁免期时允许暂时超容量，
+            // 豁免到期后的下一次周期调用补裁。
+            var toRemove = _allocations
+                .Where(kvp => !IsKeepUntilActive(kvp.Value, DateTime.UtcNow))
                 .OrderBy(kvp => kvp.Value.IsManuallyOverridden ? 1 : 0)
                 .ThenBy(kvp => kvp.Value.PriorityScore)
                 .ThenBy(kvp => kvp.Value.LastUpdated)
+                .Take(excess)
                 .ToList();
-
-            var toRemove = sorted.Take(_allocations.Count - MaxAgents);
 
             foreach (var kvp in toRemove)
             {

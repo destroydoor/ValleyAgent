@@ -280,9 +280,10 @@ public static class GMCMIntegration
 
         gmcm.AddNumberOption(
             manifest,
-            name: () => T("最小 Agent NPC 数", "Min Agent NPCs", config),
-            tooltip: () => T("硬下限：低于此值时 spark 概率加倍、导演优先选未分配 NPC (0 - Normal)",
-                "Hard floor: below this, spark probability doubles and director prioritizes unassigned NPCs (0 - Normal).",
+            // PR2 B6（设计 §3.1）：分配语义从"身份"改为"身体"——三档数值行为/钳制不动，仅文案对齐。
+            name: () => T("最少 AI 身体数", "Min AI Bodies", config),
+            tooltip: () => T("硬下限：低于此值时 spark 概率加倍、导演优先选无身体 NPC (0 - Normal)",
+                "Hard floor: below this, spark probability doubles and the director prioritizes NPCs without an AI body (0 - Normal).",
                 config),
             getValue: () => config.MinAgentNpcs,
             setValue: value =>
@@ -300,7 +301,7 @@ public static class GMCMIntegration
 
         gmcm.AddNumberOption(
             manifest,
-            name: () => T("普通 Agent NPC 数", "Normal Agent NPCs", config),
+            name: () => T("平时 AI 身体数", "Normal AI Bodies", config),
             tooltip: () => T("日常目标：spark 主动激活到此数量停止 (Min - Max)",
                 "Daily target: spark stops proactive activation at this count (Min - Max).", config),
             getValue: () => config.NormalAgentNpcs,
@@ -314,8 +315,9 @@ public static class GMCMIntegration
 
         gmcm.AddNumberOption(
             manifest,
-            name: () => T("最大 Agent NPC 数", "Max Agent NPCs", config),
-            tooltip: () => T("硬上限：任何分配不超过此值 (Normal - 10)", "Hard ceiling: no allocation exceeds this (Normal - 10).",
+            name: () => T("AI 身体上限", "Max AI Bodies", config),
+            tooltip: () => T("硬上限：同时持有的 AI 身体不超过此值 (Normal - 10)",
+                "Hard ceiling: concurrent AI bodies never exceed this (Normal - 10).",
                 config),
             getValue: () => config.MaxAgentNpcs,
             setValue: value =>

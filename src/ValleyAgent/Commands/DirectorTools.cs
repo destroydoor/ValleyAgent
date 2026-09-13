@@ -7,6 +7,7 @@ using StardewModdingAPI;
 using StardewValley;
 using ValleyAgent.Beats;
 using ValleyAgent.Brain;
+using ValleyAgent.Patches;
 using ValleyAgent.Protocol;
 using ValleyAgent.Services;
 using ActionResultReason = ValleyAgent.Protocol.ProtocolV2.ActionResultReason;
@@ -28,25 +29,68 @@ public class DirectorTools
     private readonly int _defaultBeatDurationMinutes;
     private readonly Func<string, AgentInstance?> _brainResolver;
 
+    /// <summary>
+    ///     行为类工具的"确保身体"接缝（PR2 B4，设计 §3.3）：入参 (npcName, tool)，
+    ///     返回 true 表示该 NPC 已持有身体或已成功建身体。null = 未接线形态
+    ///     （internal 构造器直建的单测路径），此时行为类工具跳过建身体、保持既有行为。
+    /// </summary>
+    private readonly Func<string, string, bool>? _ensureBody;
+
     public DirectorTools(IMonitor monitor, AgentService agentService, BeatStore? beatStore = null, int defaultBeatDurationMinutes = 120)
         : this(monitor, beatStore, defaultBeatDurationMinutes,
-            npcName => agentService.TryGetBrain(npcName, out var agent) ? agent : null)
+            npcName => agentService.TryGetBrain(npcName, out var agent) ? agent : null,
+            (npcName, tool) => EnsureBodyForDirectorTool(agentService, npcName))
     {
     }
 
     /// <summary>
     ///     内部构造（单测接缝）：注入 brain 解析器与 beat 存储，不依赖 AgentService 实例。
+    ///     ensureBody 供 spy 注入：验证行为类工具会调分配、数据类工具从不调分配。
     /// </summary>
     internal DirectorTools(
         IMonitor? monitor,
         BeatStore? beatStore,
         int defaultBeatDurationMinutes,
-        Func<string, AgentInstance?> brainResolver)
+        Func<string, AgentInstance?> brainResolver,
+        Func<string, string, bool>? ensureBody = null)
     {
         _monitor = monitor;
         _beatStore = beatStore;
         _defaultBeatDurationMinutes = defaultBeatDurationMinutes;
         _brainResolver = brainResolver ?? throw new ArgumentNullException(nameof(brainResolver));
+        _ensureBody = ensureBody;
+    }
+
+    /// <summary>
+    ///     行为类工具的默认建身体实现（B4）：已有身体直接放行；无身体时先做 NPC 存在性守卫
+    ///     （防幽灵身体占名额，与房客中继路径同款守卫），再走 PromoteToAgent——
+    ///     ForceAllocate + manual override 释放循环 + KeepUntil 豁免，与对话 promote 语义完全一致。
+    ///     分配失败（满员无可替槽 / NPC 不存在 / 游戏状态未就绪）返回 false，
+    ///     调用方按 AgentMissing 失败语义处理，不抛异常。
+    /// </summary>
+    private static bool EnsureBodyForDirectorTool(AgentService agentService, string npcName)
+    {
+        if (agentService.HasAgent(npcName))
+        {
+            return true;
+        }
+
+        NPC? npc;
+        try
+        {
+            npc = Game1.getCharacterFromName<NPC>(npcName);
+        }
+        catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
+        {
+            npc = null;
+        }
+
+        if (npc == null)
+        {
+            return false;
+        }
+
+        return DialogueBoxInputPatch.PromoteToAgent(npcName, "director");
     }
 
     /// <summary>
@@ -103,6 +147,20 @@ public class DirectorTools
         if (!TryGetTile(args, out var tile))
         {
             return (false, ActionResultReason.InvalidState, "set_npc_position: missing/invalid tile [x, y]");
+        }
+
+        // B4 行为类工具（设计 §3.3）：warp 前确保身体——无身体的 NPC 会被原版日程立即拉回，
+        // warp 不持久（mood/working_on 也无行为表达）。纯数据类工具（mood/recent_events/working_on/
+        // inventory/money/inject_memory/spawn_beat）不建身体——"改个心情不该占一个身体名额"。
+        // 分配失败（满员无可替槽等）按既有失败语义返回 AgentMissing，不抛异常；
+        // _ensureBody == null 为未接线形态（internal 构造器直建的旧单测路径），保持既有行为。
+        if (_ensureBody != null && !_ensureBody(npcName, "set_npc_position"))
+        {
+            _monitor?.Log(
+                $"[DirectorTools] set_npc_position: body allocation failed for '{npcName}' (pool full or npc missing)",
+                LogLevel.Warn);
+            return (false, ActionResultReason.AgentMissing,
+                $"set_npc_position: body allocation failed for '{npcName}'");
         }
 
         NPC? npc;
