@@ -97,17 +97,47 @@ public class ThinClientCapabilityMatrixTests
     }
 
     /// <summary>
-    ///     红色缺口：ChatBarRouter 只在主机 EventHandlerInitializer 初始化，ThinClient 不创建——
+    ///     M3 已修复（2026-09-13）：房客聊天栏路由。
+    ///     原缺口：ChatBarRouter 只在主机 EventHandlerInitializer 初始化，ThinClient 不创建——
     ///     ChatBoxInputPatch 在房客侧捕获了聊天输入但路由器未初始化，聊天栏发起的 NPC 对话静默丢弃。
+    ///     修复：InitializeThinClientMode 注入 FarmhandDialogueTransport 版路由器
+    ///     （InitializeFarmhand），并在 tick 排水里消费其回复队列。
+    ///
+    ///     这里仍是源码审计（无法在本机驱动真实房客 tick），但断言从"提过 ChatBarRouter 这个名字"
+    ///     升级为"初始化 + 回复排水"两处接线都在位——缺任一处房客聊天栏依旧是死的。
     /// </summary>
     [Fact]
     public void ThinClient_MustWireChatBarRouter()
     {
         var body = ThinClientInitBody();
 
-        Assert.True(body.Contains("ChatBarRouter", StringComparison.Ordinal),
-            "ModEntry.InitializeThinClientMode 未初始化 ChatBarRouter（主机侧在 EventHandlerInitializer 初始化）→ "
-            + "房客聊天栏输入被 ChatBoxInputPatch 捕获后静默丢弃，聊天栏 NPC 对话在客户端不可用。"
-            + "修复方向：ThinClient 注入 FarmhandDialogueTransport 版 ChatBarRouter 或在判定后显式禁用入口并提示。");
+        Assert.True(body.Contains("ChatBarRouter.InitializeFarmhand", StringComparison.Ordinal),
+            "ModEntry.InitializeThinClientMode 未初始化房客版 ChatBarRouter → "
+            + "房客聊天栏输入被 ChatBoxInputPatch 捕获后无人路由，聊天栏 NPC 对话在客户端不可用。");
+
+        Assert.True(body.Contains("ChatBarRouter.ProcessPendingReplies()", StringComparison.Ordinal),
+            "房客 UpdateTicked 未排空 ChatBarRouter 的回复队列 → "
+            + "主机回包到达房客后只入队不渲染（后台线程入队、主线程消费，缺排水即黑屏）。");
+
+        // 聊天输入拦截补丁也要接上 monitor，否则路由异常在房客侧完全静默。
+        Assert.True(body.Contains("ChatBoxInputPatch.Initialize", StringComparison.Ordinal),
+            "房客未初始化 ChatBoxInputPatch（只设 IMonitor）→ 聊天栏路由出错时无任何日志，故障不可观测。");
+    }
+
+    /// <summary>
+    ///     房客形态的对话请求必须经 FarmhandDialogueTransport 转发主机（房客没有本地 LLM 通道）。
+    ///     审计 ChatBarRouter：存在 transport 分支，且房客不重复执行 actions（实体在主机权威）。
+    /// </summary>
+    [Fact]
+    public void ChatBarRouter_Farmhand_ForwardsViaTransport()
+    {
+        var src = ReadSource("src", "ValleyAgent", "Chat", "ChatBarRouter.cs");
+
+        Assert.Contains("IDialogueTransport? _dialogueTransport", src);
+        Assert.Contains("InitializeFarmhand", src);
+        // 房客：在场候选只取主机广播的 Agent 名单（房客没有 AgentService）
+        Assert.Contains("IsFarmhand && _remoteRenderer?.GetRemoteState(npc.Name) == null", src);
+        // 主机已执行过 actions（含广播同步），房客重复执行会造成双份效果
+        Assert.Contains("if (!IsFarmhand)", src);
     }
 }

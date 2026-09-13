@@ -44,6 +44,18 @@ public static class MultiplayerTestCommands
             "分配 NPC 为 Agent（C3 前置：TryGenerateDialogue 需要 NPC 已是 Agent）。\n" +
             "Usage: va_test_alloc <npc_name>",
             (_, args) => RunAlloc(args, monitor));
+
+        _ = helper.ConsoleCommands.Add("va_test_chat",
+            "C6 (M3): 房客聊天栏路由——与原版 textBoxEnter 同参调用 receiveChatMessage 提交本地聊天，\n" +
+            "验证 ChatBoxInputPatch → ChatBarRouter（farmhand 形态）→ 主机转发 → 本地渲染全链路。\n" +
+            "Usage: va_test_chat <npc_name> <message...>  (消息含 NPC 名如 Haley 即可命中路由)",
+            (_, args) => { Task.Run(() => RunC6Chat(args, monitor)); });
+
+        _ = helper.ConsoleCommands.Add("va_test_menu",
+            "C7 (M3): 房客送礼/交易菜单——farmhand 手持可赠物品 checkAction，\n" +
+            "验证 GiftTradeMenu 弹出（M3 前被 isThinClient 过滤，房客直接开对话）。\n" +
+            "Usage: va_test_menu <npc_name> [item_id]  (默认 item_id=74 钻石)",
+            (_, args) => RunC7Menu(args, monitor));
     }
 
     /// <summary>C3 前置：主机侧分配 NPC 为 Agent（TryGenerateDialogue 对非 Agent 返回 false）。
@@ -257,14 +269,38 @@ public static class MultiplayerTestCommands
             return;
         }
 
-        // 轮询等待响应
+        // 轮询等待响应（基线比对：TryGetLastDialogue 会返回上一轮的陈旧响应，
+        // 只有与发送前不同才判定为新回复，防止旧响应假绿）。
+        api.TryGetLastDialogue(npc.Name, out var baselineResponse);
         var sw = Stopwatch.StartNew();
-        while (sw.Elapsed.TotalSeconds < 30)
+        var busyRetries = 0;
+        while (sw.Elapsed.TotalSeconds < 120)
         {
             await Task.Delay(500).ConfigureAwait(false);
 
-            if (api.TryGetLastDialogue(npc.Name, out var response) && !string.IsNullOrEmpty(response))
+            if (api.TryGetLastDialogue(npc.Name, out var response)
+                && !string.IsNullOrEmpty(response)
+                && response != baselineResponse)
             {
+                // BUSY 灰字（NPC 在途对话占用）不算链路通：等冷却后重发，最多 3 次。
+                if (response.Contains("正在和别人交流"))
+                {
+                    busyRetries++;
+                    if (busyRetries > 3)
+                    {
+                        monitor.Log("[C3] FAIL: 连续 3 次 BUSY（NPC 一直忙），放弃。", LogLevel.Error);
+                        ShowTestHud("C3 FAIL: NPC 持续忙碌");
+                        return;
+                    }
+                    monitor.Log($"[C3] BUSY（第 {busyRetries} 次），等 6s 冷却后重发。", LogLevel.Warn);
+                    await Task.Delay(6000).ConfigureAwait(false);
+                    if (!api.TryGenerateDialogue(npc.Name, message))
+                    {
+                        monitor.Log("[C3] BUSY 重发被拒（冷却中），继续等待。", LogLevel.Warn);
+                    }
+                    continue;
+                }
+
                 api.TryGetLastDialogueSource(npc.Name, out var source);
                 monitor.Log($"[C3] 收到响应 (source={source}): {response}", LogLevel.Info);
                 // 2026-09-10：PASS 行携带 source——fallback 与真实 LLM 响应此前无法区分，
@@ -275,8 +311,147 @@ public static class MultiplayerTestCommands
             }
         }
 
-        monitor.Log("[C3] FAIL: 30 秒内未收到 LLM 响应。", LogLevel.Error);
+        monitor.Log("[C3] FAIL: 120 秒内未收到 LLM 响应。", LogLevel.Error);
         ShowTestHud("C3 FAIL: 未收到响应");
+    }
+
+    /// <summary>
+    ///     C6 (M3): 房客聊天栏路由。与原版 textBoxEnter 同参调用 receiveChatMessage
+    ///     （ChatBox.cs:127 同款：sourceFarmer=自己, chatKind=0），触发
+    ///     ChatBoxInputPatch 前缀 → ChatBarRouter 房客形态（在场候选取主机广播名单、
+    ///     请求经 FarmhandDialogueTransport 转发、回复本地渲染且跳过 actions 执行）。
+    ///     前置：①RemoteRenderer 已收到该 NPC 状态（M3 候选过滤）；②房客真实换图到
+    ///     NPC 所在位置（本地裸改 currentLocation 不触发位置激活，characters 集合为空
+    ///     → BuildPresence "No villager present"，2026-09-13 实测踩坑）。
+    /// </summary>
+    internal static async Task RunC6Chat(string[] args, IMonitor monitor)
+    {
+        var npcName = args.Length > 0 ? args[0] : TestConfig.NpcName;
+        var message = args.Length > 1 ? string.Join(" ", args[1..]) : "Haley nice weather today";
+        if (!EnsureLoaded(monitor, npcName, out var player, out var npc))
+        {
+            monitor.Log($"[C6] 前置条件不满足（玩家或 NPC {npcName} 未找到）。", LogLevel.Error);
+            return;
+        }
+
+        try
+        {
+            TeleportNear(player, npc, monitor);
+
+            if (Game1.chatBox == null)
+            {
+                monitor.Log("[C6] FAIL: Game1.chatBox 为空（聊天栏不可用）。", LogLevel.Error);
+                return;
+            }
+
+            // ① 等远程状态就绪：M3 房客候选过滤要求 GetRemoteState != null，alloc 广播是周期性的。
+            var remoteReady = IsAgentNpc(npc.Name, monitor);
+            for (var i = 0; !remoteReady && i < 30; i++)
+            {
+                await Task.Delay(1000).ConfigureAwait(false);
+                remoteReady = IsAgentNpc(npc.Name, monitor);
+            }
+            if (!remoteReady)
+            {
+                monitor.Log("[C6] FAIL: 30s 内房客 RemoteRenderer 未收到该 NPC 远程状态（M3 候选过滤会丢消息）。", LogLevel.Error);
+                return;
+            }
+
+            // ② 真实 warp 到 NPC 所在位置（走原版 warpFarmer，房客端合法换图 + 位置激活）。
+            var locName = npc.currentLocation?.Name ?? "Town";
+            var tile = npc.Tile;
+            monitor.Log(
+                $"[C6] 真实 warp: {Game1.player.currentLocation?.Name} → {locName} tile=({tile.X},{tile.Y})", LogLevel.Info);
+            Game1.warpFarmer(locName, (int)tile.X + 1, (int)tile.Y, false);
+            await Task.Delay(3000).ConfigureAwait(false);
+
+            monitor.Log(
+                $"[C6] 提交前诊断: 当前位置={Game1.player.currentLocation?.Name}, 在场村民数={Game1.player.currentLocation?.characters.Count}",
+                LogLevel.Info);
+
+            monitor.Log($"[C6] 经 receiveChatMessage 提交本地聊天: {message}", LogLevel.Info);
+            Game1.chatBox.receiveChatMessage(
+                Game1.player.UniqueMultiplayerID, 0, LocalizedContentManager.CurrentLanguageCode, message);
+            monitor.Log(
+                "[C6] 已提交。判定看日志：房客 [ChatBar] 路由行 → 主机对话请求 → 房客渲染回复（ProcessPendingReplies）。",
+                LogLevel.Info);
+            ShowTestHud($"C6 已发送: {message}");
+        }
+        catch (Exception ex)
+        {
+            monitor.Log($"[C6] 异常: {ex}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    ///     C7 (M3): 房客送礼/交易菜单。farmhand 手持可赠送物品调用 checkAction
+    ///     （与 RunC1 同款真实右键路径），断言弹出含 送礼/交易 响应键的问题对话框。
+    ///     M3 前房客被 isThinClient 过滤，手持物品右键直接开 AI 对话，到不了这里。
+    /// </summary>
+    internal static void RunC7Menu(string[] args, IMonitor monitor)
+    {
+        var npcName = args.Length > 0 ? args[0] : TestConfig.NpcName;
+        var itemId = args.Length > 1 ? args[1] : "74"; // 钻石
+        if (!EnsureLoaded(monitor, npcName, out var player, out var npc))
+        {
+            monitor.Log($"[C7] 前置条件不满足（玩家或 NPC {npcName} 未找到）。", LogLevel.Error);
+            return;
+        }
+
+        try
+        {
+            TeleportNear(player, npc, monitor);
+
+            // 清掉可能已打开的菜单
+            if (Game1.activeClickableMenu != null)
+            {
+                Game1.exitActiveMenu();
+            }
+
+            var gift = new Object(itemId, 1);
+            player.addItemToInventoryBool(gift);
+            player.ActiveObject = gift;
+
+            monitor.Log($"[C7] 手持 {gift.DisplayName} 调用 {npc.Name}.checkAction...", LogLevel.Info);
+            var result = npc.checkAction(player, npc.currentLocation);
+
+            if (Game1.activeClickableMenu is DialogueBox db && db.responses.Length > 0)
+            {
+                var keys = string.Join(",", db.responses.Select(r => r.responseKey));
+                var hasGift = db.responses.Any(r => r.responseKey == GiftTradeMenuLogic.ResponseKeyGift);
+                var hasTrade = db.responses.Any(r => r.responseKey == GiftTradeMenuLogic.ResponseKeyTrade);
+                monitor.Log($"[C7] result={result}, menu=DialogueBox(responses=[{keys}])", LogLevel.Info);
+                if (hasGift && hasTrade)
+                {
+                    monitor.Log("[C7] PASS: farmhand 手持物品弹出了 送礼/交易 菜单（M3 房客形态生效）。", LogLevel.Info);
+                    ShowTestHud("C7 PASS: 房客送礼/交易菜单");
+                }
+                else
+                {
+                    monitor.Log("[C7] FAIL: 对话框缺少 送礼/交易 响应键。", LogLevel.Error);
+                    ShowTestHud("C7 FAIL: 响应键缺失");
+                }
+            }
+            else
+            {
+                monitor.Log(
+                    $"[C7] FAIL: menu={Game1.activeClickableMenu?.GetType().Name ?? "(null)"}（未弹出问题对话框）。",
+                    LogLevel.Error);
+                ShowTestHud("C7 FAIL: 无菜单");
+            }
+
+            // 清场：关菜单 + 移除手持测试物品
+            Game1.exitActiveMenu();
+            if (player.ActiveObject != null)
+            {
+                player.removeItemFromInventory(player.ActiveObject);
+                player.ActiveObject = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            monitor.Log($"[C7] 异常: {ex}", LogLevel.Error);
+        }
     }
 
     private static bool EnsureLoaded(IMonitor monitor, string npcName, out Farmer player, out NPC npc)

@@ -7,6 +7,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
 using ValleyAgent.Api;
+using ValleyAgent.Chat;
 using ValleyAgent.Config;
 using ValleyAgent.Friendship;
 using ValleyAgent.Infrastructure;
@@ -468,6 +469,18 @@ public class ModEntry : Mod
         // 4.5 初始化 farmhand 可用的公共 API（对话请求通过 FarmhandDialogueTransport 转发给主机）
         _valleyApi = new ValleyAgentApi(_farmhandDialogueTransport, Monitor);
 
+        // 4.6 M3 多玩家化：聊天栏路由（房客形态）。
+        // 此前 ChatBarRouter 只在主机 EventHandlerInitializer 初始化，房客侧 ChatBoxInputPatch
+        // 捕获了聊天输入却无人路由 → 聊天栏发起的 NPC 对话静默丢失（"客户端没有主机的功能"）。
+        // 房客注入 FarmhandDialogueTransport 版路由器：在场候选取主机广播的 Agent 名单，
+        // 对话请求转发主机执行，回复在本地渲染（气泡/聊天栏）。
+        ChatBoxInputPatch.Initialize(Monitor);
+        ChatBarRouter.InitializeFarmhand(
+            Monitor,
+            _farmhandDialogueTransport!,
+            _remoteRenderer!,
+            Helper.ReadConfig<ModConfig>());
+
         // 5. 薄 Harmony 补丁：只打 ThinClient 需要的（NPCDialoguePatch/NPCGiftPatch/DialogueBoxInputPatch）。
         // 不打 SocialPagePatch（记忆宫殿是主机数据，farmhand 不可见）。
         // 必须初始化 patch 类静态字段，否则 Prefix 会因 null 守卫返回 true（让原版处理）。
@@ -493,7 +506,8 @@ public class ModEntry : Mod
             try
             {
                 _remoteRenderer?.Update(tickCounter++);
-                DialogueBoxInputPatch.ProcessPendingReplies();          // AI 回复渲染
+                DialogueBoxInputPatch.ProcessPendingReplies();          // AI 回复渲染（对话框）
+                ChatBarRouter.ProcessPendingReplies();                  // M3：聊天栏 AI 回复渲染（房客形态）
                 NPCGiftPatch.ProcessMainThreadActions();                // 送礼反应 + fd.Points 落账
                 Multiplayer.HostRequestHandlers.ProcessMainThreadActions(); // 房客侧入队路径（含 transport 主线程化发送）
             }
@@ -540,6 +554,9 @@ public class ModEntry : Mod
                 // Transport 注入置空，避免 farmhand 在标题画面（无 NPC）误触发请求
                 DialogueBoxInputPatch.SetDialogueTransport(null);
                 NPCGiftPatch.SetGiftTransport(null);
+                // M3：聊天栏路由状态复位（会话簿记/在途守卫/待渲染队列）。
+                // 路由器实例本身保留（持有 transport 引用），下次 SaveLoaded 无需重建。
+                ChatBarRouter.Reset();
             }
             catch (Exception ex)
             {

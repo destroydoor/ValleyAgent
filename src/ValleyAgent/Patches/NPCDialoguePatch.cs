@@ -108,10 +108,11 @@ public static class NPCDialoguePatch
         // 修复：原代码将此检查放在 isAgent 之后，导致非 Agent NPC 手持物品右键时
         // 直接走原版送礼（消耗物品），不弹菜单。现在所有村民（Agent 和非 Agent）都能弹菜单。
         // 武器/工具等不可赠送手持物视为空手，继续走下方对话流程。
-        if (GiftTradeMenuLogic.ShouldOfferGiftTradeMenu(isThinClient,
+        if (GiftTradeMenuLogic.ShouldOfferGiftTradeMenu(
                 GiftTradeMenuLogic.IsGiftableHeldItem(who.ActiveObject)))
         {
-            ShowGiftTradeMenu(__instance, who, l);
+            // M3：房客与主机同菜单（送礼走 gift transport、交易走 dialogue transport，两条管道房客侧都已接通）。
+            ShowGiftTradeMenu(__instance, who, l, isThinClient);
             __result = true;
             InterceptCount++;
             return false;
@@ -201,7 +202,7 @@ public static class NPCDialoguePatch
     /// <summary>
     ///     手持可赠送物品时弹出原版风格问题对话框：送礼 / 交易 / 取消。
     /// </summary>
-    private static void ShowGiftTradeMenu(NPC npc, Farmer who, GameLocation location)
+    private static void ShowGiftTradeMenu(NPC npc, Farmer who, GameLocation location, bool isThinClient)
     {
         // 菜单打开期间玩家可能切换手持物，物品名/数量在此时定格，用于交易意图文案
         var heldObj = who.ActiveObject!;
@@ -233,13 +234,14 @@ public static class NPCDialoguePatch
         location.createQuestionDialogue(
             GiftTradeMenuLogic.BuildMenuQuestion(npc.displayName, itemDisplayName),
             responses,
-            (farmer, whichAnswer) => OnGiftTradeMenuAnswer(npc, farmer, whichAnswer, itemDisplayName, stack),
+            (farmer, whichAnswer) =>
+                OnGiftTradeMenuAnswer(npc, farmer, whichAnswer, itemDisplayName, stack, isThinClient),
             npc);
     }
 
     /// <summary>送礼/交易菜单的回答处理。</summary>
     private static void OnGiftTradeMenuAnswer(NPC npc, Farmer farmer, string whichAnswer, string itemDisplayName,
-        int stack)
+        int stack, bool isThinClient)
     {
         switch (whichAnswer)
         {
@@ -259,7 +261,9 @@ public static class NPCDialoguePatch
 
                 // 打开 AI 对话并以玩家口吻预注入交易意图，让 NPC 表态开价；
                 // 后续还价/成交流程全部走已有对话管道，不在菜单里另起逻辑。
-                OpenAgentDialogue(npc, false);
+                // M3：房客侧 OpenAgentDialogue 需要 isThinClient=true 才不会去摸本地
+                // AgentService（房客没有），此前硬编码 false —— 房客原本走不到这里。
+                OpenAgentDialogue(npc, isThinClient);
                 DialogueBoxInputPatch.QueueExternalInput(
                     GiftTradeMenuLogic.BuildTradeIntentMessage(itemDisplayName, stack));
                 break;

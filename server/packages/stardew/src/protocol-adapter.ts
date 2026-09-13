@@ -29,6 +29,7 @@ import type {
 import { AgentLedger } from "./agent-ledger";
 import type { AgentMemory } from "./agent-memory";
 import { EmotionEngine } from "./emotion-engine";
+import { PlayerDirectory } from "./player-directory";
 import { MEMORY_SIDE_EFFECT_RECORDED, DEFAULT_EMOTION } from "./types";
 import { MorningShoutRouter } from "./morning-shout-router";
 import type { Director } from "./director";
@@ -59,6 +60,11 @@ export interface ProtocolAdapterOptions {
   adjustReconcileRetryMs?: number;
   /** 2026-08-15 步骤 3：确定性情绪引擎（事件驱动，Director mood 覆盖权）。 */
   emotionEngine?: EmotionEngine;
+  /**
+   * M3 多玩家化：观察式玩家名录（换日导演编排时按此名单 per-player 组 prompt）。
+   * 不注入时 morningPlan 走单玩家路径，行为等价 M3 前。
+   */
+  playerDirectory?: PlayerDirectory;
 }
 
 /** adjust_result 回执等待超时（设计 §6：回执丢失 → 超时回滚 pending，TS 重发靠 instructionId 幂等兜底）。 */
@@ -84,6 +90,13 @@ export class ProtocolAdapter {
   // Phase 2: set_goal 意图暂存（callId → 目标类型）。action_result 不带工具参数，
   // 目标记忆需要 type，故在 dialogue_response 发出时按 callId 暂存，回执到达后消费。
   private readonly pendingGoals = new Map<string, string>();
+  // M3 多玩家化（2026-09-13）：动作归属暂存（callId → 发起玩家 ID）。
+  // action_result 协议不带 playerId，而情绪必须 per-player（A 惹毛 NPC 不该让 B 承接），
+  // 故在此按 callId 记住是谁的动作，handleActionResult 消费后即时删除
+  // （与 pendingGoals 同生命周期；换日随情绪一起清空，防 callId 无回执时无界增长）。
+  private readonly pendingActionPlayers = new Map<string, string>();
+  // M3 多玩家化：观察式玩家名录（不注入时退化为单玩家编排，测试可注入定制实例）。
+  private readonly playerDirectory: PlayerDirectory;
   // 2026-08-15 账本迁移（步骤 1）：execute_adjust 回执等待表（instructionId → waiter）。
   // sendAdjust 挂等待；adjust_result 到达时按 instructionId 解析（超时 10s 回滚 pending）。
   private readonly pendingAdjusts = new Map<string, PendingAdjustWaiter>();
@@ -95,7 +108,9 @@ export class ProtocolAdapter {
   constructor(
     private readonly registry: StardewAgentRegistry,
     private readonly options?: ProtocolAdapterOptions,
-  ) {}
+  ) {
+    this.playerDirectory = options?.playerDirectory ?? new PlayerDirectory();
+  }
 
   async handleHello(req: HelloRequest): Promise<HelloResponse> {
     console.log(`[${timestamp()}] [recv] hello modVersion=${(req as { modVersion?: string }).modVersion ?? "?"}`);
@@ -116,8 +131,15 @@ export class ProtocolAdapter {
 
   async handleActionResult(req: ActionResultMessage): Promise<{ type: "ack"; requestId: string }> {
     // 2026-08-15 步骤 3：工具执行结果 → 情绪推导（chop_tree/set_goal 成败）。
+    // M3：动作归属到发起玩家（对话时按 callId 暂存），情绪落该玩家桶而非世界桶。
     if (req.npcName) {
-      this.options?.emotionEngine?.applyEvent(req.npcName, { kind: "action_result", ...(req.tool !== undefined ? { detail: req.tool } : {}), success: req.success });
+      const actorPlayerId = req.callId ? this.pendingActionPlayers.get(req.callId) : undefined;
+      if (req.callId) this.pendingActionPlayers.delete(req.callId);
+      this.options?.emotionEngine?.applyEvent(
+        req.npcName,
+        { kind: "action_result", ...(req.tool !== undefined ? { detail: req.tool } : {}), success: req.success },
+        actorPlayerId,
+      );
     }
     const reason = (req as { reason?: string }).reason;
     console.log(`[${timestamp()}] [recv] action_result callId=${req.callId} ok=${req.success}${reason ? ` reason=${reason}` : ""}${req.result ? ` result="${req.result}"` : ""}`);
@@ -160,6 +182,9 @@ export class ProtocolAdapter {
     // 事件类别、resetDay 产出 source:"day_started"，但此前从未接线——昨天的情绪
     // 会一直挂进今天的 prompt。重置与 Director 是否接线无关，放最前无条件执行）。
     this.options?.emotionEngine?.resetAll();
+    // M3：换日同时清空动作归属暂存表（情绪已整体回 baseline，残留的 callId → playerId
+    // 只可能来自永远等不到回执的动作，留着是无界增长）。
+    this.pendingActionPlayers.clear();
     // directorContext 由 C# DirectorContextBuilder 拼装（阶段 3）；接收即记录长度，
     // 内容消费留给工具型 Director（morningPlan 走 GameContextManager 结构化通道）。
     const dctxLen = req.directorContext?.length;
@@ -178,7 +203,10 @@ export class ProtocolAdapter {
     }
     console.log(`[${timestamp()}] [director] triggered: probability=${probability} roll=${roll.toFixed(4)} (命中，调用 morningPlan)`);
     try {
-      const beats = await director.morningPlan();
+      // M3：联机下按已知玩家名单逐个编排（每人一份画像、各自一次 LLM 调用，
+      // 全局 beat 预算与玩家数上限由 Director 内部钉住）。名单为空 → 单玩家路径。
+      const playerIds = this.playerDirectory.listPlayerIds();
+      const beats = await director.morningPlan({ playerIds });
       console.log(`[${timestamp()}] [director] morningPlan 返回 ${beats.length} 个 beat`);
       for (const beat of beats) {
         const msg: AllocateAgentMessage = {
@@ -586,6 +614,10 @@ export class ProtocolAdapter {
 
       const scene = decodeWorldSnapshot(req.worldSnapshot);
 
+      // M3 多玩家化：登记发起玩家（换日导演编排按此名单 per-player 取画像；
+      // 单机只有一个 playerId，行为等价现状）。
+      this.playerDirectory.observe(req.playerId, scene.farmerName);
+
       // 2026-08-15 账本迁移（步骤 1）：首次见 NPC 从 worldSnapshot 播种权威账本
       // （npcMoney/npcInventory 镜像基线；步骤 2 后权威性移交账本本身）。播种后保存。
       const ledger = this.options?.ledger;
@@ -646,9 +678,13 @@ export class ProtocolAdapter {
       // Phase 2: 暂存 set_goal 意图（callId → 目标类型），回执到达后写目标记忆。
       // 2026-08-15 步骤 2: receive_payment 已改 TS 同步执行（工具内写记忆），
       // 不再产生 action，无需暂存（pendingPayments 已删除）。
+      // M3：同时暂存 callId → 发起玩家（action_result 回执据此把情绪归属到玩家桶）。
       for (const action of result.actions) {
         if (action.tool === "set_goal" && action.callId) {
           this.pendingGoals.set(action.callId, String(action.args.type ?? ""));
+        }
+        if (action.callId && playerId) {
+          this.pendingActionPlayers.set(action.callId, playerId);
         }
       }
 
@@ -670,9 +706,11 @@ export class ProtocolAdapter {
 
       // 2026-08-15 步骤 3：响应情绪 = Director set_npc_mood 覆盖权 > 情绪引擎推导 > 默认。
       // scene.npcMood 由 C# worldSnapshot 携带（Director 写过则非 null）。
+      // M3：引擎推导按发起玩家取（玩家桶 > 世界桶，最近写入胜出）；无 playerId 的
+      // 旧客户端退化为世界桶，行为等价现状。
       const responseEmotion = scene.npcMood && scene.npcMood.trim() !== ""
         ? scene.npcMood
-        : (this.options?.emotionEngine?.current(req.npcName).emotion ?? result.emotion);
+        : (this.options?.emotionEngine?.current(req.npcName, req.playerId).emotion ?? result.emotion);
 
       return {
         type: "dialogue_response",

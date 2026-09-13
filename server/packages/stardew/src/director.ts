@@ -12,6 +12,7 @@
 import type { Beat, BeatStatus, PlayerProfile, GameContext } from "./types";
 import type { BeatStore } from "./beat-store";
 import type { PlayerProfileManager } from "./player-profile";
+import { LEGACY_PLAYER_ID } from "./player-profile-store";
 import type { ActivityLogStore } from "./activity-log-store";
 import type { GameContextManager } from "./game-context";
 import type { TranscriptStore } from "./transcript-store";
@@ -50,6 +51,24 @@ export interface DirectorConfig {
   maxRecentBeatsForBudget?: number;
   /** Cooldown days for the same NPC (default 5). */
   npcCooldownDays?: number;
+  /**
+   * M3 多玩家化：一次 morningPlan 最多为多少个玩家分别编排（默认 4，星露谷联机上限）。
+   * 每玩家一次 LLM 调用 + 各自画像，故必须有硬上限把 token 成本钉住。
+   */
+  maxPlayersPerPlan?: number;
+}
+
+/**
+ * M3 多玩家化：morningPlan 的编排目标。
+ * playerIds 省略/为空 → 单玩家（legacy）行为，与 M3 前完全一致。
+ */
+export interface DirectorPlanOptions {
+  playerIds?: string[];
+}
+
+/** M3：milestoneReact 的编排目标（里程碑天然归属单个玩家）。 */
+export interface DirectorMilestoneOptions {
+  playerId?: string;
 }
 
 /**
@@ -75,6 +94,11 @@ export interface DirectorPlanRunOptions {
   status: DirectorRunStatus;
   /** 调度出错时的错误信息。 */
   error?: string;
+  /**
+   * M3 多玩家化：本次编排面向的玩家（省略 = 单玩家/legacy 编排）。
+   * 落在 director_runs.player_id 列（旧库增量加列，可空）。
+   */
+  playerId?: string;
 }
 
 /** Maximum directive length (spec §6.3). */
@@ -129,6 +153,8 @@ export class Director {
   private readonly callLlm: DirectorLlmConfig["callLlm"];
   private readonly maxBeatsPerDay: number;
   private readonly maxRecentBeatsForBudget: number;
+  /** M3：一次 morningPlan 最多编排的玩家数（钉住联机下的 LLM 调用次数）。 */
+  private readonly maxPlayersPerPlan: number;
 
   constructor(
     private readonly beatStore: BeatStore,
@@ -144,6 +170,7 @@ export class Director {
     this.callLlm = config.callLlm;
     this.maxBeatsPerDay = config.maxBeatsPerDay ?? 3;
     this.maxRecentBeatsForBudget = config.maxRecentBeatsForBudget ?? 14;
+    this.maxPlayersPerPlan = config.maxPlayersPerPlan ?? 4;
     // npcCooldownDays is accepted by the config interface for API stability
     // but not used directly — NPC cooldown is enforced implicitly via the
     // recentBeats list bounded by maxRecentBeatsForBudget (a beat for the
@@ -167,7 +194,7 @@ export class Director {
    * 每条退出路径（无上下文/节日/LLM 失败/空产出/正常产出）都写一条
    * director_runs —— 降级是行为，留痕是可观测性，两者都必须。
    */
-  async morningPlan(): Promise<Beat[]> {
+  async morningPlan(options: DirectorPlanOptions = {}): Promise<Beat[]> {
     console.log(`[${logTimestamp()}] [director] morningPlan start`);
     const runId = crypto.randomUUID();
 
@@ -201,9 +228,54 @@ export class Director {
       return [];
     }
 
-    const attempt = await this.callLlmForBeats(ctx, /* isMilestone */ false);
+    // M3：无玩家名单（单机 / 服务器重启后尚无人开口）→ 单玩家编排，行为等价 M3 前。
+    const targets = this.resolveTargetPlayers(options.playerIds);
+    if (targets.length === 0) {
+      return this.morningPlanForPlayer(ctx, undefined, new Set(), this.maxBeatsPerDay);
+    }
+
+    console.log(
+      `[${logTimestamp()}] [director] morningPlan multiplayer: ${targets.length} 个玩家 (${targets.join(", ")})，`
+      + `每日 beat 预算 ${this.maxBeatsPerDay} 全局共享（联机不放大总量）`,
+    );
+    const produced: Beat[] = [];
+    // 跨玩家保留表：同一 NPC 当天只为第一个玩家编排（否则两个玩家各拿一个同 NPC beat，
+    // 玩家侧表现为"同一个 NPC 同一天被安排两次"，破坏节奏预算）。
+    const reserved = new Set<string>();
+    for (const playerId of targets) {
+      const budget = this.maxBeatsPerDay - produced.length;
+      if (budget <= 0) {
+        console.log(`[${logTimestamp()}] [director] 每日 beat 预算已用尽 (${this.maxBeatsPerDay})，跳过剩余玩家 ${playerId}`);
+        break;
+      }
+      const beats = await this.morningPlanForPlayer(ctx, playerId, reserved, budget);
+      produced.push(...beats);
+    }
+
+    console.log(`[${logTimestamp()}] [director] morningPlan end (multiplayer) players=${targets.length} produced=${produced.length}`);
+    return produced;
+  }
+
+  /**
+   * 单个玩家的一次 morningPlan 编排（LLM 调用 → 校验 → 落库 → 留痕）。
+   * playerId 为 undefined 时是单玩家/legacy 路径（prompt 与快照取缺省玩家画像）。
+   *
+   * @param reserved 已被前面玩家占用的 NPC（跨玩家去重，函数内会把本次占用的 NPC 加进去）
+   * @param budget   剩余每日 beat 预算（多玩家共享同一个 maxBeatsPerDay）
+   */
+  private async morningPlanForPlayer(
+    ctx: GameContext,
+    playerId: string | undefined,
+    reserved: Set<string>,
+    budget: number,
+  ): Promise<Beat[]> {
+    const runId = crypto.randomUUID();
+    const who = playerId ?? "(单玩家)";
+    const playerOpt = playerId !== undefined ? { playerId } : {};
+
+    const attempt = await this.callLlmForBeats(ctx, /* isMilestone */ false, undefined, playerId);
     if (attempt.llmError !== undefined) {
-      console.log(`[${logTimestamp()}] [director] morningPlan end (no beats from LLM)`);
+      console.log(`[${logTimestamp()}] [director] morningPlan[${who}] end (no beats from LLM)`);
       this.recordPlanRun({
         runId,
         gameDate: gameDateOf(ctx),
@@ -214,11 +286,12 @@ export class Director {
         emptyResult: true,
         status: "error",
         error: attempt.llmError,
+        ...playerOpt,
       });
       return [];
     }
     if (attempt.beats.length === 0) {
-      console.log(`[${logTimestamp()}] [director] morningPlan end (no beats from LLM)`);
+      console.log(`[${logTimestamp()}] [director] morningPlan[${who}] end (no beats from LLM)`);
       this.recordPlanRun({
         runId,
         gameDate: gameDateOf(ctx),
@@ -229,20 +302,24 @@ export class Director {
         droppedBeats: [],
         emptyResult: true,
         status: "noop",
+        ...playerOpt,
       });
       return [];
     }
 
-    const { valid, dropped } = this.validateAndFilter(attempt.beats, ctx);
-    const truncated = valid.slice(0, this.maxBeatsPerDay);
+    const { valid, dropped } = this.validateAndFilter(attempt.beats, ctx, reserved);
+    const truncated = valid.slice(0, budget);
     // 超出每日上限的截断也是"丢弃"，同样留痕 + 留日志。
-    const overflow = valid.slice(this.maxBeatsPerDay);
+    const overflow = valid.slice(budget);
     for (const raw of overflow) {
-      console.log(`[${logTimestamp()}] [director] 丢弃 beat npc=${raw.npcName}: 超出每日上限 maxBeatsPerDay=${this.maxBeatsPerDay}`);
-      dropped.push({ npcName: raw.npcName, directive: raw.directive, reasonDropped: `超出每日上限 maxBeatsPerDay=${this.maxBeatsPerDay}` });
+      console.log(`[${logTimestamp()}] [director] 丢弃 beat npc=${raw.npcName}: 超出每日上限 budget=${budget}`);
+      dropped.push({ npcName: raw.npcName, directive: raw.directive, reasonDropped: `超出每日上限 budget=${budget}` });
     }
-    const produced = this.persistAll(truncated, ctx);
-    console.log(`[${logTimestamp()}] [director] morningPlan end produced=${produced.length} dropped=${attempt.beats.length - valid.length + overflow.length}`);
+    const produced = this.persistAll(truncated, ctx, playerId);
+    for (const beat of produced) {
+      reserved.add(beat.npcName);
+    }
+    console.log(`[${logTimestamp()}] [director] morningPlan[${who}] end produced=${produced.length} dropped=${attempt.beats.length - valid.length + overflow.length}`);
 
     this.recordPlanRun({
       runId,
@@ -254,8 +331,24 @@ export class Director {
       droppedBeats: dropped,
       emptyResult: produced.length === 0,
       status: "completed",
+      ...playerOpt,
     });
     return produced;
+  }
+
+  /**
+   * M3：从候选名单解析出真正要编排的玩家（去空、去重、剔除 `_legacy` 占位键、限流）。
+   * 空结果 = 走单玩家路径。
+   */
+  private resolveTargetPlayers(playerIds?: string[]): string[] {
+    if (!playerIds || playerIds.length === 0) return [];
+    const out: string[] = [];
+    for (const id of playerIds) {
+      // `_legacy` 是旧单玩家画像的归属标记，不是活人：不参与 per-player 编排。
+      if (!id || id === LEGACY_PLAYER_ID) continue;
+      if (!out.includes(id)) out.push(id);
+    }
+    return out.slice(0, this.maxPlayersPerPlan);
   }
 
   /**
@@ -268,8 +361,11 @@ export class Director {
     type: string;
     description: string;
     detectedAt: string;
-  }): Promise<Beat | null> {
+  }, options: DirectorMilestoneOptions = {}): Promise<Beat | null> {
     const runId = crypto.randomUUID();
+    // M3：里程碑天然归属单个玩家（谁的里程碑就按谁的画像编排）。
+    const playerId = options.playerId;
+    const playerOpt = playerId !== undefined ? { playerId } : {};
 
     const ctx = this.gameCtxMgr.getCurrent();
     if (!ctx) {
@@ -282,6 +378,7 @@ export class Director {
         emptyResult: true,
         status: "noop",
         error: "no game context",
+        ...playerOpt,
       });
       return null;
     }
@@ -295,11 +392,12 @@ export class Director {
         emptyResult: true,
         status: "noop",
         error: "festival day",
+        ...playerOpt,
       });
       return null;
     }
 
-    const attempt = await this.callLlmForBeats(ctx, /* isMilestone */ true, milestone);
+    const attempt = await this.callLlmForBeats(ctx, /* isMilestone */ true, milestone, playerId);
     if (attempt.llmError !== undefined) {
       this.recordPlanRun({
         runId,
@@ -311,6 +409,7 @@ export class Director {
         emptyResult: true,
         status: "error",
         error: attempt.llmError,
+        ...playerOpt,
       });
       return null;
     }
@@ -325,6 +424,7 @@ export class Director {
         droppedBeats: [],
         emptyResult: true,
         status: "noop",
+        ...playerOpt,
       });
       return null;
     }
@@ -341,11 +441,12 @@ export class Director {
         droppedBeats: dropped,
         emptyResult: true,
         status: "completed",
+        ...playerOpt,
       });
       return null;
     }
     // Milestone react always returns at most 1 beat.
-    const beats = this.persistAll([valid[0]!], ctx);
+    const beats = this.persistAll([valid[0]!], ctx, playerId);
     const produced = beats[0] ?? null;
     this.recordPlanRun({
       runId,
@@ -357,6 +458,7 @@ export class Director {
       droppedBeats: dropped,
       emptyResult: produced === null,
       status: "completed",
+      ...playerOpt,
     });
     return produced;
   }
@@ -387,6 +489,7 @@ export class Director {
     // exactOptionalPropertyTypes：可选字段只在有值时挂载。
     if (opts.llmRawOutput !== undefined) rec.llmRawOutput = opts.llmRawOutput;
     if (opts.error !== undefined) rec.error = opts.error;
+    if (opts.playerId !== undefined) rec.playerId = opts.playerId;
     this.transcriptStore.recordDirectorRun(rec);
   }
 
@@ -404,10 +507,11 @@ export class Director {
     ctx: GameContext,
     isMilestone: boolean,
     milestone?: { type: string; description: string; detectedAt: string },
+    playerId?: string,
   ): Promise<LlmAttempt> {
     const prompt = isMilestone && milestone
-      ? this.buildMilestonePrompt(ctx, milestone)
-      : this.buildMorningPrompt(ctx);
+      ? this.buildMilestonePrompt(ctx, milestone, playerId)
+      : this.buildMorningPrompt(ctx, playerId);
 
     console.log(`[${logTimestamp()}] [director] prompt输入 (${isMilestone ? "milestone" : "morning"}, ${prompt.length} chars):\n${prompt}`);
 
@@ -476,7 +580,12 @@ export class Director {
    * 返回 {valid, dropped}：dropped 携带每条丢弃原因（日志 + director_runs
    * 留痕共用同一份事实）。
    */
-  private validateAndFilter(rawBeats: RawBeatOutput[], ctx: GameContext): FilterResult {
+  private validateAndFilter(
+    rawBeats: RawBeatOutput[],
+    ctx: GameContext,
+    /** M3：已被同轮其他玩家占用的 NPC（跨玩家去重）。 */
+    reservedNpcs?: Set<string>,
+  ): FilterResult {
     const recentBeats = this.beatStore.listRecent(this.maxRecentBeatsForBudget);
     const seenNpcs = new Set<string>();
     const valid: RawBeatOutput[] = [];
@@ -488,6 +597,13 @@ export class Director {
       if (seenNpcs.has(raw.npcName)) {
         console.log(`[${logTimestamp()}] [director] 丢弃 beat npc=${raw.npcName}: 本批次重复`);
         dropped.push({ npcName: raw.npcName, directive: raw.directive, reasonDropped: "本批次重复" });
+        continue;
+      }
+
+      // M3：同一天已被前面的玩家编排过的 NPC 不再重复安排（节奏预算按世界算，不按玩家算）。
+      if (reservedNpcs?.has(raw.npcName)) {
+        console.log(`[${logTimestamp()}] [director] 丢弃 beat npc=${raw.npcName}: 本轮已为其他玩家编排过该 NPC`);
+        dropped.push({ npcName: raw.npcName, directive: raw.directive, reasonDropped: "本轮已为其他玩家编排过该 NPC" });
         continue;
       }
 
@@ -549,12 +665,13 @@ export class Director {
   // Persistence
   // ------------------------------------------------------------------
 
-  private persistAll(rawBeats: RawBeatOutput[], ctx: GameContext): Beat[] {
-    const profileSnapshot = this.profileMgr.profileStore.load() ?? emptyProfile();
+  private persistAll(rawBeats: RawBeatOutput[], ctx: GameContext, playerId?: string): Beat[] {
+    // M3：画像快照取该玩家的画像（无 playerId → 缺省/legacy 玩家，等价现状）。
+    const profileSnapshot = this.profileMgr.profileStore.loadOrClaim(playerId) ?? emptyProfile();
     const recentBeats = this.beatStore.listRecent(3);
     const beats: Beat[] = [];
     for (const raw of rawBeats) {
-      const beat = this.buildBeat(raw, profileSnapshot, ctx, recentBeats);
+      const beat = this.buildBeat(raw, profileSnapshot, ctx, recentBeats, playerId);
       this.beatStore.save(beat);
       beats.push(beat);
     }
@@ -566,6 +683,7 @@ export class Director {
     profile: PlayerProfile,
     ctx: GameContext,
     recentBeats: Beat[],
+    playerId?: string,
   ): Beat {
     return {
       id: crypto.randomUUID(),
@@ -578,6 +696,8 @@ export class Director {
         playerProfileSnapshot: profile,
         gameContextSnapshot: ctx,
         recentBeats,
+        // M3：beat 归属玩家（旧数据无此字段，读取方按可选处理）。
+        ...(playerId !== undefined ? { playerId } : {}),
       },
       status: "scheduled" as BeatStatus,
     };
@@ -587,8 +707,8 @@ export class Director {
   // Prompt construction
   // ------------------------------------------------------------------
 
-  private buildMorningPrompt(ctx: GameContext): string {
-    const profileSummary = this.profileMgr.summarizeForDirector();
+  private buildMorningPrompt(ctx: GameContext, playerId?: string): string {
+    const profileSummary = this.profileMgr.summarizeForDirector(playerId);
     const gameCtxSummary = this.gameCtxMgr.summarizeForDirector();
     const recentBeats = this.beatStore.listRecent(this.maxRecentBeatsForBudget);
     const recentBeatsSummary = recentBeats.length > 0
@@ -647,8 +767,9 @@ export class Director {
   private buildMilestonePrompt(
     ctx: GameContext,
     milestone: { type: string; description: string; detectedAt: string },
+    playerId?: string,
   ): string {
-    const profileSummary = this.profileMgr.summarizeForDirector();
+    const profileSummary = this.profileMgr.summarizeForDirector(playerId);
     const gameCtxSummary = this.gameCtxMgr.summarizeForDirector();
     const recentBeats = this.beatStore.listRecent(this.maxRecentBeatsForBudget);
     const recentBeatsSummary = recentBeats.length > 0

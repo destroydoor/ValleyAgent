@@ -19,11 +19,19 @@ public static class GiftTradeMenuLogic
 
     /// <summary>
     ///     手持物品右键 Agent NPC 时是否弹出 送礼/交易 选择菜单。
-    ///     仅 Host 模式支持：ThinClient 维持现状（手持物品也直接开 AI 对话），
-    ///     因为 ThinClient 的送礼走 IGiftTransport 代理管道，菜单注入交易意图依赖本地对话状态。
+    ///     房客（ThinClient）同样支持（M3 多玩家化，2026-09-13）：
+    ///     - 送礼分支走 <see cref="NPCGiftPatch" /> 的 IGiftTransport 代理管道（FarmhandGiftTransport → 主机评估）；
+    ///     - 交易分支走 DialogueBoxInputPatch 的 IDialogueTransport 管道（FarmhandDialogueTransport → 主机 LLM），
+    ///       交易意图以"玩家口吻预注入"的方式进入同一条对话流，不需要任何本地对话状态。
+    ///     此前房客被排除是因为交易意图注入被误判为"依赖本地对话状态"——实测两条管道在房客侧都已接通。
     /// </summary>
-    public static bool ShouldOfferGiftTradeMenu(bool isThinClient, bool isGiftableHeldItem)
-        => !isThinClient && isGiftableHeldItem;
+    /// <param name="isGiftableHeldItem">手持物是否可赠送（不可赠送视为空手，不弹菜单）。</param>
+    /// <remarks>
+    ///     房客与主机同判定（M3 前房客恒 false，是"客户端没有主机功能"的一处实证）。
+    ///     不保留 isThinClient 形参：留一个被忽略的布尔是陷阱——后来的调用方会以为它还在过滤。
+    /// </remarks>
+    public static bool ShouldOfferGiftTradeMenu(bool isGiftableHeldItem)
+        => isGiftableHeldItem;
 
     /// <summary>
     ///     玩家手持物是否可赠送：必须是 StardewValley.Object 且原版判定 canBeGivenAsGift()

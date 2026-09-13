@@ -77,6 +77,8 @@ interface DirectorRunRow {
   status: string;
   error_json: string | null;
   created_at: string;
+  /** M3：旧库增量加列（可空），读回时按可选字段还原。 */
+  player_id: string | null;
 }
 
 interface TableNameRow {
@@ -155,6 +157,15 @@ export class TranscriptStore {
       );
       CREATE INDEX IF NOT EXISTS idx_director_runs_date ON director_runs(game_date);
     `);
+
+    // M3 多玩家化：director_runs 增量加 player_id 列（旧库已存在，ADD COLUMN 会报
+    // "duplicate column name"——吞掉即可，幂等）。失败最坏情况只是留痕缺玩家维度，
+    // 不影响主流程（留痕本就 best-effort）。
+    try {
+      this.db.exec("ALTER TABLE director_runs ADD COLUMN player_id TEXT;");
+    } catch {
+      // 列已存在：正常路径，无需处理。
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -279,9 +290,9 @@ export class TranscriptStore {
           `INSERT INTO director_runs (
              run_id, game_date, trigger, prompt_full, llm_raw_output,
              produced_beats_json, dropped_beats_json,
-             empty_result, status, error_json
+             empty_result, status, error_json, player_id
            )
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(run_id) DO UPDATE SET
              game_date = excluded.game_date,
              trigger = excluded.trigger,
@@ -291,7 +302,8 @@ export class TranscriptStore {
              dropped_beats_json = excluded.dropped_beats_json,
              empty_result = excluded.empty_result,
              status = excluded.status,
-             error_json = excluded.error_json;`,
+             error_json = excluded.error_json,
+             player_id = excluded.player_id;`,
         )
         .run(
           rec.runId,
@@ -304,6 +316,7 @@ export class TranscriptStore {
           rec.emptyResult ? 1 : 0,
           rec.status,
           errorJson,
+          rec.playerId ?? null,
         );
     } catch (err) {
       console.warn(`[transcript] write failed: ${err}`);
@@ -475,6 +488,7 @@ export class TranscriptStore {
     };
     if (row.llm_raw_output !== null) rec.llmRawOutput = row.llm_raw_output;
     if (row.error_json !== null) rec.error = row.error_json;
+    if (row.player_id !== null) rec.playerId = row.player_id;
     return rec;
   }
 
