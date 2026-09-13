@@ -204,6 +204,11 @@ export interface Beat {
     playerProfileSnapshot: PlayerProfile;
     gameContextSnapshot: GameContext;
     recentBeats: Beat[];
+    /**
+     * M3 多玩家化：这个 beat 是为哪个玩家编排的（缺省 = 单玩家/未归属）。
+     * 旧存档与旧代码没有该字段，读取方一律按可选处理。
+     */
+    playerId?: string;
   };
   status: BeatStatus;
   reactSteps?: ReActStep[]; // 执行轨迹（调试用）

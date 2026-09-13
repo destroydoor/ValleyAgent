@@ -20,6 +20,9 @@ const MAX_GIFTS_PER_NPC = 10;
  * Implementations should return the model's text response and token usage;
  * they MUST NOT throw on transient LLM errors — instead, callers handle
  * failure modes (see refreshPreferences / refreshPersonality).
+ *
+ * M3 多玩家化（2026-09-13）：所有读写方法接受可选 playerId（缺省 → legacy/单玩家
+ * 键，行为等价现状）。联机下每个玩家一份五层画像，导演按玩家各自取摘要编排。
  */
 export interface PlayerProfileLlmConfig {
   callLlm: (prompt: string) => Promise<{
@@ -59,8 +62,8 @@ export class PlayerProfileManager {
    * Safe to call once per game (typically when the player starts a new
    * save). If a profile already exists it is overwritten.
    */
-  initProfile(staticLayer: PlayerProfile["static"]): void {
-    this.profileStore.save(emptyProfileWithStatic(staticLayer));
+  initProfile(staticLayer: PlayerProfile["static"], playerId?: string): void {
+    this.profileStore.save(emptyProfileWithStatic(staticLayer), playerId);
   }
 
   /**
@@ -68,16 +71,17 @@ export class PlayerProfileManager {
    *   - ActivityLogStore: raw activity log (for median/sum aggregates)
    *   - PlayerProfileStore: profile.behavior.dailyActivities (latest 30)
    */
-  recordDailyActivity(activity: DailyActivity): void {
+  recordDailyActivity(activity: DailyActivity, playerId?: string): void {
     this.activityStore.saveDaily(activity);
-    this.profileStore.appendDailyActivity(activity);
+    this.profileStore.appendDailyActivity(activity, playerId);
   }
 
   updateRelationship(
     npcName: string,
     rel: PlayerProfile["relationships"][string],
+    playerId?: string,
   ): void {
-    this.profileStore.updateRelationship(npcName, rel);
+    this.profileStore.updateRelationship(npcName, rel, playerId);
   }
 
   /**
@@ -85,8 +89,8 @@ export class PlayerProfileManager {
    * only the most recent MAX_INTERACTIONS_PER_NPC entries. If the NPC
    * has no relationship entry yet, one is created with empty defaults.
    */
-  appendInteraction(npcName: string, interaction: Interaction): void {
-    const profile = this.loadOrInit();
+  appendInteraction(npcName: string, interaction: Interaction, playerId?: string): void {
+    const profile = this.loadOrInit(playerId);
     const rel = profile.relationships[npcName] ?? emptyRelationship();
     const next = [...rel.last5Interactions, interaction];
     rel.last5Interactions =
@@ -94,30 +98,30 @@ export class PlayerProfileManager {
         ? next.slice(next.length - MAX_INTERACTIONS_PER_NPC)
         : next;
     rel.lastUpdated = interaction.date;
-    this.profileStore.updateRelationship(npcName, rel);
+    this.profileStore.updateRelationship(npcName, rel, playerId);
   }
 
   /**
    * Append a gift to a NPC's giftHistory list, keeping only the most
    * recent MAX_GIFTS_PER_NPC entries.
    */
-  appendGiftHistory(npcName: string, gift: GiftRecord): void {
-    const profile = this.loadOrInit();
+  appendGiftHistory(npcName: string, gift: GiftRecord, playerId?: string): void {
+    const profile = this.loadOrInit(playerId);
     const rel = profile.relationships[npcName] ?? emptyRelationship();
     const next = [...rel.giftHistory, gift];
     rel.giftHistory =
       next.length > MAX_GIFTS_PER_NPC
         ? next.slice(next.length - MAX_GIFTS_PER_NPC)
         : next;
-    this.profileStore.updateRelationship(npcName, rel);
+    this.profileStore.updateRelationship(npcName, rel, playerId);
   }
 
-  appendBeatHistory(entry: BeatHistoryEntry): void {
-    this.profileStore.appendBeatHistory(entry);
+  appendBeatHistory(entry: BeatHistoryEntry, playerId?: string): void {
+    this.profileStore.appendBeatHistory(entry, playerId);
   }
 
-  addRecurringTrope(trope: string): void {
-    this.profileStore.addRecurringTrope(trope);
+  addRecurringTrope(trope: string, playerId?: string): void {
+    this.profileStore.addRecurringTrope(trope, playerId);
   }
 
   /**
@@ -137,8 +141,20 @@ export class PlayerProfileManager {
    * (spec §4 example). Falls back to a minimal placeholder when no
    * profile exists yet so the Director can still issue a generic plan.
    */
-  summarizeForDirector(): string {
-    const profile = this.profileStore.load();
+  /**
+   * 已登记画像的玩家（供导演 per-player 编排）。返回值的元素可能是旧单玩家
+   * 格式的占位键 `_legacy`——导演侧按"未知玩家"处理（等价于今天的单玩家行为）。
+   */
+  listPlayerIds(): string[] {
+    return this.profileStore.listPlayerIds();
+  }
+
+  /**
+   * 某玩家的画像摘要（playerId 缺省 → legacy/单玩家键）。
+   * M3：联机下导演对每个玩家各取一份摘要，互不串味。
+   */
+  summarizeForDirector(playerId?: string): string {
+    const profile = this.profileStore.loadOrClaim(playerId);
     if (!profile) return "[玩家画像]\n无玩家档案\n";
 
     const lines: string[] = ["[玩家画像]"];
@@ -193,8 +209,8 @@ export class PlayerProfileManager {
    * without throwing — the Director should not crash on a single bad
    * LLM call.
    */
-  async refreshPreferences(): Promise<void> {
-    const profile = this.profileStore.load();
+  async refreshPreferences(playerId?: string): Promise<void> {
+    const profile = this.profileStore.loadOrClaim(playerId);
     if (!profile) return; // nothing to refresh
 
     const prompt = this.buildPreferencesPrompt(profile);
@@ -209,11 +225,14 @@ export class PlayerProfileManager {
     const trimmed = responseText.trim();
     if (!trimmed) return;
 
-    this.profileStore.updatePreferences({
-      ...profile.preferences,
-      routinePattern: trimmed,
-      lastUpdated: nowIso(),
-    });
+    this.profileStore.updatePreferences(
+      {
+        ...profile.preferences,
+        routinePattern: trimmed,
+        lastUpdated: nowIso(),
+      },
+      playerId,
+    );
   }
 
   /**
@@ -221,8 +240,8 @@ export class PlayerProfileManager {
    * On LLM failure, preserves the existing archetype and returns
    * without throwing.
    */
-  async refreshPersonality(): Promise<void> {
-    const profile = this.profileStore.load();
+  async refreshPersonality(playerId?: string): Promise<void> {
+    const profile = this.profileStore.loadOrClaim(playerId);
     if (!profile) return;
 
     const prompt = this.buildPersonalityPrompt(profile);
@@ -236,11 +255,14 @@ export class PlayerProfileManager {
     const trimmed = responseText.trim();
     if (!trimmed) return;
 
-    this.profileStore.updatePersonality({
-      ...profile.personality,
-      archetype: trimmed,
-      lastUpdated: nowIso(),
-    });
+    this.profileStore.updatePersonality(
+      {
+        ...profile.personality,
+        archetype: trimmed,
+        lastUpdated: nowIso(),
+      },
+      playerId,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -251,11 +273,11 @@ export class PlayerProfileManager {
    * Load the existing profile, or initialize an empty one if none exists
    * yet (so appendInteraction / appendGiftHistory work pre-initProfile).
    */
-  private loadOrInit(): PlayerProfile {
-    const existing = this.profileStore.load();
+  private loadOrInit(playerId?: string): PlayerProfile {
+    const existing = this.profileStore.loadOrClaim(playerId);
     if (existing) return existing;
     const fresh = emptyProfile();
-    this.profileStore.save(fresh);
+    this.profileStore.save(fresh, playerId);
     return fresh;
   }
 

@@ -8,6 +8,8 @@ using StardewValley;
 using ValleyAgent.AI;
 using ValleyAgent.Config;
 using ValleyAgent.Infrastructure;
+using ValleyAgent.Multiplayer;
+using ValleyAgent.Multiplayer.Transports;
 using ValleyAgent.Patches;
 using ValleyAgent.Services;
 using ValleyAgent.Services.Schedule;
@@ -22,6 +24,14 @@ namespace ValleyAgent.Chat;
 ///     职责：构建在场 NPC 摘要 → 四层路由消歧 → 只对被路由命中的 NPC 发起一次 LLM
 ///     dialogue 请求 → 主线程把回复交给 ActiveSpeechRouter 渲染（气泡/聊天栏），
 ///     全程不强制打开对话框（§3.1）。
+///
+///     M3 多玩家化（2026-09-13）：支持 farmhand（ThinClient）形态——
+///     房客没有本地 AgentServerProvider/AgentService，但同样需要在聊天栏跟在场 NPC 说话。
+///     房客形态的差异只有三处：
+///     - 在场候选只取主机广播的 Agent 名单（RemoteRenderer），而不是全部村民；
+///     - 对话请求经 IDialogueTransport（FarmhandDialogueTransport）转发主机，不直连 LLM；
+///     - 远程喊话（依赖 AgentService 的全员候选）在房客侧静默跳过。
+///     主机形态一条代码路径不变（transport/renderer 为 null）。
 /// </summary>
 public static class ChatBarRouter
 {
@@ -30,6 +40,11 @@ public static class ChatBarRouter
     private static IAgentServerProvider? _agentServerProvider;
     private static CommandExecutor? _commandExecutor;
     private static ModConfig? _config;
+
+    // M3：房客（ThinClient）形态依赖——对话转发到主机的传输层 + 主机广播的 Agent 名单缓存。
+    // 两者都只在 InitializeFarmhand 注入；主机形态恒为 null，走原路径。
+    private static IDialogueTransport? _dialogueTransport;
+    private static AgentRemoteRenderer? _remoteRenderer;
 
     // E5-2: 远程喊话调度器（玩家喊到不在场 NPC 时安排延迟回应）与 4 层确定性路由。
     private static ShoutReplyScheduler? _shoutReplyScheduler;
@@ -74,13 +89,17 @@ public static class ChatBarRouter
         CommandExecutor? commandExecutor,
         ModConfig? config,
         ProactiveSpeechQuota? proactiveSpeechQuota = null,
-        NpcScheduleService? scheduleService = null)
+        NpcScheduleService? scheduleService = null,
+        IDialogueTransport? dialogueTransport = null,
+        AgentRemoteRenderer? remoteRenderer = null)
     {
         _monitor = monitor;
         _agentService = agentService;
         _agentServerProvider = provider;
         _commandExecutor = commandExecutor;
         _config = config;
+        _dialogueTransport = dialogueTransport;
+        _remoteRenderer = remoteRenderer;
 
         if (config != null)
         {
@@ -95,6 +114,25 @@ public static class ChatBarRouter
         _morningShoutRouter = new MorningShoutRouter();
         _scheduleService = scheduleService;
     }
+
+    /// <summary>
+    ///     M3：房客（ThinClient）形态初始化。房客没有本地 LLM 通道与 AgentService，
+    ///     对话经 transport 转发主机，在场候选取主机广播的 Agent 名单。
+    ///     由 ModEntry.InitializeThinClientMode 调用（此前房客完全不初始化路由器 →
+    ///     聊天栏输入被 ChatBoxInputPatch 捕获后静默丢弃，即"客户端没有主机的功能"）。
+    /// </summary>
+    public static void InitializeFarmhand(
+        IMonitor monitor,
+        IDialogueTransport dialogueTransport,
+        AgentRemoteRenderer remoteRenderer,
+        ModConfig? config)
+    {
+        Initialize(monitor, null, null, null, config, null, null, dialogueTransport, remoteRenderer);
+        _monitor?.Log("[ChatBar] farmhand router ready (聊天栏 NPC 对话经主机转发)", LogLevel.Debug);
+    }
+
+    /// <summary>是否处于房客形态（对话走 transport 转发，而非本地 LLM 通道）。</summary>
+    private static bool IsFarmhand => _dialogueTransport != null;
 
     /// <summary>
     ///     E5-2: 默认远程回应文本（无 LLM 接线时的礼貌回应）。
@@ -117,6 +155,8 @@ public static class ChatBarRouter
     {
         if (_morningShoutRouter == null || _shoutReplyScheduler == null || _agentService == null)
         {
+            // M3：房客无 AgentService（拿不到全员候选），远程喊话在此静默终止——
+            // 房客只支持"对在场 NPC 说话"，不支持"喊不在场的 NPC"。
             return false;
         }
 
@@ -189,9 +229,10 @@ public static class ChatBarRouter
     {
         try
         {
-            if (_agentServerProvider == null)
+            // M3：主机走本地 provider，房客走 transport 转发主机；两者皆无才是未初始化/Inert。
+            if (_agentServerProvider == null && _dialogueTransport == null)
             {
-                return; // ThinClient / 未初始化：不路由
+                return;
             }
 
             if (_config == null || !_config.Enabled || !_config.ChatBarRoutingEnabled)
@@ -305,7 +346,14 @@ public static class ChatBarRouter
             _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
 
             NPCDialoguePatch.IncrementConversationCount(reply.NpcName);
-            DialogueBoxInputPatch.DispatchDialogueActions(npc, reply.Actions);
+
+            // M3：房客不执行 actions —— 实体在主机权威，主机侧 HandleDialogueRequest
+            // 已经执行过一次（含广播同步）；房客重复执行会造成双份效果。
+            if (!IsFarmhand)
+            {
+                DialogueBoxInputPatch.DispatchDialogueActions(npc, reply.Actions);
+            }
+
         }
     }
 
@@ -371,6 +419,14 @@ public static class ChatBarRouter
         foreach (var character in location.characters)
         {
             if (character is not NPC npc || !npc.IsVillager || npc.Tile == null)
+            {
+                continue;
+            }
+
+            // M3：房客只看主机广播过的 Agent NPC——房客本地没有 AgentService，
+            // 给非 Agent 村民发请求会在主机侧被拒（TryGenerateDialogue 返回 false），
+            // 玩家侧表现为"说了话没人理"，不如一开始就不进候选。
+            if (IsFarmhand && _remoteRenderer?.GetRemoteState(npc.Name) == null)
             {
                 continue;
             }

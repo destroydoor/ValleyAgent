@@ -362,7 +362,9 @@ export class StardewAgent {
     const scene = sceneStateFromGameContext(gameCtx, beat.npcName);
 
     // Build beat system prompt with profile + game-context summaries injected.
-    const profileSummary = profileMgr.summarizeForDirector();
+    // M3：beat 是导演为某个玩家编排的（beat.context.playerId）→ 用该玩家的画像摘要；
+    // 无归属（单玩家/旧数据）→ 缺省玩家键，行为等价 M3 前。
+    const profileSummary = profileMgr.summarizeForDirector(beat.context.playerId);
     const gameCtxSummary = gameCtxMgr.summarizeForDirector();
     const systemPrompt = this.promptBuilder.buildBeatSystemPrompt(
       this.memory,

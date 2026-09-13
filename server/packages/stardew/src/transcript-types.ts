@@ -95,4 +95,9 @@ export interface DirectorRunRecord {
   emptyResult: boolean;
   status: DirectorRunStatus;
   error?: string;
+  /**
+   * M3 多玩家化：本次导演编排面向的玩家（缺省 = 单玩家/未归属）。
+   * 落在 director_runs.player_id 列（旧库增量加列，可空）。
+   */
+  playerId?: string;
 }
