@@ -173,6 +173,14 @@ namespace ValleyAgent.Api
                 try { action(); }
                 catch (InvalidOperationException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex.Message}", LogLevel.Warn); }
                 catch (ArgumentException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex.Message}", LogLevel.Warn); }
+                catch (Exception ex)
+                {
+                    // 死锁修复（2026-09-12）：原来只吞 InvalidOperationException/ArgumentException。
+                    // 队列动作直写 Game1（fd.Points / getCharacterFromName / drawDialogue），
+                    // 切图与玩家为 null 时会抛 NRE 等——异常逃出 while 会连带跳过调用方
+                    // 下游的所有主线程泵（泵是串行责任链），对话回复因此永远渲染不出来。
+                    Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex}", LogLevel.Warn);
+                }
             }
         }
     }

@@ -180,14 +180,28 @@ namespace ValleyAgent.WebSocket
             }
             finally
             {
-                StopHeartbeat();
+                // 死锁修复（2026-09-12）：这段 finally 是**唯一的自动重连入口**，
+                // 原来 5 个步骤裸串在一起——任何一步抛异常，后面的 ReconnectIndependentAsync()
+                // 就永远执行不到，WebSocket 断线后整个进程再也不会重连
+                //（所有对话抛 "WebSocket is not connected"，AI 静默死亡，无告警）。
+                // 每一步独立兜底，重连必须走到。
+                try { StopHeartbeat(); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] StopHeartbeat failed in read-loop teardown: {ex.Message}"); }
+
                 // 断连时立即 fail 所有 pending 请求，避免调用方等 30 秒超时
-                _tracker.FailAll(new InvalidOperationException("WebSocket disconnected"));
-                OnDisconnected?.Invoke();
+                try { _tracker.FailAll(new InvalidOperationException("WebSocket disconnected")); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] FailAll failed in read-loop teardown: {ex.Message}"); }
+
+                // 订阅者抛异常同样不得吃掉重连（OnDisconnected 的订阅方在 EventHandlerInitializer 侧发 WS 消息）
+                try { OnDisconnected?.Invoke(); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] OnDisconnected handler failed: {ex.Message}"); }
+
                 // 释放旧 ws 实例
-                try { ws?.Dispose(); } catch (InvalidOperationException) { }
+                try { ws?.Dispose(); } catch (Exception) { /* ws 可能已被 Abort/Dispose */ }
+
                 // 使用独立 CTS 重连，不依赖 ReadLoop 的 ct（可能已被取消）
-                _ = ReconnectIndependentAsync();
+                try { _ = ReconnectIndependentAsync(); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] Reconnect kick-off failed: {ex.Message}"); }
             }
         }
 
@@ -306,7 +320,18 @@ namespace ValleyAgent.WebSocket
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break; // StopHeartbeat 取消：正常收尾，不该作为 unobserved exception 冒出去
+                }
+                catch (ObjectDisposedException)
+                {
+                    break; // StopHeartbeat 已 Dispose 该 CTS：同上
+                }
 
                 if (ct.IsCancellationRequested) break;
 
