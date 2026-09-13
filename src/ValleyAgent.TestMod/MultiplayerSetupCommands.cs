@@ -43,10 +43,16 @@ public static class MultiplayerSetupCommands
             "Usage: va_mp_join [address]  (default: 127.0.0.1:24642)",
             (_, args) => JoinGame(args.Length > 0 ? args[0] : DefaultJoinAddress));
 
+        _ = helper.ConsoleCommands.Add("va_test_sleep",
+            "Trigger a day change (same as vanilla debug sleep, but executed on the main thread).\n" +
+            "Usage: va_test_sleep",
+            (_, _) => s_pendingSleep = true);
+
         helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
     }
 
     private static int s_minCabins = 1;
+    private static bool s_pendingSleep;
 
     private static void HostServer(string[] args)
     {
@@ -369,6 +375,24 @@ public static class MultiplayerSetupCommands
 
     private static void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
+        // 换日必须在主线程执行（answerDialogueAction 会动菜单/流程状态）；
+        // console 命令线程只置位。逻辑等价原版 DebugCommands.Sleep。
+        if (s_pendingSleep && Game1.hasLoadedGame)
+        {
+            s_pendingSleep = false;
+            try
+            {
+                s_monitor.Log("[MP] va_test_sleep: triggering day change (Sleep_Yes)...", LogLevel.Info);
+                Game1.player.isInBed.Value = true;
+                Game1.player.sleptInTemporaryBed.Value = true;
+                Game1.currentLocation.answerDialogueAction("Sleep_Yes", null);
+            }
+            catch (Exception ex)
+            {
+                s_monitor.Log($"[MP] va_test_sleep failed: {ex}", LogLevel.Error);
+            }
+        }
+
         if (s_pendingHost && Game1.hasLoadedGame)
         {
             try

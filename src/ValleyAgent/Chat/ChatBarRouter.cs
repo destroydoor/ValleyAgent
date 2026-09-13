@@ -469,15 +469,26 @@ public static class ChatBarRouter
         try
         {
             var worldSnapshot = WorldSnapshotBuilder.Build(npcName, DialogueBoxInputPatch.GetNpcState(npcName));
-            var request = new DialogueRequest(
-                "dialogue",
-                Guid.NewGuid().ToString("N"),
-                npcName,
-                text,
-                worldSnapshot,
-                Game1.player.UniqueMultiplayerID.ToString());
 
-            var response = await _agentServerProvider!.GenerateDialogueAsync(request).ConfigureAwait(false);
+            // M3：主机走本地 provider，房客走 transport 转发主机（DialogueBoxInputPatch 同款双路径）。
+            // 此前房客形态仍解引用 _agentServerProvider（房客恒为 null）→ 每次聊天必 NRE，
+            // 玩家侧表现为 "*NPC 没有回应*" 灰字（2026-09-13 实机联机测试定位）。
+            DialogueResponse response;
+            if (_dialogueTransport != null)
+            {
+                response = await _dialogueTransport.SendAsync(npcName, text, worldSnapshot).ConfigureAwait(false);
+            }
+            else
+            {
+                var request = new DialogueRequest(
+                    "dialogue",
+                    Guid.NewGuid().ToString("N"),
+                    npcName,
+                    text,
+                    worldSnapshot,
+                    Game1.player.UniqueMultiplayerID.ToString());
+                response = await _agentServerProvider!.GenerateDialogueAsync(request).ConfigureAwait(false);
+            }
             _pendingReplies.Enqueue(new PendingChatReply(
                 npcName,
                 response.Speech ?? string.Empty,
