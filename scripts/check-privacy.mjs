@@ -4,7 +4,13 @@
  *
  * 目的：防止本机绝对路径、真实存档名、API key 等个人信息被重新提交进公开仓库。
  * 用法：node scripts/check-privacy.mjs      （非 0 退出码表示发现疑似泄露）
+ *
+ * 扫描范围：git 仓库内只扫 git 跟踪的文件（含已暂存的新文件）——能进公开仓库
+ * 的只有这些；未跟踪的本机工具状态（.mimosa/.claude、临时补丁脚本等）扫了只会
+ * 让本地门禁常红。CI 干净检出下与全量扫描等价，不放过任何会落库的泄露。
+ * 非 git 目录（如导出包）回退到全目录遍历。
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
@@ -48,8 +54,23 @@ function* walk(dir) {
   }
 }
 
+// 返回 git 跟踪的仓库相对路径（NUL 分隔，规避文件名里的特殊字符）；
+// 不在 git 仓库内或 git 不可用时返回 null，调用方回退到全目录遍历。
+function listTrackedFiles() {
+  const git = spawnSync("git", ["ls-files", "-c", "-z"], { cwd: ROOT });
+  if (git.status !== 0 || !git.stdout?.length) return null;
+  return git.stdout.toString("utf8").split("\0").filter(Boolean);
+}
+
+const tracked = listTrackedFiles();
+const files = tracked
+  ? tracked
+      .filter((f) => !SKIP_DIRS.has(f.split("/")[0]))
+      .map((f) => join(ROOT, f))
+  : walk(ROOT);
+
 const findings = [];
-for (const file of walk(ROOT)) {
+for (const file of files) {
   const rel = relative(ROOT, file).split(sep).join("/");
   if (SKIP_FILES.has(rel)) continue;
   let text;
