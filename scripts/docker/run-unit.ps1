@@ -15,7 +15,7 @@
 
 .EXAMPLE
     .\scripts\docker\run-unit.ps1
-    .\scripts\docker\run-unit.ps1 -GamePath "D:\Games\Stardew Valley"
+    .\scripts\docker\run-unit.ps1 -GamePath "X:\Games\Stardew Valley"
     .\scripts\docker\run-unit.ps1 -NoCache -SkipBuild
 #>
 [CmdletBinding()]
@@ -33,9 +33,11 @@ if (-not $GamePath) {
         "C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley"
         "C:\Program Files\Steam\steamapps\common\Stardew Valley"
         "C:\Program Files\GOG Games\Stardew Valley"
-        "D:\SteamLibrary\steamapps\common\Stardew Valley"
         "$PSScriptRoot\..\..\Stardew Valley"
     )
+    foreach ($d in (Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+        $candidates += (Join-Path $d.Root "SteamLibrary\steamapps\common\Stardew Valley")
+    }
     foreach ($c in $candidates) {
         if (Test-Path "$c\Stardew Valley.dll") { $GamePath = $c; break }
     }

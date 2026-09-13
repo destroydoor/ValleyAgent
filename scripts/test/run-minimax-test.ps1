@@ -11,10 +11,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GamePath = "d:\Source\ValleyTalk\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath
 $SMAPIExe = Join-Path $GamePath "StardewModdingAPI.exe"
 $SmapiLogPath = Join-Path $env:AppData "StardewValley\ErrorLogs\SMAPI-latest.txt"
-$RepoRoot = "d:\Source\ValleyTalk"
+$RepoRoot = Get-RepoRoot
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $resultFile = Join-Path $RepoRoot "scripts\results\game-test-$timestamp.txt"
 

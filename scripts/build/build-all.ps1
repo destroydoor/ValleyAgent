@@ -73,7 +73,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Log "ValleyAgent.Autopilot build succeeded." "Success"
 
 # Step 5: Build ValleyAI TypeScript server (valley-ai-server.exe) if ValleyAI repo is available
-$ValleyAIDir = "D:\Source\ValleyAI"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$ValleyAIDir = Get-ValleyAIRoot
 $ValleyAIEntry = Join-Path $ValleyAIDir "packages\stardew\src\cli.ts"
 if (Test-Path $ValleyAIEntry) {
     Write-Log "Building valley-ai-server.exe (Bun compile)..." "Info"

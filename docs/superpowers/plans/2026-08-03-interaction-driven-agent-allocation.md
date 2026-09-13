@@ -11,8 +11,8 @@
 **设计文档:** `docs/superpowers/specs/2026-08-03-interaction-driven-agent-allocation-design.md`
 
 **仓库布局:**
-- C# Mod: `d:\Source\ValleyTalk\src\ValleyAgent` + `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests`
-- TS Server: `D:\Source\ValleyAI\packages\stardew` + `D:\Source\ValleyAI\protocol\messages.json`
+- C# Mod: `<REPO_ROOT>\src\ValleyAgent` + `<REPO_ROOT>\src\ValleyAgent.UnitTests`
+- TS Server: `<VALLEYAI_ROOT>\packages\stardew` + `<VALLEYAI_ROOT>\protocol\messages.json`
 
 ---
 
@@ -21,11 +21,11 @@
 ### Task 1: ModConfig 加 NormalAgentNpcs 字段
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs` (第 45-52 行附近)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs` (第 45-52 行附近)
 
 - [ ] **Step 1: 写失败测试 — 迁移与 Validate**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\ModConfigThreeTierTests.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\ModConfigThreeTierTests.cs`
 
 ```csharp
 #nullable enable
@@ -129,7 +129,7 @@ git commit -m "feat(config): add NormalAgentNpcs three-tier agent count config"
 ### Task 2: GMCM 设置界面接入 Normal 档
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Config\GMCMIntegration.cs` (第 213-242 行)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Config\GMCMIntegration.cs` (第 213-242 行)
 
 - [ ] **Step 1: 在 Min 与 Max 滑块之间插入 Normal 滑块**
 
@@ -212,12 +212,12 @@ git commit -m "feat(config): add Normal Agent NPCs slider to GMCM with min/max l
 ### Task 3: AgentAllocationInfo 加互动空闲字段
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Agents\AgentAllocationInfo.cs`
-- Test: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\AgentAllocationInfoTests.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Agents\AgentAllocationInfo.cs`
+- Test: `<REPO_ROOT>\src\ValleyAgent.UnitTests\AgentAllocationInfoTests.cs`
 
 - [ ] **Step 1: 写失败测试 — ShouldEvict 判定**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\AgentAllocationInfoTests.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\AgentAllocationInfoTests.cs`
 
 ```csharp
 #nullable enable
@@ -333,7 +333,7 @@ git commit -m "feat(allocation): add LastPlayerInteractionTick, KeepUntil, Shoul
 ### Task 4: 删除 DayStarted Phase 2 任意回退
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (第 970-989 行)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (第 970-989 行)
 
 - [ ] **Step 1: 删除 Phase 2 fallback 块**
 
@@ -396,13 +396,13 @@ git commit -m "fix(allocation): remove Phase 2 fallback that arbitrarily assigne
 ### Task 5: spark 触发器 — 玩家附近 NPC 低概率激活
 
 **Files:**
-- Create: `d:\Source\ValleyTalk\src\ValleyAgent\Agents\SparkAllocator.cs`
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Core\AgentTickLoop.cs` (tick 循环调用 spark)
-- Test: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\SparkAllocatorTests.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Agents\SparkAllocator.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Core\AgentTickLoop.cs` (tick 循环调用 spark)
+- Test: `<REPO_ROOT>\src\ValleyAgent.UnitTests\SparkAllocatorTests.cs`
 
 - [ ] **Step 1: 写失败测试 — spark 概率与每日每 NPC 一次**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\SparkAllocatorTests.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\SparkAllocatorTests.cs`
 
 ```csharp
 #nullable enable
@@ -467,7 +467,7 @@ Expected: FAIL — `SparkAllocator` 类型不存在
 
 - [ ] **Step 3: 实现 SparkAllocator**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent\Agents\SparkAllocator.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent\Agents\SparkAllocator.cs`
 
 ```csharp
 using System;
@@ -657,10 +657,10 @@ git commit -m "feat(allocation): add SparkAllocator for 5% nearby NPC activation
 ### Task 6: 互动空闲淘汰
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Core\AgentTickLoop.cs`
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` (PromoteToAgent 刷新 LastPlayerInteractionTick)
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCDialoguePatch.cs` (对话时刷新)
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Patches\NPCGiftPatch.cs` (送礼时刷新)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Core\AgentTickLoop.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` (PromoteToAgent 刷新 LastPlayerInteractionTick)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCDialoguePatch.cs` (对话时刷新)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\NPCGiftPatch.cs` (送礼时刷新)
 
 - [ ] **Step 1: 在 AgentTickLoop 加互动空闲淘汰检查**
 
@@ -759,7 +759,7 @@ git commit -m "feat(allocation): add interaction-idle eviction with LastPlayerIn
 ### Task 7: ProtocolV2 加 allocate_agent 消息常量与 ActionResultReason 枚举
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Protocol\ProtocolV2.cs` (第 13-18 行, 第 95-115 行)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Protocol\ProtocolV2.cs` (第 13-18 行, 第 95-115 行)
 
 - [ ] **Step 1: 加消息类型常量**
 
@@ -826,7 +826,7 @@ git commit -m "feat(protocol): add allocate_agent and day_started message types 
 ### Task 8: WebSocketClient 路由 unsolicited 消息
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent.Abstractions\WebSocket\WebSocketClient.cs` (第 181-202 行 HandleMessage)
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\WebSocket\WebSocketClient.cs` (第 181-202 行 HandleMessage)
 
 - [ ] **Step 1: 加 OnUnsolicitedMessage 事件**
 
@@ -898,13 +898,13 @@ git commit -m "feat(ws): route unsolicited messages to OnUnsolicitedMessage even
 ### Task 9: AllocateAgentHandler 处理 allocate_agent 消息
 
 **Files:**
-- Create: `d:\Source\ValleyTalk\src\ValleyAgent\Protocol\AllocateAgentHandler.cs`
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (订阅 OnUnsolicitedMessage)
-- Test: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\AllocateAgentHandlerTests.cs`
+- Create: `<REPO_ROOT>\src\ValleyAgent\Protocol\AllocateAgentHandler.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (订阅 OnUnsolicitedMessage)
+- Test: `<REPO_ROOT>\src\ValleyAgent.UnitTests\AllocateAgentHandlerTests.cs`
 
 - [ ] **Step 1: 写失败测试**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent.UnitTests\AllocateAgentHandlerTests.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent.UnitTests\AllocateAgentHandlerTests.cs`
 
 ```csharp
 #nullable enable
@@ -1009,7 +1009,7 @@ Expected: FAIL — `AllocateAgentHandler` 类型不存在
 
 - [ ] **Step 3: 实现 AllocateAgentHandler**
 
-Create: `d:\Source\ValleyTalk\src\ValleyAgent\Protocol\AllocateAgentHandler.cs`
+Create: `<REPO_ROOT>\src\ValleyAgent\Protocol\AllocateAgentHandler.cs`
 
 ```csharp
 using System;
@@ -1191,7 +1191,7 @@ git commit -m "feat(protocol): handle allocate_agent messages from TS director w
 ### Task 10: C# DayStarted 发送 day_started 消息
 
 **Files:**
-- Modify: `d:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (OnDayStarted 第 897 行附近)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (OnDayStarted 第 897 行附近)
 
 - [ ] **Step 1: 在 OnDayStarted 发送 day_started**
 
@@ -1246,7 +1246,7 @@ git commit -m "feat(protocol): send day_started notification to TS on DayStarted
 ### Task 11: messages.json 加 allocate_agent 与 day_started 定义
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\protocol\messages.json`
+- Modify: `<VALLEYAI_ROOT>\protocol\messages.json`
 
 - [ ] **Step 1: 加 day_started 消息定义**
 
@@ -1291,13 +1291,13 @@ git commit -m "feat(protocol): send day_started notification to TS on DayStarted
 
 - [ ] **Step 3: 运行 check:protocol（预期部分红——TS/C# 实现待接）**
 
-Run: `cd D:\Source\ValleyAI && bun run check:protocol`
+Run: `cd <VALLEYAI_ROOT> && bun run check:protocol`
 Expected: 报 SCHEMA_DRIFT（routeMessage 未路由 day_started / allocate_agent 未发送）—— 这是预期红，后续 Task 接线后转绿
 
 - [ ] **Step 4: 提交**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add protocol/messages.json
 git commit -m "feat(protocol): add day_started and allocate_agent message definitions"
 ```
@@ -1307,7 +1307,7 @@ git commit -m "feat(protocol): add day_started and allocate_agent message defini
 ### Task 12: TS types.ts 加 DayStartedMessage 与 AllocateAgentMessage 类型
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\types.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\types.ts`
 
 - [ ] **Step 1: 加类型定义**
 
@@ -1334,13 +1334,13 @@ export interface AllocateAgentMessage {
 
 - [ ] **Step 2: 类型编译验证**
 
-Run: `cd D:\Source\ValleyAI && bunx tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bunx tsc --noEmit`
 Expected: 0 errors
 
 - [ ] **Step 3: 提交**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/types.ts
 git commit -m "feat(types): add DayStartedMessage and AllocateAgentMessage types"
 ```
@@ -1350,12 +1350,12 @@ git commit -m "feat(types): add DayStartedMessage and AllocateAgentMessage types
 ### Task 13: ProtocolAdapter 路由 day_started + 发送 allocate_agent
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\protocol-adapter-day-started.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\protocol-adapter-day-started.test.ts`
 
 - [ ] **Step 1: 写失败测试 — day_started 10% 概率触发 morningPlan**
 
-Create: `D:\Source\ValleyAI\packages\stardew\tests\protocol-adapter-day-started.test.ts`
+Create: `<VALLEYAI_ROOT>\packages\stardew\tests\protocol-adapter-day-started.test.ts`
 
 ```typescript
 import { describe, test, expect, mock } from "bun:test";
@@ -1410,7 +1410,7 @@ describe("ProtocolAdapter day_started", () => {
 
 - [ ] **Step 2: 运行测试验证失败**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/protocol-adapter-day-started.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter-day-started.test.ts`
 Expected: FAIL — ProtocolAdapter 构造函数不接受 options
 
 - [ ] **Step 3: ProtocolAdapter 加 options + day_started handler**
@@ -1502,13 +1502,13 @@ import type { AllocateAgentMessage, DayStartedMessage } from "./types";
 
 - [ ] **Step 4: 运行测试验证通过**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/protocol-adapter-day-started.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter-day-started.test.ts`
 Expected: PASS (2/2)
 
 - [ ] **Step 5: 提交**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/protocol-adapter.ts packages/stardew/tests/protocol-adapter-day-started.test.ts
 git commit -m "feat(adapter): route day_started with 10% director trigger and allocate_agent dispatch"
 ```
@@ -1518,7 +1518,7 @@ git commit -m "feat(adapter): route day_started with 10% director trigger and al
 ### Task 14: server.ts 实例化 Director 并注入 ProtocolAdapter
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\stardew\src\server.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\stardew\src\server.ts`
 
 - [ ] **Step 1: 加 Director 实例化**
 
@@ -1607,18 +1607,18 @@ Modify `server.ts` ServerHandle 返回的 stop：
 
 - [ ] **Step 4: 类型编译验证**
 
-Run: `cd D:\Source\ValleyAI && bunx tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bunx tsc --noEmit`
 Expected: 0 errors
 
 - [ ] **Step 5: 运行全部 TS 测试验证无回归**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew`
 Expected: 既有测试全绿 + 新测试全绿
 
 - [ ] **Step 6: 提交**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/server.ts
 git commit -m "feat(server): instantiate Director with stores and inject into ProtocolAdapter"
 ```
@@ -1630,11 +1630,11 @@ git commit -m "feat(server): instantiate Director with stores and inject into Pr
 ### Task 15: check:protocol 转绿
 
 **Files:**
-- Verify: `D:\Source\ValleyAI\scripts\check-protocol-contract.ts`
+- Verify: `<VALLEYAI_ROOT>\scripts\check-protocol-contract.ts`
 
 - [ ] **Step 1: 运行 check:protocol**
 
-Run: `cd D:\Source\ValleyAI && bun run check:protocol`
+Run: `cd <VALLEYAI_ROOT> && bun run check:protocol`
 Expected: exit 0（全绿）
 
 - [ ] **Step 2: 如有 SCHEMA_DRIFT，修复**
@@ -1648,7 +1648,7 @@ Expected: exit 0（全绿）
 - [ ] **Step 3: 提交（如有修复）**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "test(protocol): check:protocol green for day_started and allocate_agent"
 ```
@@ -1669,12 +1669,12 @@ Expected: BUILD SUCCESS, 0 warnings
 
 - [ ] **Step 3: TS 全量测试**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew`
 Expected: ALL PASS
 
 - [ ] **Step 4: TS 类型检查**
 
-Run: `cd D:\Source\ValleyAI && bunx tsc --noEmit`
+Run: `cd <VALLEYAI_ROOT> && bunx tsc --noEmit`
 Expected: 0 errors
 
 ---

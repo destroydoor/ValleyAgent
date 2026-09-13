@@ -1,7 +1,8 @@
 # Game integration test v2 - launches SMAPI and monitors log
 # Uses file-based output capture to avoid pipe-close-kills-process issue
 $ErrorActionPreference = "Stop"
-$GamePath = "D:\Source\ValleyTalk\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath
 $SMAPIExe = Join-Path $GamePath "StardewModdingAPI.exe"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $stdoutFile = Join-Path $PSScriptRoot "results\game-stdout-$timestamp.txt"

@@ -36,7 +36,13 @@ import urllib.request
 from ctypes import wintypes
 
 BASE = "http://localhost:5555"
-OUT_DIR = r"D:\Source\ValleyTalk\test-recordings\kimi_player_eval"
+OUT_DIR = os.environ.get(
+    "VALLEY_EVAL_OUT_DIR",
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "test-recordings", "kimi_player_eval",
+    ),
+)
 
 # 控制台是 GBK：LLM 回复可能含 emoji，print 时避免 UnicodeEncodeError
 try:
@@ -257,8 +263,9 @@ class Recorder:
     def start(self, out_mp4: str) -> bool:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
-            cand = r"C:\Tools\ffmpeg\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"
-            ffmpeg = cand if os.path.exists(cand) else None
+            # 不在 PATH 时，允许用 FFMPEG_PATH 指定（不硬编码某台机器的安装目录）
+            cand = os.environ.get("FFMPEG_PATH", "")
+            ffmpeg = cand if cand and os.path.exists(cand) else None
         if not ffmpeg:
             return False
         wr = find_game_client_rect()

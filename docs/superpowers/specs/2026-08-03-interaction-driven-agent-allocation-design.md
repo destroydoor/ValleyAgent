@@ -2,7 +2,7 @@
 
 > **创建时间**: 2026-08-03
 > **状态**: 已批准（方案 B），转入实施计划
-> **代码位置**: `d:\Source\ValleyTalk`（C# Mod）+ `D:\Source\ValleyAI`（TS Agent Server）
+> **代码位置**: `<REPO_ROOT>`（C# Mod）+ `<VALLEYAI_ROOT>`（TS Agent Server）
 > **背景**: 当前自动分配在 Day 1 会把 Agent 任意分配给刘易斯/罗宾等"未遇见村民"（Phase 2 fallback 任意挑选），违反"NPC 自主意识"愿景。本设计改为交互驱动 + 导演驱动 + 低概率 spark 的懒加载分配，并把容量配置从两档（Min/Max）扩展为三档（Min/Normal/Max）。
 
 ---
@@ -24,11 +24,11 @@
 
 ### 2.1 当前分配路径（3 处）
 
-1. **DayStarted 自动分配** [EventHandlerInitializer.cs:929-990](file:///d:/Source/ValleyTalk/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L929-L990)
+1. **DayStarted 自动分配** [EventHandlerInitializer.cs:929-990](file:///<REPO_ROOT>/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L929-L990)
    - Phase 1：从有 friendship 数据的 NPC 按 hearts 排序补到 MaxAgentNpcs
    - **Phase 2（问题根源）**：从"玩家从未遇见"的村民任意挑选补到 MinAgentNpcs。第1天无 friendship 数据 → 走 Phase 2 → 任意分配刘易斯/罗宾等
-2. **对话 PromoteToAgent** [DialogueBoxInputPatch.cs:452](file:///d:/Source/ValleyTalk/src/ValleyAgent/Patches/DialogueBoxInputPatch.cs#L452)：玩家通过聊天栏/物理动作激活 NPC 时 `ForceAllocate`。保留。
-3. **存档恢复** [EventHandlerInitializer.cs:574](file:///d:/Source/ValleyTalk/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L574)：`ForceAllocate` 恢复存档中的 Agent。保留。
+2. **对话 PromoteToAgent** [DialogueBoxInputPatch.cs:452](file:///<REPO_ROOT>/src/ValleyAgent/Patches/DialogueBoxInputPatch.cs#L452)：玩家通过聊天栏/物理动作激活 NPC 时 `ForceAllocate`。保留。
+3. **存档恢复** [EventHandlerInitializer.cs:574](file:///<REPO_ROOT>/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L574)：`ForceAllocate` 恢复存档中的 Agent。保留。
 
 ### 2.2 现有淘汰
 
@@ -76,7 +76,7 @@
 
 #### 4.2.1 玩家交互（保留现有）
 
-- 入口：`PromoteToAgent` [DialogueBoxInputPatch.cs:452](file:///d:/Source/ValleyTalk/src/ValleyAgent/Patches/DialogueBoxInputPatch.cs#L452)
+- 入口：`PromoteToAgent` [DialogueBoxInputPatch.cs:452](file:///<REPO_ROOT>/src/ValleyAgent/Patches/DialogueBoxInputPatch.cs#L452)
 - 行为：玩家对话/聊天栏路由/物理动作触发 → `ForceAllocate` + 标记 manual override
 - 刷新 `LastPlayerInteractionTick`（见 4.3）
 
@@ -103,7 +103,7 @@
 
 #### 4.3.1 删除 Phase 2 任意回退
 
-- 删除 [EventHandlerInitializer.cs:970-989](file:///d:/Source/ValleyTalk/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L970-L989) 的 Phase 2 fallback 逻辑
+- 删除 [EventHandlerInitializer.cs:970-989](file:///<REPO_ROOT>/src/ValleyAgent/Initialization/EventHandlerInitializer.cs#L970-L989) 的 Phase 2 fallback 逻辑
 - `MinAgentNpcs` 不再从"未遇见村民"里任意拉人
 - 第1天 = 0 个 Agent（除非存档恢复/spark/导演/交互激活）
 
@@ -127,7 +127,7 @@
 
 ### 4.4 协议变更
 
-`D:\Source\ValleyAI\protocol\messages.json` 新增 `allocate_agent` 消息定义：
+`<VALLEYAI_ROOT>\protocol\messages.json` 新增 `allocate_agent` 消息定义：
 
 ```json
 {
@@ -150,7 +150,7 @@
 
 ### 4.5 配置迁移
 
-旧存档只有 Min/Max，无 Normal 字段。反序列化时 `NormalAgentNpcs` 默认 0 → 迁移逻辑设为 `Math.Clamp(Max, Min, Max)`（即旧存档 Normal = Max，行为与现状一致，不引入回归）。迁移代码加在 [ModConfig.cs:421-427](file:///d:/Source/ValleyTalk/src/ValleyAgent/Config/ModConfig.cs#L421-L427) 现有迁移旁。
+旧存档只有 Min/Max，无 Normal 字段。反序列化时 `NormalAgentNpcs` 默认 0 → 迁移逻辑设为 `Math.Clamp(Max, Min, Max)`（即旧存档 Normal = Max，行为与现状一致，不引入回归）。迁移代码加在 [ModConfig.cs:421-427](file:///<REPO_ROOT>/src/ValleyAgent/Config/ModConfig.cs#L421-L427) 现有迁移旁。
 
 `Validate()` 增加：
 ```csharp
@@ -160,12 +160,12 @@ if (NormalAgentNpcs > MaxAgentNpcs) { NormalAgentNpcs = MaxAgentNpcs; changed = 
 
 ### 4.6 GMCM 设置界面
 
-现有 [GMCMIntegration.cs:217-237](file:///d:/Source/ValleyTalk/src/ValleyAgent/Config/GMCMIntegration.cs#L217-L237) 有 Min/Max 两个 `AddNumberOption` 滑块。新增 Normal 档：
+现有 [GMCMIntegration.cs:217-237](file:///<REPO_ROOT>/src/ValleyAgent/Config/GMCMIntegration.cs#L217-L237) 有 Min/Max 两个 `AddNumberOption` 滑块。新增 Normal 档：
 
 - 插在 Min 与 Max 之间，`setValue: value => config.NormalAgentNpcs = Math.Clamp(value, config.MinAgentNpcs, config.MaxAgentNpcs)`
 - Min 滑块 `setValue` 联动：Min 上调超过 Normal 时 Normal 跟进
 - Max 滑块 `setValue` 联动：Max 下调低于 Normal 时 Normal 回退
-- Clone 方法 [GMCMIntegration.cs:882-883](file:///d:/Source/ValleyTalk/src/ValleyAgent/Config/GMCMIntegration.cs#L882-L883) 加 `target.NormalAgentNpcs = source.NormalAgentNpcs`
+- Clone 方法 [GMCMIntegration.cs:882-883](file:///<REPO_ROOT>/src/ValleyAgent/Config/GMCMIntegration.cs#L882-L883) 加 `target.NormalAgentNpcs = source.NormalAgentNpcs`
 
 ---
 

@@ -64,8 +64,8 @@ if (-not $NoGame) {
     Write-Host "[1/1] 运行游戏集成测试..." -ForegroundColor Cyan
 
     # 创建编排器标记文件
-    $GamePath = $env:STARDW_PATH
-    if (-not $GamePath) { $GamePath = "D:\Source\ValleyTalk\Stardew Valley" }
+    . "$PSScriptRoot\..\lib\paths.ps1"
+    $GamePath = Get-GamePath
     $markerDir = Join-Path $GamePath "Mods\ValleyAgent.TestMod"
     if (-not (Test-Path $markerDir)) { New-Item -ItemType Directory -Path $markerDir -Force | Out-Null }
 

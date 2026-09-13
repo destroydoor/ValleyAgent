@@ -8,13 +8,13 @@
 
 **Tech Stack:** TypeScript (Bun runtime)、C# (.NET 8.0 + SMAPI)、SQLite (better-sqlite3)、WebSocket JSON 协议、Vercel AI SDK + Minimax LLM。
 
-**Spec:** [2026-07-21-narrative-director-design.md](file:///d:/Source/ValleyTalk/docs/superpowers/specs/2026-07-21-narrative-director-design.md)
+**Spec:** [2026-07-21-narrative-director-design.md](file:///<REPO_ROOT>/docs/superpowers/specs/2026-07-21-narrative-director-design.md)
 
 ---
 
 ## 文件结构
 
-### TS 侧（`D:\Source\ValleyAI\packages\stardew\`）
+### TS 侧（`<VALLEYAI_ROOT>\packages\stardew\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -31,7 +31,7 @@
 | `src\server.ts` | 修改 | 初始化 Director + Stores |
 | `src\prompt-builder.ts` | 修改 | 新增 beat prompt 模板 |
 
-### C# 侧（`D:\Source\ValleyTalk\src\ValleyAgent\`）
+### C# 侧（`<REPO_ROOT>\src\ValleyAgent\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -53,7 +53,7 @@
 
 ### Task 1: types.ts 扩展
 
-**Files:** Modify `D:\Source\ValleyAI\packages\stardew\src\types.ts`
+**Files:** Modify `<VALLEYAI_ROOT>\packages\stardew\src\types.ts`
 
 在文件末尾追加以下类型定义（完整代码见 spec 第 2-5 章，所有字段名严格对齐）：
 
@@ -358,7 +358,7 @@ imports 顶部追加：`import type { Beat, GameContext, PlayerProfile } from ".
 
 ### Task 10: ActivityTypes.cs 数据结构
 
-**Files:** Create `D:\Source\ValleyTalk\src\ValleyAgent\Tracking\ActivityTypes.cs`
+**Files:** Create `<REPO_ROOT>\src\ValleyAgent\Tracking\ActivityTypes.cs`
 
 定义 C# 镜像类型（与 TS types.ts 字段一一对应）：
 - `class DailyActivity`（含 Date/FishingMinutes/.../GiftsGiven）

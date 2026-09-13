@@ -6,7 +6,7 @@
 #   - valleyagent-gameit image built (docker build -f docker/Dockerfile.gameit -t valleyagent-gameit .)
 #   - docker/linux-game/ populated (run-it.ps1 or manual copy)
 #   - docker/smapi-cache/ populated (SMAPI installer zip)
-#   - docker/saves/ populated (save files, e.g. awa_445353290)
+#   - docker/saves/ populated (save files, e.g. TestSave_Main)
 #
 # Usage:
 #   .\scripts\docker\run-e2e.ps1                      # full run

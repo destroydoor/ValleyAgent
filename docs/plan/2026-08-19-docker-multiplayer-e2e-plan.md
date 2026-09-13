@@ -42,7 +42,7 @@
 | D7 | 命令驱动：宿主直接写 `docker/data-{role}/Mods/ValleyAgent.TestMod/test_commands_{role}.txt`——bind mount 使容器内 CommandFileWatcher 即时可见，**零改造复用现有文件通道** | CommandFileWatcher.cs:107 实例文件命名 |
 | D8 | 联机建立：host 载档后 `va_mp_host`（自动建 Cabin），farmhand 载档后 `va_mp_join valley-host:24642`（**地址参数已支持**，默认 127.0.0.1 需显式传容器名） | MultiplayerSetupCommands.cs:41-44 |
 | D9 | LLM key 注入：TS 容器 env `LLM_API_KEY` 取自宿主 `docker/mods-cache/ValleyAgent/config.json` 的 `LlmApiKey`（prep 时已有，.gitignore 已排除不入库） | config.json LlmApiKey 字段实证 |
-| D10 | 存档：两容器各自 AutoLoadGame 载同一 `awa_445353290`；host 开服建 Cabin，farmhand 加入槽位 | Windows harness 同机双开已验证此路径 |
+| D10 | 存档：两容器各自 AutoLoadGame 载同一 `TestSave_Main`；host 开服建 Cabin，farmhand 加入槽位 | Windows harness 同机双开已验证此路径 |
 | D11 | `/game`、`/smapi-cache` 只读挂载双容器共享；`/data-host`、`/data-farmhand` 独立 bind mount；TS 容器只读挂载 `/data-host` | Docker 调研 Q9.1/Q9.2 |
 | D12 | 容器退出：C1-C5 完成后 harness `docker kill`（runner=manual 无自动退出） | TestMod 无 exit 命令（命令清单实证） |
 

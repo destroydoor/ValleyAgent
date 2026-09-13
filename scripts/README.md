@@ -3,7 +3,7 @@
 Scripts for building, testing, and managing the ValleyTalk project.
 
 > **Architecture note (v4.3+)**: The intelligence layer is the TypeScript
-> Agent Server (`valley-ai-server.exe`, source at `D:\Source\ValleyAI`). The
+> Agent Server (`valley-ai-server.exe`, source at `<VALLEYAI_ROOT>`). The
 > C# mod's `ServerProcessManager` auto-launches and supervises the exe — no
 > manual server start is needed. See `AGENTS.md` for the full architecture.
 
@@ -98,10 +98,10 @@ since filenames encode timestamps and test type.
 - Commands: `vat_auto` (all phases), `vat_status`, `vat_abort`
 - Run: `scripts\test\run-tests.ps1 -Group <Group>` or `scripts\test\test-game.ps1`
 
-### TS Server Unit/Integration Tests (run inside D:\Source\ValleyAI)
+### TS Server Unit/Integration Tests (run inside <VALLEYAI_ROOT>)
 - `packages/core/tests/*.test.ts` — Agent framework primitives
 - `packages/stardew/tests/*.test.ts` — Stardew-specific (NPC, protocol, validator)
-- Run via `bun test` in the `D:\Source\ValleyAI` workspace
+- Run via `bun test` in the `<VALLEYAI_ROOT>` workspace
 - These tests are **not** invoked from ValleyTalk scripts — they belong to the
   ValleyAI repo
 
@@ -121,7 +121,7 @@ Passed: 23/32
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STARDW_PATH` | `D:\Source\ValleyTalk\Stardew Valley` | Game installation path |
+| `STARDW_PATH` | `<REPO_ROOT>\Stardew Valley` | Game installation path |
 | `VALLEY_LLM_PROVIDER` | `minimax` | TS server LLM provider (`minimax`/`openai`/`anthropic`/`google`/`deepseek`/`openrouter`/`lmstudio`) |
 | `VALLEY_LLM_BASE_URL` | `https://api.minimax.chat/v1` | OpenAI-compatible base URL |
 | `VALLEY_LLM_API_KEY` | — | LLM API key (set in `secrets.local.ps1`) |

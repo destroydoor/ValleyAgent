@@ -1,6 +1,6 @@
 {
   "Name": "ValleyAgent",
-  "Author": "dandm1",
+  "Author": "destroydoor (based on ValleyTalk by dandm1)",
   "Version": "4.2.0",
   "Description": "AI Agent NPC system for Stardew Valley — evolution of ValleyTalk",
   "UniqueID": "dandm1.ValleyAgent",

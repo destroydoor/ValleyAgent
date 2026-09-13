@@ -17,7 +17,7 @@
     输出详细匹配行。
 
 .EXAMPLE
-    .\analyze-multiplayer-logs.ps1 -HostLog "C:\Logs\host-SMAPI-latest.txt" -FarmhandLog "C:\Logs\farmhand-SMAPI-latest.txt"
+    .\analyze-multiplayer-logs.ps1 -HostLog "<日志目录>\host-SMAPI-latest.txt" -FarmhandLog "<日志目录>\farmhand-SMAPI-latest.txt"
 #>
 [CmdletBinding()]
 param(
@@ -32,7 +32,7 @@ $isVerbose = $PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue'
 if (-not $PSBoundParameters.ContainsKey('HostLog') -and -not $PSBoundParameters.ContainsKey('FarmhandLog')) {
     Write-Host "提示: 未指定日志路径，将自动查找默认 SMAPI 日志位置。" -ForegroundColor DarkGray
     Write-Host "       双端验收时请分别提供主机和客机日志以获得准确 verdict。" -ForegroundColor DarkGray
-    Write-Host "示例: .\analyze-multiplayer-logs.ps1 -HostLog C:\Logs\host-SMAPI-latest.txt -FarmhandLog C:\Logs\farmhand-SMAPI-latest.txt -Verbose" -ForegroundColor DarkGray
+    Write-Host "示例: .\analyze-multiplayer-logs.ps1 -HostLog <日志目录>\host-SMAPI-latest.txt -FarmhandLog <日志目录>\farmhand-SMAPI-latest.txt -Verbose" -ForegroundColor DarkGray
 }
 
 # ── Helpers ──

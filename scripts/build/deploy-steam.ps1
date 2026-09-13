@@ -1,5 +1,5 @@
 # Deploy ValleyAgent to Steam-installed Stardew Valley Mods folder
-# 硬编码 deploy.ps1 的复制逻辑，路径改到 G:\SteamLibrary\steamapps\common\Stardew Valley\Mods
+# 与 deploy.ps1 相同的复制逻辑；游戏路径由 scripts/lib/paths.ps1 解析（STARDW_PATH 可覆盖）。
 param(
     [switch]$SkipBuild,
     [ValidateSet("Debug", "Release")]
@@ -7,10 +7,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$GamePath = "G:\SteamLibrary\steamapps\common\Stardew Valley"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$RepoRoot = Get-RepoRoot
+$GamePath = Get-GamePath
 $ModsDir  = Join-Path $GamePath "Mods"
-$ValleyAIDir = "D:\Source\ValleyAI"
+$ValleyAIDir = Get-ValleyAIRoot
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $logFile = Join-Path $RepoRoot "scripts\results\deploy-steam-$timestamp.txt"
 

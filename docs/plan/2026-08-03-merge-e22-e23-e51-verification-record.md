@@ -79,7 +79,7 @@
 
 | 门禁 | 结果 |
 |---|---|
-| `dotnet test ValleyAgent.UnitTests -p:GamePath="D:\Source\ValleyTalk\Stardew Valley"` | **192 passed / 0 failed / 0 skipped** |
+| `dotnet test ValleyAgent.UnitTests -p:GamePath="<REPO_ROOT>\Stardew Valley"` | **192 passed / 0 failed / 0 skipped** |
 | 全部 6 个项目构建（ValleyAgent, Abstractions, Autopilot, Test, ApiTest, UnitTests） | 6 × EXIT=0，0 警告 0 错误 |
 | ApiTest CA2024 既有警告 | 2 处（KimiProvider.cs:270 / OpenAICompatibleProvider.cs:150），**改动范围外、既有**，已另行 ticket，不修复 |
 

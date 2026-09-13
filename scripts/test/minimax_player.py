@@ -8,8 +8,16 @@ import time
 import requests
 import sys
 
-BRIDGE_PATH = "F:/SteamLibrary/steamapps/common/Stardew Valley/Mods/StardewMCPBridge/bridge_data.json"
-ACTION_PATH = "F:/SteamLibrary/steamapps/common/Stardew Valley/Mods/StardewMCPBridge/actions.json"
+# 游戏路径不硬编码：设置 STARDW_PATH 环境变量指向 Stardew Valley 安装目录。
+_GAME_PATH = os.environ.get("STARDW_PATH", "")
+if not _GAME_PATH:
+    raise SystemExit(
+        "请先设置 STARDW_PATH 环境变量，指向 Stardew Valley 安装目录\n"
+        '例如: set STARDW_PATH=X:\\SteamLibrary\\steamapps\\common\\Stardew Valley'
+    )
+_BRIDGE_DIR = os.path.join(_GAME_PATH, "Mods", "StardewMCPBridge")
+BRIDGE_PATH = os.path.join(_BRIDGE_DIR, "bridge_data.json")
+ACTION_PATH = os.path.join(_BRIDGE_DIR, "actions.json")
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_MODEL = "minimax-m2.7"
 MINIMAX_URL = "https://api.minimax.chat/v1/text/chat/completions"

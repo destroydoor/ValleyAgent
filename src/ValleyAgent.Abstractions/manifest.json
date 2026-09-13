@@ -1,6 +1,6 @@
 {
   "Name": "ValleyAgent.Abstractions",
-  "Author": "dandm1",
+  "Author": "destroydoor (based on ValleyTalk by dandm1)",
   "Version": "1.0.0",
   "Description": "Abstractions library for ValleyAgent — shared types for ValleyAgent and TestMod",
   "UniqueID": "dandm1.ValleyAgent.Abstractions",

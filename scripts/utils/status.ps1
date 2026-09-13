@@ -1,7 +1,10 @@
 # Show ValleyTalk project status
 param(
-    [string]$GamePath = "F:\SteamLibrary\steamapps\common\Stardew Valley"
+    [string]$GamePath
 )
+
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath -Hint $GamePath
 
 $ErrorActionPreference = "Continue"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

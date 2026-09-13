@@ -1,14 +1,14 @@
 # ValleyAgent 测试文档
 
 > **架构现状（v4.3+）**：智能层是 TypeScript Agent Server（`valley-ai-server.exe`，
-> 源码位于 `D:\Source\ValleyAI`）。C# Mod 通过 `ServerProcessManager` 自动拉起
+> 源码位于 `<VALLEYAI_ROOT>`）。C# Mod 通过 `ServerProcessManager` 自动拉起
 > 并监护该 exe，无需手动启动服务器。完整架构见根目录 `AGENTS.md`。
 
 ## 测试架构
 
 测试分为两个独立层面：
 
-1. **TS Agent Server 单元/集成测试**（位于 `D:\Source\ValleyAI`）
+1. **TS Agent Server 单元/集成测试**（位于 `<VALLEYAI_ROOT>`）
    - `packages/core/tests/*.test.ts` — Agent 框架原语（agentLoop、CircuitBreaker、
      LLMProvider、TokenBudget、ToolRegistry、MemoryBackend 等）
    - `packages/stardew/tests/*.test.ts` — Stardew 实现（NPC prompt loader、
@@ -25,10 +25,10 @@
 
 ## 测试方式
 
-### TS Agent Server 测试（在 D:\Source\ValleyAI 目录）
+### TS Agent Server 测试（在 <VALLEYAI_ROOT> 目录）
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 bun test                       # 运行所有 core + stardew 单元测试
 bun test packages/stardew      # 仅运行 Stardew 实现
 bun test packages/core         # 仅运行 core 框架

@@ -17,8 +17,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$ValleyAIDir = "D:\Source\ValleyAI"
+. "$PSScriptRoot\..\lib\paths.ps1"
+$RepoRoot   = Get-RepoRoot
+$ValleyAIDir = Get-ValleyAIRoot
 $DevConfigPath = Join-Path $RepoRoot "Stardew Valley\Mods\ValleyAgent\config.json"
 $OutRoot = Join-Path $RepoRoot "release"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = 'D:\\Source\\ValleyAI\\packages\\core\\e2e\\stardew-run.ts';
+const path = '<VALLEYAI_ROOT>\\packages\\core\\e2e\\stardew-run.ts';
 let content = fs.readFileSync(path, 'utf8');
 
 const oldCode = `// 检查第5轮：是否 set_state FOLLOW

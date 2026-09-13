@@ -7,7 +7,8 @@
 # - Enters interactive mode: user can type SMAPI console commands
 param(
     [string]$NpcName = "Haley",
-    [string]$SaveName = "ForTest_444038365",
+    # 存档名可用 VALLEY_TEST_SAVE 环境变量覆盖（勿硬编码含账号数字的真实存档名）
+    [string]$SaveName = $(if ($env:VALLEY_TEST_SAVE) { $env:VALLEY_TEST_SAVE } else { "TestSave_Manual" }),
     [int]$InitTimeoutSeconds = 120,
     [switch]$SetupOnly,
     [switch]$KeepTestMod
@@ -15,8 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$GamePath = $env:STARDW_PATH
-if (-not $GamePath) { $GamePath = "D:\Source\ValleyTalk\Stardew Valley" }
+. "$PSScriptRoot\..\lib\paths.ps1"
+$GamePath = Get-GamePath
 $SMAPIExe = Join-Path $GamePath "StardewModdingAPI.exe"
 $ModsDir = Join-Path $GamePath "Mods"
 

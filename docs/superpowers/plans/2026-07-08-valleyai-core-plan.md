@@ -2,7 +2,7 @@
 
 > **状态（2026-07-26 更新）：✅ 已实现**
 >
-> `@valley/core` 抽象框架已实现，位于 `D:\Source\ValleyAI\packages\core`。
+> `@valley/core` 抽象框架已实现，位于 `<VALLEYAI_ROOT>\packages\core`。
 > 配套的 `@valley/stardew` 星露谷实现也已完成，编译产物为
 > `valley-ai-server.exe`。本文档为实施计划阶段产物，保留作为任务追踪依据。
 
@@ -21,7 +21,7 @@
 ## File Structure
 
 ```
-D:\Source\ValleyAI\
+<VALLEYAI_ROOT>\
 ├── package.json                      npm workspaces root
 ├── tsconfig.base.json                shared TS strict config
 ├── bunfig.toml                       Bun config
@@ -87,14 +87,14 @@ D:\Source\ValleyAI\
 ## Task 1: Project Skeleton
 
 **Files:**
-- Create: `D:\Source\ValleyAI\package.json`
-- Create: `D:\Source\ValleyAI\tsconfig.base.json`
-- Create: `D:\Source\ValleyAI\bunfig.toml`
-- Create: `D:\Source\ValleyAI\.dependency-cruiser.cjs`
-- Create: `D:\Source\ValleyAI\packages\core\package.json`
-- Create: `D:\Source\ValleyAI\packages\core\tsconfig.json`
-- Create: `D:\Source\ValleyAI\packages\core\src\index.ts`
-- Create: `D:\Source\ValleyAI\packages\core\tests\skeleton.test.ts`
+- Create: `<VALLEYAI_ROOT>\package.json`
+- Create: `<VALLEYAI_ROOT>\tsconfig.base.json`
+- Create: `<VALLEYAI_ROOT>\bunfig.toml`
+- Create: `<VALLEYAI_ROOT>\.dependency-cruiser.cjs`
+- Create: `<VALLEYAI_ROOT>\packages\core\package.json`
+- Create: `<VALLEYAI_ROOT>\packages\core\tsconfig.json`
+- Create: `<VALLEYAI_ROOT>\packages\core\src\index.ts`
+- Create: `<VALLEYAI_ROOT>\packages\core\tests\skeleton.test.ts`
 
 - [ ] **Step 1: Create root package.json**
 
@@ -225,19 +225,19 @@ test("CORE_VERSION is defined", () => {
 
 - [ ] **Step 8: Install dependencies and run test**
 
-Run: `cd D:\Source\ValleyAI && bun install`
+Run: `cd <VALLEYAI_ROOT> && bun install`
 Expected: dependencies installed, lockfile created
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/skeleton.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/skeleton.test.ts`
 Expected: 1 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors, 0 warnings
 
 - [ ] **Step 9: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git init
 git add -A
 git commit -m "feat(core): project skeleton with npm workspaces and bun test"
@@ -328,7 +328,7 @@ test("all 10 event types are representable", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/types.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/types.test.ts`
 Expected: FAIL — cannot find module `../src/types`
 
 - [ ] **Step 3: Implement types.ts**
@@ -459,7 +459,7 @@ export interface AgentContext {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/types.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/types.test.ts`
 Expected: 7 pass, 0 fail
 
 - [ ] **Step 5: Write failing test for EventStream**
@@ -550,7 +550,7 @@ test("emit after done throws", () => {
 
 - [ ] **Step 6: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/event-stream.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/event-stream.test.ts`
 Expected: FAIL — cannot find module `../src/event-stream`
 
 - [ ] **Step 7: Implement event-stream.ts**
@@ -615,18 +615,18 @@ export class EventStream<T> {
 
 - [ ] **Step 8: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/event-stream.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/event-stream.test.ts`
 Expected: 7 pass, 0 fail
 
 - [ ] **Step 9: Run typecheck**
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors, 0 warnings
 
 - [ ] **Step 10: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): types and EventStream"
 ```
@@ -836,7 +836,7 @@ test("execute validates args before calling tool", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/tool-registry.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/tool-registry.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement tool.ts**
@@ -944,16 +944,16 @@ export class ToolRegistry {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/tool-registry.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/tool-registry.test.ts`
 Expected: 12 pass, 0 fail
 
 - [ ] **Step 6: Run typecheck and commit**
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors, 0 warnings
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): tool system with schema validation and visibility tiers"
 ```
@@ -1076,7 +1076,7 @@ test("isOpen returns true only in OPEN state", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/circuit-breaker.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/circuit-breaker.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement circuit-breaker.ts**
@@ -1184,14 +1184,14 @@ export class CircuitBreaker {
 
 - [ ] **Step 4: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/circuit-breaker.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/circuit-breaker.test.ts`
 Expected: 11 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): circuit breaker with 3-state protection"
 ```
@@ -1268,7 +1268,7 @@ test("getUsed returns consumed amount", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/token-budget.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/token-budget.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement token-budget.ts**
@@ -1330,14 +1330,14 @@ export class TokenBudgetManager {
 
 - [ ] **Step 4: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/token-budget.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/token-budget.test.ts`
 Expected: 8 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): token budget manager with time-window reset"
 ```
@@ -1423,7 +1423,7 @@ test("measure wraps async function and records timing", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/performance-monitor.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/performance-monitor.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement performance-monitor.ts**
@@ -1513,14 +1513,14 @@ export class PerformanceMonitor {
 
 - [ ] **Step 4: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/performance-monitor.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/performance-monitor.test.ts`
 Expected: 6 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): performance monitor with measure wrapper"
 ```
@@ -1728,7 +1728,7 @@ test("preWarm initializes without error", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-provider.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-provider.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement llm-config.ts**
@@ -1997,14 +1997,14 @@ export class VercelAIProvider implements ILLMProvider {
 
 - [ ] **Step 5: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/llm-provider.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/llm-provider.test.ts`
 Expected: 13 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): LLM provider with retry, concurrency, budget, think-stripping"
 ```
@@ -2176,7 +2176,7 @@ test("getConnectionCount returns active connections", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/transport.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/transport.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement transport.ts**
@@ -2322,14 +2322,14 @@ export class BunWebSocketTransport implements Transport {
 
 - [ ] **Step 5: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/transport.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/transport.test.ts`
 Expected: 8 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): WebSocket transport with Bun native implementation"
 ```
@@ -2603,7 +2603,7 @@ test("transformContext hook modifies context before LLM call", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/agent-loop.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/agent-loop.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement agent-loop.ts**
@@ -2796,14 +2796,14 @@ async function processToolCall(
 
 - [ ] **Step 4: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/agent-loop.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/agent-loop.test.ts`
 Expected: 11 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): agentLoop pure function with 7 hooks and dual exec mode"
 ```
@@ -2952,7 +2952,7 @@ test("AgentState exposes streaming status", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/agent.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/agent.test.ts`
 Expected: FAIL — cannot find module
 
 - [ ] **Step 3: Implement agent.ts**
@@ -3140,14 +3140,14 @@ export class Agent {
 
 - [ ] **Step 4: Run test, typecheck, commit**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/agent.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/agent.test.ts`
 Expected: 9 pass, 0 fail
 
-Run: `cd D:\Source\ValleyAI && bun run typecheck`
+Run: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add -A
 git commit -m "feat(core): Agent stateful wrapper with dual queues and lifecycle"
 ```

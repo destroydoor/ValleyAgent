@@ -157,7 +157,7 @@ ValleyAgent Chat CLI v${VERSION} — 终端对话工具
   LLM_PROVIDER         提供者 (minimax|openai|deepseek)
 
 启动 server:
-  cd D:/Source/ValleyAI
+  cd <ValleyAI 仓库根目录>
   LLM_API_KEY=your_key bun run packages/stardew/src/cli.ts
 
 对话中可用命令:
@@ -496,7 +496,7 @@ function handleCommand(input: string, sim: SimState, npcNames: string[]): Comman
     case "clear": {
       console.log(`  [提示] server 侧记忆存储在 agents/ 目录下。`);
       console.log(`  删除对应的 rel 文件可重置 NPC 记忆:`);
-      console.log(`    rm -rf D:/Source/ValleyAI/agents/${sim.npcName}_players/`);
+      console.log(`    rm -rf ./agents/${sim.npcName}_players/`);
       console.log(`  然后重连 (/npc ${sim.npcName}) 即可获得全新对话。`);
       break;
     }
@@ -627,7 +627,7 @@ async function main() {
     console.error(`  原因: ${msg}`);
     console.error();
     console.error(`  请先启动 ValleyAI Agent Server:`);
-    console.error(`    cd D:/Source/ValleyAI`);
+    console.error(`    cd <ValleyAI 仓库根目录>`);
     console.error(`    LLM_API_KEY=your_key bun run packages/stardew/src/cli.ts`);
     console.error();
     process.exit(1);

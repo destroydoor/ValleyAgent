@@ -314,7 +314,7 @@ TS 端 `createModel()` 新增 moonshot/zhipu/baichuan/qwen/custom 走 OpenAI 兼
 ### 5.1 核心类
 
 ```typescript
-// D:\Source\ValleyAI\packages\core\src\llm-router.ts
+// <VALLEYAI_ROOT>\packages\core\src\llm-router.ts
 export type LlmRole = "director" | "protagonist" | "npc";
 
 export interface RoleProviderConfig {

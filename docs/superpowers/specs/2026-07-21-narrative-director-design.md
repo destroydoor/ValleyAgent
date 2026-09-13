@@ -2,7 +2,7 @@
 
 > **创建时间**: 2026-07-21
 > **状态**: 设计阶段（待用户审核）
-> **代码位置**: `D:\Source\ValleyAI`（TS 服务器）+ `D:\Source\ValleyTalk`（C# Mod）
+> **代码位置**: `<VALLEYAI_ROOT>`（TS 服务器）+ `<REPO_ROOT>`（C# Mod）
 > **背景**: 当前架构让 NPC 每 30 秒调一次 LLM 在 7 状态 FSM 里做反应式决策，导致 Token 消耗高（2880 次/天/NPC）且无法保证玩家体验密度（NPC 不会主动找玩家、下矿钓鱼种地遇不到 NPC）。本设计引入双层 LLM 叙事导演架构解决这两个核心问题。
 
 ---
@@ -717,7 +717,7 @@ LLM 正常 → ReAct 正常执行
 
 ## 12. 文件结构映射
 
-### 12.1 C# 侧（`D:\Source\ValleyTalk\src\ValleyAgent\`）
+### 12.1 C# 侧（`<REPO_ROOT>\src\ValleyAgent\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -730,7 +730,7 @@ LLM 正常 → ReAct 正常执行
 | `WebSocket\WebSocketClient.cs` | 修改 | 新增 8 种消息类型处理 |
 | `StateSyncSender.cs` | 修改 | 增加 activity_report / game_context_sync 推送 |
 
-### 12.2 TS 侧（`D:\Source\ValleyAI\packages\stardew\`）
+### 12.2 TS 侧（`<VALLEYAI_ROOT>\packages\stardew\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|

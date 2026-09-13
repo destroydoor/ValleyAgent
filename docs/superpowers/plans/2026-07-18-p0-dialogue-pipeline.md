@@ -9,8 +9,8 @@
 > **当前权威文档**：[`../../../AGENTS.md`](../../../AGENTS.md) 第 2.2 节"关键数据流"。
 >
 > **路径变更**：文档中提到的
-> `d:\Source\ValleyTalk\src\valley_agent_server\data\npc_prompts.json` 已迁移到
-> `D:\Source\ValleyAI\packages\stardew\data\npc_prompts.json`。
+> `<REPO_ROOT>\src\valley_agent_server\data\npc_prompts.json` 已迁移到
+> `<VALLEYAI_ROOT>\packages\stardew\data\npc_prompts.json`。
 
 ---
 
@@ -26,7 +26,7 @@
 
 ## npc_prompts.json Schema 摘要
 
-**文件位置**：`d:\Source\ValleyTalk\src\valley_agent_server\data\npc_prompts.json`
+**文件位置**：`<REPO_ROOT>\src\valley_agent_server\data\npc_prompts.json`
 **文件大小**：91769 字节（~90KB）
 **NPC 数量**：33 个（Abigail, Alex, Caroline, Clint, Demetrius, Dwarf, Elliott, Emily, Evelyn, George, Gus, Haley, Harvey, Jas, Jodi, Kent, Krobus, Leah, Lewis, Linus, Marnie, Maru, Pam, Penny, Pierre, Robin, Sam, Sandy, Sebastian, Shane, Vincent, Willy, Wizard）
 
@@ -55,7 +55,7 @@
 
 ## 文件结构映射
 
-### TS 服务器侧（`D:\Source\ValleyAI\packages\`）
+### TS 服务器侧（`<VALLEYAI_ROOT>\packages\`）
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
@@ -105,12 +105,12 @@
 ### Task 1: core/src/index.ts re-export 所有模块
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\core\src\index.ts`
-- Test: `D:\Source\ValleyAI\packages\core\tests\index-exports.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\index.ts`
+- Test: `<VALLEYAI_ROOT>\packages\core\tests\index-exports.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\core\tests\index-exports.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\core\tests\index-exports.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -168,12 +168,12 @@ test("index re-exports type interfaces (compile-time check)", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/index-exports.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/index-exports.test.ts`
 Expected: FAIL with "Core.Agent is undefined" (因为 index.ts 只导出 CORE_VERSION)
 
 - [ ] **Step 3: Write minimal implementation**
 
-Replace `D:\Source\ValleyAI\packages\core\src\index.ts` with:
+Replace `<VALLEYAI_ROOT>\packages\core\src\index.ts` with:
 
 ```typescript
 export const CORE_VERSION = "0.1.0";
@@ -232,16 +232,16 @@ export { TokenBudgetManager } from "./token-budget";
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/index-exports.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/index-exports.test.ts`
 Expected: PASS (9 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/index.ts packages/core/tests/index-exports.test.ts
 git commit -m "feat(core): re-export all modules from index.ts
 
@@ -253,14 +253,14 @@ External packages can now import { Agent, agentLoop, ToolRegistry, ... } from '@
 ### Task 2: CircuitBreaker 字段别名 + 回调
 
 **Files:**
-- Modify: `D:\Source\ValleyAI\packages\core\src\circuit-breaker.ts`
-- Test: `D:\Source\ValleyAI\packages\core\tests\circuit-breaker-callbacks.test.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\circuit-breaker.ts`
+- Test: `<VALLEYAI_ROOT>\packages\core\tests\circuit-breaker-callbacks.test.ts`
 
 **背景**：spec 5.4 节使用 `failureThreshold`/`openDurationMs` 字段名和 `onSuccess`/`onOpen`/`onClose` 回调，但现有代码用 `threshold`/`recoveryTime`。为不破坏现有测试，加字段别名而非重命名。
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\core\tests\circuit-breaker-callbacks.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\core\tests\circuit-breaker-callbacks.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -347,12 +347,12 @@ test("backwards compatible with old threshold/recoveryTime fields", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/circuit-breaker-callbacks.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/circuit-breaker-callbacks.test.ts`
 Expected: FAIL with "failureThreshold does not exist in type CircuitBreakerConfig" (TypeScript compile error)
 
 - [ ] **Step 3: Write minimal implementation**
 
-Replace `D:\Source\ValleyAI\packages\core\src\circuit-breaker.ts` with:
+Replace `<VALLEYAI_ROOT>\packages\core\src\circuit-breaker.ts` with:
 
 ```typescript
 export enum CircuitState {
@@ -475,20 +475,20 @@ export class CircuitBreaker {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/circuit-breaker-callbacks.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/circuit-breaker-callbacks.test.ts`
 Expected: PASS (6 tests)
 
 Run existing circuit-breaker tests to verify no regression:
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/circuit-breaker.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/circuit-breaker.test.ts`
 Expected: PASS (all existing tests still pass)
 
-Run typecheck: `cd D:\Source\ValleyAI && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/circuit-breaker.ts packages/core/tests/circuit-breaker-callbacks.test.ts
 git commit -m "feat(core): add failureThreshold/openDurationMs aliases + onSuccess/onOpen/onClose callbacks
 
@@ -500,13 +500,13 @@ Spec 5.4 uses failureThreshold/openDurationMs field names; old threshold/recover
 ### Task 3: MemoryBackend 接口定义
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\core\src\memory-backend.ts`
-- Modify: `D:\Source\ValleyAI\packages\core\src\index.ts`
-- Test: `D:\Source\ValleyAI\packages\core\tests\memory-backend.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\core\src\memory-backend.ts`
+- Modify: `<VALLEYAI_ROOT>\packages\core\src\index.ts`
+- Test: `<VALLEYAI_ROOT>\packages\core\tests\memory-backend.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\core\tests\memory-backend.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\core\tests\memory-backend.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -542,12 +542,12 @@ test("MemoryBackend interface is structurally compatible with a minimal impl", (
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/memory-backend.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/memory-backend.test.ts`
 Expected: FAIL with "Cannot find module '../src/memory-backend'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\core\src\memory-backend.ts`:
+Create `<VALLEYAI_ROOT>\packages\core\src\memory-backend.ts`:
 
 ```typescript
 // MemoryBackend — 接口契约，让 AgentMemory 实现，方便 P2/P3 替换为 Qdrant/SQLite
@@ -612,7 +612,7 @@ export interface MemoryBackend {
 }
 ```
 
-Add to `D:\Source\ValleyAI\packages\core\src\index.ts` (append before Performance+Token section):
+Add to `<VALLEYAI_ROOT>\packages\core\src\index.ts` (append before Performance+Token section):
 
 ```typescript
 // MemoryBackend interface
@@ -621,16 +621,16 @@ export type { MemoryBackend, MemoryEntry, SignificantMemory, ConversationEntry }
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/core/tests/memory-backend.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/core/tests/memory-backend.test.ts`
 Expected: PASS (1 test)
 
-Run typecheck: `cd D:\Source\ValleyAI && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT> && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/core/src/memory-backend.ts packages/core/src/index.ts packages/core/tests/memory-backend.test.ts
 git commit -m "feat(core): add MemoryBackend interface for pluggable memory backends
 
@@ -644,16 +644,16 @@ Spec 3.2: AgentMemory implements this interface; P2/P3 can swap to Qdrant/SQLite
 ### Task 4: stardew 包结构 + 配置 + data 复制
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\package.json`
-- Create: `D:\Source\ValleyAI\packages\stardew\tsconfig.json`
-- Create: `D:\Source\ValleyAI\packages\stardew\data\npc_prompts.json` (复制)
-- Create: `D:\Source\ValleyAI\packages\stardew\src\index.ts`
-- Create: `D:\Source\ValleyAI\packages\stardew\src\types.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\package-setup.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\package.json`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\tsconfig.json`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\data\npc_prompts.json` (复制)
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\index.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\types.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\package-setup.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\package-setup.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\package-setup.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -681,12 +681,12 @@ test("stardew package index exports placeholder", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/package-setup.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/package-setup.test.ts`
 Expected: FAIL with "Cannot find module '@valley/core'" or "Cannot find module '../src/index'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\package.json`:
+Create `<VALLEYAI_ROOT>\packages\stardew\package.json`:
 
 ```json
 {
@@ -708,7 +708,7 @@ Create `D:\Source\ValleyAI\packages\stardew\package.json`:
 }
 ```
 
-Create `D:\Source\ValleyAI\packages\stardew\tsconfig.json`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tsconfig.json`:
 
 ```json
 {
@@ -734,13 +734,13 @@ Create `D:\Source\ValleyAI\packages\stardew\tsconfig.json`:
 }
 ```
 
-Create `D:\Source\ValleyAI\packages\stardew\src\index.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\index.ts`:
 
 ```typescript
 export const STARDEW_VERSION = "0.1.0";
 ```
 
-Create `D:\Source\ValleyAI\packages\stardew\src\types.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\types.ts`:
 
 ```typescript
 // Stardew-side shared types (spec 2.2 data contracts)
@@ -843,10 +843,10 @@ export interface SceneState {
 
 Copy npc_prompts.json:
 ```bash
-cp d:/Source/ValleyTalk/src/valley_agent_server/data/npc_prompts.json d:/Source/ValleyAI/packages/stardew/data/npc_prompts.json
+cp <REPO_ROOT>/src/valley_agent_server/data/npc_prompts.json <VALLEYAI_ROOT>/packages/stardew/data/npc_prompts.json
 ```
 
-Verify the root `package.json` of ValleyAI has workspaces configured. If not, check `D:\Source\ValleyAI\package.json` and ensure:
+Verify the root `package.json` of ValleyAI has workspaces configured. If not, check `<VALLEYAI_ROOT>\package.json` and ensure:
 ```json
 {
   "workspaces": ["packages/*"]
@@ -855,17 +855,17 @@ Verify the root `package.json` of ValleyAI has workspaces configured. If not, ch
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun install` (to link workspace)
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/package-setup.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun install` (to link workspace)
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/package-setup.test.ts`
 Expected: PASS (3 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/
 git commit -m "feat(stardew): scaffold @valley/stardew package with types + npc_prompts.json data
 
@@ -877,12 +877,12 @@ Package depends on @valley/core workspace. types.ts defines spec 2.2 data contra
 ### Task 5: NpcPromptLoader
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\npc-prompt-loader.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\npc-prompt-loader.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\npc-prompt-loader.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\npc-prompt-loader.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\npc-prompt-loader.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\npc-prompt-loader.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -951,12 +951,12 @@ test("getAttitudeBrief returns correct brief for friendship level", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
 Expected: FAIL with "Cannot find module '../src/npc-prompt-loader'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\npc-prompt-loader.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\npc-prompt-loader.ts`:
 
 ```typescript
 import { readFileSync } from "fs";
@@ -1038,16 +1038,16 @@ export class NpcPromptLoader {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/npc-prompt-loader.test.ts`
 Expected: PASS (6 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/npc-prompt-loader.ts packages/stardew/tests/npc-prompt-loader.test.ts
 git commit -m "feat(stardew): add NpcPromptLoader for npc_prompts.json access
 
@@ -1059,12 +1059,12 @@ Loads 33 NPCs x 5 phases. getPhaseForFriendship maps 0-2500 friendship to strang
 ### Task 6: WorldSnapshotDecoder + SceneState
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\world-snapshot-decoder.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\world-snapshot-decoder.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\world-snapshot-decoder.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\world-snapshot-decoder.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\world-snapshot-decoder.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\world-snapshot-decoder.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -1141,12 +1141,12 @@ test("summarizeNearby returns input or default when empty", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/world-snapshot-decoder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/world-snapshot-decoder.test.ts`
 Expected: FAIL with "Cannot find module '../src/world-snapshot-decoder'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\world-snapshot-decoder.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\world-snapshot-decoder.ts`:
 
 ```typescript
 import type { WorldSnapshot, SceneState } from "./types";
@@ -1203,16 +1203,16 @@ export function summarizeNearby(nearby: string | undefined): string {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/world-snapshot-decoder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/world-snapshot-decoder.test.ts`
 Expected: PASS (6 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/world-snapshot-decoder.ts packages/stardew/tests/world-snapshot-decoder.test.ts
 git commit -m "feat(stardew): add WorldSnapshotDecoder + time/location helpers
 
@@ -1224,12 +1224,12 @@ decodeWorldSnapshot validates required fields and converts C# JSON to SceneState
 ### Task 7: AgentMemory with load/save (implements MemoryBackend)
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\agent-memory.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\agent-memory.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\agent-memory.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\agent-memory.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\agent-memory.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\agent-memory.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -1398,12 +1398,12 @@ test("getSignificantMemoriesText returns default when empty", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/agent-memory.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/agent-memory.test.ts`
 Expected: FAIL with "Cannot find module '../src/agent-memory'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\agent-memory.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\agent-memory.ts`:
 
 ```typescript
 import type { MemoryBackend, MemoryEntry, SignificantMemory, ConversationEntry } from "@valley/core";
@@ -1560,16 +1560,16 @@ export class AgentMemory implements MemoryBackend {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/agent-memory.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/agent-memory.test.ts`
 Expected: PASS (11 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/agent-memory.ts packages/stardew/tests/agent-memory.test.ts
 git commit -m "feat(stardew): add AgentMemory implementing MemoryBackend with JSON load/save
 
@@ -1583,12 +1583,12 @@ Ports e2e/stardew-memory.ts bugs fixes (60s dedup, MAX_SHORT_TERM=30, significan
 ### Task 8: StardewTools（8 个对话工具）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\stardew-tools.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\stardew-tools.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-tools.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-tools.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\stardew-tools.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-tools.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -1739,12 +1739,12 @@ test("tools register cleanly into ToolRegistry", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-tools.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-tools.test.ts`
 Expected: FAIL with "Cannot find module '../src/stardew-tools'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\stardew-tools.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\stardew-tools.ts`:
 
 ```typescript
 import { Type } from "@sinclair/typebox";
@@ -1970,16 +1970,16 @@ export function buildStardewTools(ctx: ToolContext): Tool[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-tools.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-tools.test.ts`
 Expected: PASS (11 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/stardew-tools.ts packages/stardew/tests/stardew-tools.test.ts
 git commit -m "feat(stardew): add 8 dialogue tools (speak/emote/give_item/give_gift/set_state/show_dialogue/remember/get_info)
 
@@ -1991,12 +1991,12 @@ Refactored from e2e/stardew-tools.ts: removed wait/stop (not in spec P0). Tools 
 ### Task 9: PromptBuilder with npc_prompts.json
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\prompt-builder.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\prompt-builder.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\prompt-builder.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\prompt-builder.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\prompt-builder.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\prompt-builder.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -2106,12 +2106,12 @@ test("buildDialogueSystemPrompt includes all 9 placeholders filled (no unfilled 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/prompt-builder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/prompt-builder.test.ts`
 Expected: FAIL with "Cannot find module '../src/prompt-builder'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\prompt-builder.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\prompt-builder.ts`:
 
 ```typescript
 import type { AgentMemory } from "./agent-memory";
@@ -2190,16 +2190,16 @@ export class PromptBuilder {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/prompt-builder.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/prompt-builder.test.ts`
 Expected: PASS (8 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/prompt-builder.ts packages/stardew/tests/prompt-builder.test.ts
 git commit -m "feat(stardew): add PromptBuilder using NpcPromptLoader for runtime prompt assembly
 
@@ -2211,12 +2211,12 @@ buildDialogueSystemPrompt(memory, scene, npcName) fills 9 placeholders with phas
 ### Task 10: OutputValidator
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\output-validator.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\output-validator.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\output-validator.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\output-validator.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\output-validator.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\output-validator.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -2297,12 +2297,12 @@ test("validateSpeechAndActions rejects when both speech and tool text are invali
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/output-validator.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/output-validator.test.ts`
 Expected: FAIL with "Cannot find module '../src/output-validator'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\output-validator.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\output-validator.ts`:
 
 ```typescript
 import type { ToolAction } from "./types";
@@ -2379,16 +2379,16 @@ export class OutputValidator {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/output-validator.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/output-validator.test.ts`
 Expected: PASS (10 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/output-validator.ts packages/stardew/tests/output-validator.test.ts
 git commit -m "feat(stardew): add OutputValidator for CJK ratio + empty detection
 
@@ -2400,12 +2400,12 @@ P0 minimal language check: rejects text with CJK ratio < 0.3 or empty. validateS
 ### Task 11: RuleEngine（简化 IDLE fallback）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\rule-engine.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\rule-engine.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\rule-engine.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\rule-engine.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\rule-engine.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\rule-engine.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -2490,12 +2490,12 @@ test("buildFallbackResponse includes emote action", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/rule-engine.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/rule-engine.test.ts`
 Expected: FAIL with "Cannot find module '../src/rule-engine'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\rule-engine.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\rule-engine.ts`:
 
 ```typescript
 import { LLMBillingError, LLMUnavailableError } from "@valley/core";
@@ -2536,16 +2536,16 @@ export class RuleEngine {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/rule-engine.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/rule-engine.test.ts`
 Expected: PASS (6 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/rule-engine.ts packages/stardew/tests/rule-engine.test.ts
 git commit -m "feat(stardew): add simplified RuleEngine for Layer 3 fallback
 
@@ -2559,12 +2559,12 @@ buildFallbackResponse(req, err) maps LLMBillingError/LLMUnavailableError/generic
 ### Task 12: StardewAgent class
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -2794,12 +2794,12 @@ test("StardewAgent uses maxTurns=5 by default", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-agent.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-agent.test.ts`
 Expected: FAIL with "Cannot find module '../src/stardew-agent'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\stardew-agent.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent.ts`:
 
 ```typescript
 import { Agent, VercelAIProvider, ToolRegistry } from "@valley/core";
@@ -2996,20 +2996,20 @@ export class StardewAgent {
 }
 ```
 
-**Note**: `chatWithTools` method needs to exist on VercelAIProvider. If it does not exist yet, verify by checking `D:\Source\ValleyAI\packages\core\src\llm-provider.ts` for the method. If missing, the test will fail and you must add a `chatWithTools` method to VercelAIProvider that returns `ProviderToolCallResult`. The e2e/stardew-run.ts uses `provider.chatWithTools(messages, tools)` so the method should already exist.
+**Note**: `chatWithTools` method needs to exist on VercelAIProvider. If it does not exist yet, verify by checking `<VALLEYAI_ROOT>\packages\core\src\llm-provider.ts` for the method. If missing, the test will fail and you must add a `chatWithTools` method to VercelAIProvider that returns `ProviderToolCallResult`. The e2e/stardew-run.ts uses `provider.chatWithTools(messages, tools)` so the method should already exist.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-agent.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-agent.test.ts`
 Expected: PASS (8 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/stardew-agent.ts packages/stardew/tests/stardew-agent.test.ts
 git commit -m "feat(stardew): add StardewAgent class wrapping core Agent for dialogue
 
@@ -3021,12 +3021,12 @@ runDialogue(playerInput, scene) builds prompt, runs agentLoop (maxTurns=5), extr
 ### Task 13: StardewAgentRegistry（多 NPC 并发管理）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\stardew-agent-registry.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent-registry.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent-registry.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent-registry.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\stardew-agent-registry.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\stardew-agent-registry.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -3160,12 +3160,12 @@ test("getMemoryFilePath returns expected path", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-agent-registry.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-agent-registry.test.ts`
 Expected: FAIL with "Cannot find module '../src/stardew-agent-registry'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\stardew-agent-registry.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\stardew-agent-registry.ts`:
 
 ```typescript
 import type { VercelAIProvider } from "@valley/core";
@@ -3238,16 +3238,16 @@ export class StardewAgentRegistry {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/stardew-agent-registry.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/stardew-agent-registry.test.ts`
 Expected: PASS (7 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/stardew-agent-registry.ts packages/stardew/tests/stardew-agent-registry.test.ts
 git commit -m "feat(stardew): add StardewAgentRegistry for multi-NPC management
 
@@ -3259,12 +3259,12 @@ Map<npcName, StardewAgent> + per-NPC dialogue lock (spec 4.4 + 5.5). Memory path
 ### Task 14: ProtocolAdapter（5 消息路由）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\protocol-adapter.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\protocol-adapter.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\protocol-adapter.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\protocol-adapter.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -3463,12 +3463,12 @@ test("handleDialogue rejects when NPC is locked (busy)", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/protocol-adapter.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter.test.ts`
 Expected: FAIL with "Cannot find module '../src/protocol-adapter'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\protocol-adapter.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\protocol-adapter.ts`:
 
 ```typescript
 import { LLMBillingError, LLMUnavailableError } from "@valley/core";
@@ -3585,16 +3585,16 @@ export class ProtocolAdapter {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/protocol-adapter.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/protocol-adapter.test.ts`
 Expected: PASS (7 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/protocol-adapter.ts packages/stardew/tests/protocol-adapter.test.ts
 git commit -m "feat(stardew): add ProtocolAdapter routing 5 message types
 
@@ -3606,15 +3606,15 @@ handleHello/handlePing/handleToolCallResult/handleActionResult + handleDialogue 
 ### Task 14.5: Integration Tests 补完（ws-compat / multi-npc / dialogue-fallback）
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\tests\integration\ws-compat.test.ts`
-- Create: `D:\Source\ValleyAI\packages\stardew\tests\integration\multi-npc.test.ts`
-- Create: `D:\Source\ValleyAI\packages\stardew\tests\integration\dialogue-fallback.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\tests\integration\ws-compat.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\tests\integration\multi-npc.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\tests\integration\dialogue-fallback.test.ts`
 
 **背景**：spec 6.2 节要求 3 个集成测试覆盖跨层契约。这些测试在 Task 14（ProtocolAdapter）和 Task 7（AgentMemory）已实现后即可编写，无需等 Task 15 服务器。
 
 - [ ] **Step 1: Write `ws-compat.test.ts` — C# 端字段名兼容（camelCase）/ null 字段忽略 / 枚举字符串**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\integration\ws-compat.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\integration\ws-compat.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -3737,7 +3737,7 @@ test("accepts string enum values (weather: 'sunny' / npcState: 'IDLE')", async (
 
 - [ ] **Step 2: Write `multi-npc.test.ts` — 2 NPC 并发对话 / 独立 memory / 互不干扰**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\integration\multi-npc.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\integration\multi-npc.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -3870,7 +3870,7 @@ test("same NPC concurrent requests are serialized (lock rejects second)", async 
 
 - [ ] **Step 3: Write `dialogue-fallback.test.ts` — CircuitBreaker 状态转换 + 持续 fallback + 恢复后 CLOSED**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\integration\dialogue-fallback.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\integration\dialogue-fallback.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -3989,16 +3989,16 @@ test("LLM recovery after fallback returns to normal LLM response (fallback=false
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/integration/`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/integration/`
 Expected: PASS (9 tests across 3 files)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/tests/integration/ws-compat.test.ts packages/stardew/tests/integration/multi-npc.test.ts packages/stardew/tests/integration/dialogue-fallback.test.ts
 git commit -m "test(stardew): add 3 integration tests — ws-compat / multi-npc / dialogue-fallback
 
@@ -4010,12 +4010,12 @@ ws-compat: C# camelCase JSON / null field tolerance / string enums. multi-npc: 2
 ### Task 15: WebSocket Server + Dialogue E2E Integration Test
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\src\server.ts`
-- Test: `D:\Source\ValleyAI\packages\stardew\tests\dialogue-e2e.test.ts`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\server.ts`
+- Test: `<VALLEYAI_ROOT>\packages\stardew\tests\dialogue-e2e.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `D:\Source\ValleyAI\packages\stardew\tests\dialogue-e2e.test.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\tests\dialogue-e2e.test.ts`:
 
 ```typescript
 import { test, expect } from "bun:test";
@@ -4189,12 +4189,12 @@ test("server persists memory after dialogue", async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/dialogue-e2e.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/dialogue-e2e.test.ts`
 Expected: FAIL with "Cannot find module '../src/server'"
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\server.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\server.ts`:
 
 ```typescript
 import { VercelAIProvider, type LLMConfig, type ProviderToolCallResult } from "@valley/core";
@@ -4285,16 +4285,16 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd D:\Source\ValleyAI && bun test packages/stardew/tests/dialogue-e2e.test.ts`
+Run: `cd <VALLEYAI_ROOT> && bun test packages/stardew/tests/dialogue-e2e.test.ts`
 Expected: PASS (5 tests)
 
-Run typecheck: `cd D:\Source\ValleyAI\packages\stardew && bun run typecheck`
+Run typecheck: `cd <VALLEYAI_ROOT>\packages\stardew && bun run typecheck`
 Expected: 0 errors
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/server.ts packages/stardew/tests/dialogue-e2e.test.ts
 git commit -m "feat(stardew): add Bun WebSocket server + dialogue E2E test
 
@@ -4311,13 +4311,13 @@ startServer(config) wires NpcPromptLoader + PromptBuilder + VercelAIProvider + R
 These tasks modify interdependent files (DialogueResponse record + SubmitInput + CommandExecutor + Mock libraries). Committing partially will break compilation. Only commit at Task 19 Step 5.
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs`
 
 **背景**：当前 `DialogueResponse` record 用 `Text`/`Action` 字段，需重定义为 `Speech`/`Actions[]` + 新增 `ToolAction` record。改造点 1 必须与改造点 2 + 6 同次提交（编译耦合）。
 
 - [ ] **Step 1: Locate the current DialogueResponse record**
 
-Run: `cd D:\Source\ValleyTalk && Select-String -Path "src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs" -Pattern "record DialogueResponse" -SimpleMatch`
+Run: `cd <REPO_ROOT> && Select-String -Path "src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs" -Pattern "record DialogueResponse" -SimpleMatch`
 
 Expected output shows the line at line 75-81 area:
 ```
@@ -4326,7 +4326,7 @@ record DialogueResponse(string Text, string? Emotion, string? Action, string Req
 
 - [ ] **Step 2: Add ToolAction record + redefine DialogueResponse**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs` lines 70-85 to find exact insertion point. Then Edit by replacing the DialogueResponse record line:
+Read `<REPO_ROOT>\src\ValleyAgent.Abstractions\WebSocket\IAgentServerProvider.cs` lines 70-85 to find exact insertion point. Then Edit by replacing the DialogueResponse record line:
 
 Old:
 ```csharp
@@ -4349,7 +4349,7 @@ If the existing line uses a different parameter order or has trailing content, m
 
 - [ ] **Step 3: Build to find all compile errors**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release 2>&1 | Select-String "error CS"`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release 2>&1 | Select-String "error CS"`
 
 Expected: Compile errors at every site that references `response.Text` or `response.Action`. Capture the list of files+lines (actual line numbers verified via Grep on 2026-07-18):
 
@@ -4409,7 +4409,7 @@ resultAction = response.Actions.Count > 0 ? response.Actions[0].Tool : null;  //
 
 - [ ] **Step 5: Verify build passes (no commit yet — combined commit in Task 19)**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release`
 Expected: Build succeeded, 0 errors, 0 warnings (TreatWarningsAsErrors)
 
 **Do not commit yet.** Proceed to Task 17 (CommandExecutor.ExecuteAction) which must be in the same commit.
@@ -4419,11 +4419,11 @@ Expected: Build succeeded, 0 errors, 0 warnings (TreatWarningsAsErrors)
 ### Task 17: CommandExecutor.ExecuteAction 方法
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\CommandExecutor.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\CommandExecutor.cs`
 
 - [ ] **Step 1: Read the existing CommandExecutor structure**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\CommandExecutor.cs` to find:
+Read `<REPO_ROOT>\src\ValleyAgent\CommandExecutor.cs` to find:
 - The class declaration line
 - The existing `ExecuteSingleCommand` method (to understand the dispatch pattern)
 - The `CommandRegistry` field/property used to look up commands
@@ -4569,7 +4569,7 @@ private static int MapEmoteStringToInt(string emoteId)
 
 - [ ] **Step 3: Verify build (still no commit — combined in Task 19)**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release`
 Expected: Build succeeded, 0 errors, 0 warnings
 
 Proceed to Task 18.
@@ -4579,11 +4579,11 @@ Proceed to Task 18.
 ### Task 18: DialogueBoxInputPatch.SubmitInput 简化
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` (lines 260-327)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` (lines 260-327)
 
 - [ ] **Step 1: Read the current SubmitInput method**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` lines 260-327 to understand the existing structure. Identify:
+Read `<REPO_ROOT>\src\ValleyAgent\Patches\DialogueBoxInputPatch.cs` lines 260-327 to understand the existing structure. Identify:
 - Where `DialogueRequest` is constructed (line ~288 has `Personality=""`, line ~293 has `ConversationHistory=""`)
 - Where `response.Text` is consumed (lines ~299, 306, 310)
 - Where the timeout/exception handling lives
@@ -4798,7 +4798,7 @@ private static string GetNearbyObjectsSummary(NPC npc)
 
 - [ ] **Step 5: Verify build (still no commit — combined in Task 19)**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release`
 Expected: Build succeeded, 0 errors, 0 warnings
 
 Fix any remaining compile errors (likely in `EventHandlerInitializer.cs` if it constructs `DialogueRequest` with old fields — Task 19 deletes that dead code).
@@ -4810,12 +4810,12 @@ Proceed to Task 19.
 ### Task 19: Delete BuildDialogueRequest dead code + combined commit
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (lines 2246-2280)
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Debug\ChatHandler.cs` (line 121 area)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` (lines 2246-2280)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Debug\ChatHandler.cs` (line 121 area)
 
 - [ ] **Step 1: Delete BuildDialogueRequest in EventHandlerInitializer.cs**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` lines 2240-2290 to find the exact method boundaries.
+Read `<REPO_ROOT>\src\ValleyAgent\Initialization\EventHandlerInitializer.cs` lines 2240-2290 to find the exact method boundaries.
 
 Delete the entire `BuildDialogueRequest` static method (lines 2246-2280, approximately 35 lines). The method signature looks like:
 ```csharp
@@ -4825,7 +4825,7 @@ public static DialogueRequest BuildDialogueRequest(...)
 Also check if the helper methods it calls (`GetNearbyObjectsForDialogue`, `GetVisibleTraits`, `GetSignificantMemoriesText`, `GetRecentMemoryText`, `GetFriendshipPhaseLabel`) are referenced elsewhere. Run:
 
 ```powershell
-cd D:\Source\ValleyTalk\src\ValleyAgent
+cd <REPO_ROOT>\src\ValleyAgent
 Select-String -Path "*.cs" -Recurse -Pattern "GetNearbyObjectsForDialogue|GetVisibleTraits|GetSignificantMemoriesText|GetRecentMemoryText|GetFriendshipPhaseLabel" -SimpleMatch
 ```
 
@@ -4833,22 +4833,22 @@ If any helper is ONLY called by `BuildDialogueRequest`, delete it too. If called
 
 - [ ] **Step 2: Delete BuildDialogueRequest duplicate in ChatHandler.cs**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\Debug\ChatHandler.cs` around line 121 to find the duplicate `BuildDialogueRequest` method. Delete the entire method.
+Read `<REPO_ROOT>\src\ValleyAgent\Debug\ChatHandler.cs` around line 121 to find the duplicate `BuildDialogueRequest` method. Delete the entire method.
 
 - [ ] **Step 3: Verify build passes**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release`
 Expected: Build succeeded, 0 errors, 0 warnings (TreatWarningsAsErrors)
 
 - [ ] **Step 4: Run existing C# tests if any**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet test -c Release 2>&1 | Select-String "Passed|Failed"`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet test -c Release 2>&1 | Select-String "Passed|Failed"`
 Expected: All tests pass (or "No tests found" if no test project)
 
 - [ ] **Step 5: Combined commit for Tasks 16-19**
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent.Abstractions/WebSocket/IAgentServerProvider.cs
 git add src/ValleyAgent/CommandExecutor.cs
 git add src/ValleyAgent/Patches/DialogueBoxInputPatch.cs
@@ -4870,13 +4870,13 @@ Spec 2.2: DialogueResponse now carries Speech + Actions[] (ToolAction records). 
 ### Task 20: Bun exe 打包配置
 
 **Files:**
-- Create: `D:\Source\ValleyAI\packages\stardew\bin\valley-ai-server.exe` (Bun compile output)
-- Create: `D:\Source\ValleyAI\packages\stardew\scripts\build-exe.sh`
-- Create: `D:\Source\ValleyAI\packages\stardew\src\cli.ts` (CLI entry point)
+- Create: `<VALLEYAI_ROOT>\packages\stardew\bin\valley-ai-server.exe` (Bun compile output)
+- Create: `<VALLEYAI_ROOT>\packages\stardew\scripts\build-exe.sh`
+- Create: `<VALLEYAI_ROOT>\packages\stardew\src\cli.ts` (CLI entry point)
 
 - [ ] **Step 1: Write the CLI entry point**
 
-Create `D:\Source\ValleyAI\packages\stardew\src\cli.ts`:
+Create `<VALLEYAI_ROOT>\packages\stardew\src\cli.ts`:
 
 ```typescript
 import { startServer } from "./server";
@@ -4989,7 +4989,7 @@ main().catch((err) => {
 
 - [ ] **Step 2: Write the build script**
 
-Create `D:\Source\ValleyAI\packages\stardew\scripts\build-exe.sh`:
+Create `<VALLEYAI_ROOT>\packages\stardew\scripts\build-exe.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -5016,7 +5016,7 @@ ls -lh "$OUTPUT"
 
 Run (on Windows with Bun installed):
 ```bash
-cd D:\Source\ValleyAI\packages\stardew
+cd <VALLEYAI_ROOT>\packages\stardew
 bash scripts/build-exe.sh
 ```
 
@@ -5027,7 +5027,7 @@ Expected: `bin/valley-ai-server.exe` created, ~40-50MB
 Run (start in background, then connect). This step measures the cold-start time — spec 6.5 requires ≤2s. We use `Date.now()` before launch and after WebSocket `onopen` to compute the elapsed milliseconds.
 
 ```bash
-cd D:\Source\ValleyAI\packages\stardew
+cd <VALLEYAI_ROOT>\packages\stardew
 
 # Measure cold start: record start time, launch exe, connect WS, record end time.
 bun -e '
@@ -5109,7 +5109,7 @@ Expected output:
 - [ ] **Step 5: Commit**
 
 ```bash
-cd D:\Source\ValleyAI
+cd <VALLEYAI_ROOT>
 git add packages/stardew/src/cli.ts packages/stardew/scripts/build-exe.sh
 # Note: bin/valley-ai-server.exe is typically gitignored (build artifact)
 # Add to .gitignore if not already: packages/stardew/bin/
@@ -5123,21 +5123,21 @@ cli.ts parses --port/--llm-api-key/--llm-model args (env var fallbacks). build-e
 ### Task 21: ServerProcessManager (重命名 + Bun exe 支持)
 
 **Files:**
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\WebSocket\PythonProcessManager.cs` → rename to `ServerProcessManager.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs`
-- Modify: `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\ServiceInitializer.cs` (lines 154-162)
+- Modify: `<REPO_ROOT>\src\ValleyAgent\WebSocket\PythonProcessManager.cs` → rename to `ServerProcessManager.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs`
+- Modify: `<REPO_ROOT>\src\ValleyAgent\Initialization\ServiceInitializer.cs` (lines 154-162)
 
 - [ ] **Step 1: Rename PythonProcessManager.cs to ServerProcessManager.cs**
 
 Use git mv to preserve history:
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git mv src/ValleyAgent/WebSocket/PythonProcessManager.cs src/ValleyAgent/WebSocket/ServerProcessManager.cs
 ```
 
 - [ ] **Step 2: Update the class name + internal logic**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\WebSocket\ServerProcessManager.cs` (renamed). Update:
+Read `<REPO_ROOT>\src\ValleyAgent\WebSocket\ServerProcessManager.cs` (renamed). Update:
 
 1. Class name: `PythonProcessManager` → `ServerProcessManager`
 2. Constructor / field updates:
@@ -5199,7 +5199,7 @@ _log?.Log($"Starting server: {ServerExecutablePath} (port {ServerPort})");
 
 - [ ] **Step 3: Rewrite ModConfig — new fields + [Obsolete] legacy compat + migration**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\Config\ModConfig.cs` (248 lines). The current file has legacy Python* fields at lines 64-77 and legacy LLM fields (`Provider`/`ApiKey`/`Model`/`ModelName`) scattered throughout. We must:
+Read `<REPO_ROOT>\src\ValleyAgent\Config\ModConfig.cs` (248 lines). The current file has legacy Python* fields at lines 64-77 and legacy LLM fields (`Provider`/`ApiKey`/`Model`/`ModelName`) scattered throughout. We must:
 
 1. **Add new canonical fields** (replacing Python* fields). Place these in the same location (around line 64) to minimize diff:
 ```csharp
@@ -5338,7 +5338,7 @@ public bool Validate()
 
 - [ ] **Step 4: Update ServiceInitializer assembly**
 
-Read `D:\Source\ValleyTalk\src\ValleyAgent\Initialization\ServiceInitializer.cs` lines 150-165. Find where `PythonProcessManager` is registered and update to `ServerProcessManager`:
+Read `<REPO_ROOT>\src\ValleyAgent\Initialization\ServiceInitializer.cs` lines 150-165. Find where `PythonProcessManager` is registered and update to `ServerProcessManager`:
 
 Old:
 ```csharp
@@ -5352,7 +5352,7 @@ services.AddSingleton<ServerProcessManager>(new ServerProcessManager(...));
 
 Also find all references to `PythonProcessManager` across the codebase and update:
 ```powershell
-cd D:\Source\ValleyTalk\src\ValleyAgent
+cd <REPO_ROOT>\src\ValleyAgent
 Select-String -Path "*.cs" -Recurse -Pattern "PythonProcessManager" -SimpleMatch
 ```
 
@@ -5360,20 +5360,20 @@ Replace each occurrence with `ServerProcessManager`.
 
 - [ ] **Step 5: Build + verify 0 warnings + commit**
 
-Run: `cd D:\Source\ValleyTalk\src\ValleyAgent && dotnet build -c Release`
+Run: `cd <REPO_ROOT>\src\ValleyAgent && dotnet build -c Release`
 Expected: Build succeeded, 0 errors, 0 warnings.
 
 > **CS0618 (Obsolete) warnings are NOT acceptable.** All new code must reference canonical field names (`LlmApiKey`, `ServerExecutablePath`, etc.). The only place legacy fields are referenced is inside `MigrateLegacyFields()`, which wraps them in `#pragma warning disable CS0618` / `#pragma warning restore CS0618`. If any CS0618 warning remains, find the offending reference and switch to the canonical field.
 
 > **Pre-build grep check (mandatory):** Run this PowerShell to find any remaining legacy references outside `MigrateLegacyFields`:
 > ```powershell
-> cd D:\Source\ValleyTalk\src\ValleyAgent
+> cd <REPO_ROOT>\src\ValleyAgent
 > Select-String -Path "*.cs" -Recurse -Pattern "AutoStartPythonServer|PythonExecutablePath|PythonServerDirectory|PythonServerStartupTimeoutSeconds|PythonServerMaxRestartAttempts" -SimpleMatch | Where-Object { $_.Line -notmatch "#pragma|MigrateLegacyFields" }
 > ```
 > Output must be empty. If not, fix each reference before building.
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 git add src/ValleyAgent/WebSocket/ServerProcessManager.cs
 git add src/ValleyAgent/Config/ModConfig.cs
 git add src/ValleyAgent/Initialization/ServiceInitializer.cs
@@ -5395,23 +5395,23 @@ Spec: C# Mod starts Bun-compiled TS server (valley-ai-server.exe) with --port/--
 
 ```bash
 # TS side
-cd D:\Source\ValleyAI\packages\stardew
+cd <VALLEYAI_ROOT>\packages\stardew
 bash scripts/build-exe.sh
 
 # C# side
-cd D:\Source\ValleyTalk\src\ValleyAgent
+cd <REPO_ROOT>\src\ValleyAgent
 dotnet build -c Release
 ```
 
 - [ ] **Step 2: Copy valley-ai-server.exe to mod directory**
 
 ```bash
-cp D:\Source\ValleyAI\packages\stardew\bin\valley-ai-server.exe D:\Source\ValleyTalk\Stardew Valley\Mods\ValleyAgent\
+cp <VALLEYAI_ROOT>\packages\stardew\bin\valley-ai-server.exe <REPO_ROOT>\Stardew Valley\Mods\ValleyAgent\
 ```
 
 - [ ] **Step 3: Configure mod to use real LLM API key**
 
-Edit `D:\Source\ValleyTalk\Stardew Valley\Mods\ValleyAgent\config.json`:
+Edit `<REPO_ROOT>\Stardew Valley\Mods\ValleyAgent\config.json`:
 ```json
 {
   "AutoStartServer": true,
@@ -5429,7 +5429,7 @@ Edit `D:\Source\ValleyTalk\Stardew Valley\Mods\ValleyAgent\config.json`:
 
 Run:
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 .\scripts\test\run-game-tests.bat
 ```
 
@@ -5576,12 +5576,12 @@ public class EXP013_DialogueMemory : V3TestBase
 > **Acceptance criteria for all 7 scenarios:**
 > - Scenarios 1, 2, 4, 5, 6, 7: extend existing test files if assertions are missing. The test files already exist, so the work is verification + minor additions, not new code.
 > - Scenario 3: create `EXP013_DialogueMemory.cs` (skeleton above), verify it passes against real LLM.
-> - For each scenario, capture the SMAPI log + TS server log if it fails. The SMAPI log path is typically `D:\Source\ValleyTalk\Stardew Valley\ErrorLogs\SMAPI_latest.txt`.
+> - For each scenario, capture the SMAPI log + TS server log if it fails. The SMAPI log path is typically `<REPO_ROOT>\Stardew Valley\ErrorLogs\SMAPI_latest.txt`.
 
 - [ ] **Step 6: Final commit (if any config/docs changes)**
 
 ```bash
-cd D:\Source\ValleyTalk
+cd <REPO_ROOT>
 # Only commit if config.json template or test scripts changed
 # Do NOT commit the actual config.json with real API key
 git add -A

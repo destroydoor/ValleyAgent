@@ -39,9 +39,9 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-minimax}
     volumes:
       # Prepared mods (read-only source for npc_prompts.json)
-      - D:\Source\ValleyTalk\docker\mods-cache-host:/mods-src:ro
+      - ./mods-cache-host:/mods-src:ro
       # Shared with host container: agents memory, transcript, C5 assertion files
-      - D:\Source\ValleyTalk\docker\data-host:/data-host:rw
+      - ./data-host:/data-host:rw
     networks:
       - valley-e2e
     # TS server needs no GUI ports
@@ -66,15 +66,15 @@ services:
       - VALLEY_TEST_INSTANCE=host
     volumes:
       # Game files (shared, read-only)
-      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      - ./linux-game:/game:ro
       # Mods for host role (read-only, prepared by prep-mods.ps1 -Role host)
-      - D:\Source\ValleyTalk\docker\mods-cache-host:/mods-src:ro
+      - ./mods-cache-host:/mods-src:ro
       # Save files (shared with farmhand, read-only)
-      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      - ./saves:/saves-src:ro
       # SMAPI installer cache (shared, read-only)
-      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      - ./smapi-cache:/smapi-cache:ro
       # Host data directory (writable: game copy, SMAPI install, logs, agents)
-      - D:\Source\ValleyTalk\docker\data-host:/data
+      - ./data-host:/data
     networks:
       - valley-e2e
     # Lidgren multiplayer port (exposed on bridge network for farmhand to connect)
@@ -97,15 +97,15 @@ services:
       - VALLEY_TEST_INSTANCE=farmhand
     volumes:
       # Game files (shared, read-only)
-      - D:\Source\ValleyTalk\docker\linux-game:/game:ro
+      - ./linux-game:/game:ro
       # Mods for farmhand role (read-only, prepared by prep-mods.ps1 -Role farmhand)
-      - D:\Source\ValleyTalk\docker\mods-cache-farmhand:/mods-src:ro
+      - ./mods-cache-farmhand:/mods-src:ro
       # Save files (shared with host, read-only)
-      - D:\Source\ValleyTalk\docker\saves:/saves-src:ro
+      - ./saves:/saves-src:ro
       # SMAPI installer cache (shared, read-only)
-      - D:\Source\ValleyTalk\docker\smapi-cache:/smapi-cache:ro
+      - ./smapi-cache:/smapi-cache:ro
       # Farmhand data directory (writable: game copy, SMAPI install, logs)
-      - D:\Source\ValleyTalk\docker\data-farmhand:/data
+      - ./data-farmhand:/data
     networks:
       - valley-e2e
     # VNC ports (default commented out; use -Vnc flag to expose)
