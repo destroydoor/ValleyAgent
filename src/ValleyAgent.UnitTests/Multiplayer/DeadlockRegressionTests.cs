@@ -176,7 +176,7 @@ public sealed class DeadlockRegressionTests : IDisposable
 
         var escaped = Record.Exception(() =>
         {
-            Parallel.For(0, 8, _ =>
+            Parallel.For(0, 8, worker =>
             {
                 for (var round = 0; round < 40; round++)
                 {
