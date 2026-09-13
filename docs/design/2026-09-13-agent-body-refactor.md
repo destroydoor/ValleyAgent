@@ -110,8 +110,8 @@ TS `morningPlan` 逐 beat 发 `allocate_agent`（protocol-adapter.ts:169-218，K
 
 | 维度 | 增量 | 依据 |
 |---|---|---|
-| Token | **≈ 0** | 对话按需（聊到才有 LLM 调用，F2）；beat 每日预算钉死（maxBeatsPerDay=3 + 跨玩家去重 + NPC 冷却）；TS 会话本就 per-NPC 惰性 |
-| C# 性能 | **≈ 0** | 身体数量上限不变（MaxAgentNpcs），变的只是"谁在池子里"从预分配变按需；无身体 NPC 零开销（F1 原版路径） |
+| Token | **≈ 0** | 对话按需（聊到才有 LLM 调用，F2）；beat 每日预算钉死（maxBeatsPerDay=3 + 跨玩家去重 + NPC 冷却）；TS 会话本就 per-NPC 惰性；对话由玩家主动发起，token 可控——多玩家交错带来的 prompt 缓存命中率下降是**已接受的代价**（2026-09-14 用户定案） |
+| C# 性能 | **≈ 0** | 身体数量上限不变（MaxAgentNpcs），变的只是"谁在池子里"从预分配变按需；无身体 NPC 零开销（F1 原版路径）；性能承载全部由该容量池完成，**不引入其他池化机制**（2026-09-14 用户定案，无对象池） |
 | 同步/协议 | **无变更** | 广播机制照旧（内容语义变化）；无 messages.json 改动 |
 | 改动面 | 中型 | 房客三处门 + 中继动作对齐 + 导演行为类按需分配 + 回收接线（override 释放/周期驱动/显式 KeepUntil/常驻拆除）+ GMCM 文案；无删类/无迁移 |
 
@@ -121,6 +121,7 @@ TS `morningPlan` 逐 beat 发 `allocate_agent`（protocol-adapter.ts:169-218，K
 - 不放宽 MaxAgentNpcs 上限（性能）；
 - 不动 spark（保留定案）；
 - **不动 `NPCGiftPatch.cs:98` 的房客送礼过滤**（2026-09-14 审阅补：主机侧非 Agent 送礼同样回落原版 :109-113，两边本就对称，不是漏网——不要在 B1/B2 时顺手"修"它）；
+- **不在本 PR 解决"房客一致性"的完整命题**（2026-09-14 用户定案）：拆除 UI/patch 门槛只是第一步；完整解需要**导演能获取多玩家的游玩上下文**来编排——对应 M3 已知限制的三处缺口：`activity_report` 协议未接线（C# 未上报 per-player 活动）、玩家画像行为层/活动日志仍世界级、导演 game_context 仍是主机世界级快照。列为后续工作；
 - 不做 TS 侧任何改动（F2 天然支持）。
 
 ## 6. 验证方案
@@ -174,3 +175,9 @@ TS `morningPlan` 逐 beat 发 `allocate_agent`（protocol-adapter.ts:169-218，K
 4. **B3 补三约束**：promote 先于 LastDialoguePlayerId；不得丢 speak/emote 广播；中继对话更新优先级指标。
 5. **§5 补"不动清单"**：NPCGiftPatch.cs:98 房客送礼过滤与主机对称，不是漏网。
 6. 行号校准至 PR1（723dadb）之后：EnableFirstClickVanilla 实际 :226（原 ：228）；`_pendingVanillaDialogueNpc` 置位约 :159（原 :155）。
+
+### 2026-09-14 用户定案补充（成本与边界三条）
+
+1. **Token**：LLM 对话由玩家主动发起，token 可控；多玩家交错导致的 prompt 缓存命中率下降是已接受代价。
+2. **性能**：性能承载全部由身体容量池（MaxAgentNpcs ≤10 + 按需分配 + 空闲回收）完成，不引入其他池化机制（无对象池——"池"即既有 `AgentAllocationManager` 并发分配表）。
+3. **房客一致性**：完整命题需要导演能获取多玩家游玩上下文（activity_report 接线 / per-player 画像行为层 / per-player game_context），超出本 PR，列后续。
