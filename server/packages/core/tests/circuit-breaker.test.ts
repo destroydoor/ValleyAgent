@@ -29,24 +29,37 @@ test("OPEN state blocks execution", () => {
   expect(cb.canExecute()).toBe(false);
 });
 
-test("transitions to HALF_OPEN after recoveryTime", async () => {
-  const cb = new CircuitBreaker({ threshold: 2, recoveryTime: 50, halfOpenMaxCalls: 1 });
+// 假时钟驱动的时间敏感测试：绝不真实 sleep（真实时钟会被系统对时回拨，
+// 产生偶发假红），直接推进注入的 now。
+function makeBreakerWithClock(recoveryTime: number) {
+  let nowMs = 1_000_000;
+  const cb = new CircuitBreaker({
+    threshold: 2,
+    recoveryTime,
+    halfOpenMaxCalls: 1,
+    now: () => nowMs,
+  });
+  return { cb, advance: (ms: number) => { nowMs += ms; } };
+}
+
+test("transitions to HALF_OPEN after recoveryTime", () => {
+  const { cb, advance } = makeBreakerWithClock(50);
   cb.recordFailure();
   cb.recordFailure();
   expect(cb.getState()).toBe(CircuitState.OPEN);
 
-  await new Promise((resolve) => setTimeout(resolve, 60));
+  advance(60);
 
   expect(cb.canExecute()).toBe(true);
   expect(cb.getState()).toBe(CircuitState.HALF_OPEN);
 });
 
-test("HALF_OPEN success closes the circuit", async () => {
-  const cb = new CircuitBreaker({ threshold: 2, recoveryTime: 50, halfOpenMaxCalls: 1 });
+test("HALF_OPEN success closes the circuit", () => {
+  const { cb, advance } = makeBreakerWithClock(50);
   cb.recordFailure();
   cb.recordFailure();
 
-  await new Promise((resolve) => setTimeout(resolve, 60));
+  advance(60);
   cb.canExecute();
   expect(cb.getState()).toBe(CircuitState.HALF_OPEN);
 
@@ -54,12 +67,12 @@ test("HALF_OPEN success closes the circuit", async () => {
   expect(cb.getState()).toBe(CircuitState.CLOSED);
 });
 
-test("HALF_OPEN failure reopens the circuit", async () => {
-  const cb = new CircuitBreaker({ threshold: 2, recoveryTime: 50, halfOpenMaxCalls: 1 });
+test("HALF_OPEN failure reopens the circuit", () => {
+  const { cb, advance } = makeBreakerWithClock(50);
   cb.recordFailure();
   cb.recordFailure();
 
-  await new Promise((resolve) => setTimeout(resolve, 60));
+  advance(60);
   cb.canExecute();
   expect(cb.getState()).toBe(CircuitState.HALF_OPEN);
 
