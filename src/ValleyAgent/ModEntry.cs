@@ -425,6 +425,28 @@ public class ModEntry : Mod
     }
 
     /// <summary>
+    ///     主线程泵的统一兜底执行器（死锁修复 2026-09-12）。
+    ///     本 mod 的主线程泵是**串行的责任链**：后台线程只入队，回包渲染/ModMessage 发送/
+    ///     好感落账全靠每 tick 排干。链上任一环抛异常，下游所有环当 tick 全部失效——
+    ///     对房客而言下游正是它唯一的发送泵，请求发不出去 ⇒ 回包永远不来 ⇒
+    ///     等待标记无人清除 ⇒ 对话框永久"等待回复"（联机专属硬死锁）。
+    ///     所以每个泵必须独立兜底：单个泵失败只丢当 tick 的那一个动作，链不能断。
+    /// </summary>
+    /// <param name="name">泵名（留痕用，与 QueueTelemetry 的 queueId 口径一致）。</param>
+    /// <param name="pump">泵体（内部自行 while(TryDequeue) 全量排水）。</param>
+    internal void Pump(string name, Action pump)
+    {
+        try
+        {
+            pump();
+        }
+        catch (Exception ex)
+        {
+            Monitor.Log($"[Pump] '{name}' failed this tick (downstream pumps unaffected): {ex}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
     ///     停止 GameLaunched 预启动的 TS Agent Server（farmhand/Inert 场景）。
     ///     与容器实例指向同一对象时，Dispose 会在游戏退出时统一清理。
     /// </summary>
@@ -487,20 +509,20 @@ public class ModEntry : Mod
         // 对话渲染/送礼落账/ModMessage 发送必须由本 tick 在主线程消费——
         // 队列无人排水的后果是"网络上对了也没法实际使用"（回复不渲染、好感不落账）。
         // 三个 drain 均为非阻塞 TryDequeue，帧预算无风险。
+        // 死锁修复（2026-09-12）：每个泵**各自**兜底，绝不用一个 try 串起来。
+        // 原来 4 个泵共用一个 try/catch：任一上游泵抛异常（renderer 在切图瞬间取到
+        // 正在卸载的 NPC、送礼动作写 friendshipData 抛 NRE……）就会跳过下游全部泵，
+        // 其中 HostRequestHandlers.ProcessMainThreadActions 是房客**唯一**的 ModMessage
+        // 发送泵——它一被跳过，请求发不出去、回包收不到、_isWaitingForResponse 无人清除，
+        // 对话框永久停在"等待回复"，Enter 与键盘输入全被吞（联机专属 UI 硬死锁）。
         var tickCounter = 0;
         helper.Events.GameLoop.UpdateTicked += (_, _) =>
         {
-            try
-            {
-                _remoteRenderer?.Update(tickCounter++);
-                DialogueBoxInputPatch.ProcessPendingReplies();          // AI 回复渲染
-                NPCGiftPatch.ProcessMainThreadActions();                // 送礼反应 + fd.Points 落账
-                Multiplayer.HostRequestHandlers.ProcessMainThreadActions(); // 房客侧入队路径（含 transport 主线程化发送）
-            }
-            catch (Exception ex)
-            {
-                Monitor.Log($"[ThinClient] UpdateTicked failed: {ex}", LogLevel.Error);
-            }
+            Pump("renderer", () => _remoteRenderer?.Update(tickCounter++));
+            Pump("dialogue-replies", DialogueBoxInputPatch.ProcessPendingReplies);
+            Pump("dialogue-stale-wait", DialogueBoxInputPatch.ResetStaleWait);
+            Pump("gift-actions", NPCGiftPatch.ProcessMainThreadActions);
+            Pump("host-request-mainthread", Multiplayer.HostRequestHandlers.ProcessMainThreadActions);
         };
 
         Monitor.Log("ValleyAgent initialized successfully (ThinClient mode)", LogLevel.Info);

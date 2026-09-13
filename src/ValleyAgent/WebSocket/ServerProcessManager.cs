@@ -22,11 +22,17 @@ public class ServerProcessManager : IDisposable
     private readonly IMonitor _monitor;
     private readonly object _processLock = new();
     private readonly SemaphoreSlim _startLock = new(1, 1);
-    private bool _disposed;
+    // volatile：Dispose 先置位、启动入口守卫读——跨线程可见性（死锁修复 2026-09-12）
+    private volatile bool _disposed;
     private Process? _process;
     private bool _startedByUs;
     private CancellationTokenSource? _watchCts;
     private Task? _watchTask;
+
+    // 看门狗代号（死锁修复 2026-09-12）：StopWatchdog 不再同步等待旧循环退出，
+    // 旧循环可能还卡在 _startLock.WaitAsync()（不可取消）里——它醒来后若继续跑重启分支，
+    // 会与新一代看门狗各起一个服务器进程。代号让旧循环在每次跨 await 后自证身份，过期即退出。
+    private int _watchdogGeneration;
 
     public ServerProcessManager(IMonitor monitor, IModHelper helper, ModConfig config)
     {
@@ -147,6 +153,16 @@ public class ServerProcessManager : IDisposable
     ///     EnsureRunningAsync 可能并发调用 StartServerAsync，用信号量互斥，
     ///     防止双进程启动（cmd 窗口闪断 + 端口竞争）。
     /// </summary>
+    /// <remarks>
+    ///     死锁修复（2026-09-12）：互斥区**只覆盖"杀端口 + 起进程 + 武装看门狗"**，
+    ///     就绪探测 <see cref="WaitForServerReadyAsync"/> 移到锁外。
+    ///     原实现持锁跨越整个启动流程：KillExistingServerOnPort 最长 ~9s
+    ///     （netstat WaitForExit(5000) + taskkill WaitForExit(3000) + Thread.Sleep(1000)）
+    ///     + WaitForServerReadyAsync 最长 StartupTimeoutSeconds（默认 30s，每次探测阻塞 ≤2s）
+    ///     ⇒ <c>_startLock</c> 可被独占近 40s。而 <c>_startLock.WaitAsync()</c> 不接受
+    ///     CancellationToken，等待者无法被取消——看门狗重启分支一旦卡在这里，
+    ///     主线程侧 <see cref="StopServer"/> 就构成环形等待（详见 <see cref="StopWatchdog"/>）。
+    /// </remarks>
     public async Task<bool> StartServerAsync()
     {
         if (_disposed)
@@ -154,18 +170,41 @@ public class ServerProcessManager : IDisposable
             return false;
         }
 
+        bool spawned;
         await _startLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            return await StartServerCoreAsync().ConfigureAwait(false);
+            spawned = StartServerCore();
         }
         finally
         {
             _startLock.Release();
         }
+
+        if (!spawned)
+        {
+            return false;
+        }
+
+        // 就绪探测在锁外：这段最长 StartupTimeoutSeconds，且每次 IsServerRunning() 阻塞 ≤2s。
+        // 放在锁内会让并发的 StartServerAsync/StopServer 调用方（含游戏主线程）被饿死数十秒。
+        var connected = await WaitForServerReadyAsync().ConfigureAwait(false);
+        if (connected)
+        {
+            _monitor.Log("Agent Server is ready.", LogLevel.Info);
+            return true;
+        }
+
+        _monitor.Log($"Agent Server did not become ready within {StartupTimeoutSeconds}s.", LogLevel.Warn);
+        return false;
     }
 
-    private async Task<bool> StartServerCoreAsync()
+    /// <summary>
+    ///     启动流程的互斥段：解析路径/写 runtime config/杀残留端口/起进程/武装看门狗。
+    ///     返回 true 表示进程已起来（就绪与否由调用方在锁外探测）。
+    ///     同步方法：本段全程无 await（进程启动是同步 API），保持互斥区内不产生续体切换。
+    /// </summary>
+    private bool StartServerCore()
     {
         if (_disposed)
         {
@@ -394,15 +433,8 @@ public class ServerProcessManager : IDisposable
             _monitor.Log($"Agent Server started (PID={pid}, port={ServerPort})", LogLevel.Info);
             StartWatchdog();
 
-            var connected = await WaitForServerReadyAsync().ConfigureAwait(false);
-            if (connected)
-            {
-                _monitor.Log("Agent Server is ready.", LogLevel.Info);
-                return true;
-            }
-
-            _monitor.Log($"Agent Server did not become ready within {StartupTimeoutSeconds}s.", LogLevel.Warn);
-            return false;
+            // 就绪探测已上移到 StartServerAsync 的锁外段（见该方法注释：持锁探测会饿死并发调用方）。
+            return true;
         }
         catch (Win32Exception ex)
         {
@@ -417,9 +449,20 @@ public class ServerProcessManager : IDisposable
         }
     }
 
-    public void StopServer()
+    public void StopServer() => StopServerCore(stopWatchdog: true);
+
+    /// <summary>
+    ///     停服务器。<paramref name="stopWatchdog"/> = false 供看门狗自身的重启分支调用：
+    ///     循环里调 <see cref="StopServer"/> 会走到 <see cref="StopWatchdog"/>，而后者原本
+    ///     同步等待的正是当前正在执行的这个任务——自己等自己，必然烧满超时（死锁修复 2026-09-12）。
+    /// </summary>
+    private void StopServerCore(bool stopWatchdog)
     {
-        StopWatchdog();
+        if (stopWatchdog)
+        {
+            StopWatchdog();
+        }
+
         ModErrorLog.LogServerEvent("server stopped");
 
         lock (_processLock)
@@ -484,33 +527,74 @@ public class ServerProcessManager : IDisposable
     {
         StopWatchdog();
         _watchCts = new CancellationTokenSource();
-        _watchTask = WatchdogLoopAsync(_watchCts.Token);
+        var generation = Interlocked.Increment(ref _watchdogGeneration);
+        _watchTask = WatchdogLoopAsync(_watchCts.Token, generation);
     }
 
+    /// <summary>
+    ///     停止进程看门狗——**非阻塞**（死锁修复 2026-09-12）。
+    ///     原实现 <c>_watchTask.Wait(TimeSpan.FromSeconds(5))</c> 有三条独立的死锁路径：
+    ///     (a) 自等待：看门狗重启分支 <c>StopServer()</c> → 本方法 → 在**自己**身上 Wait，
+    ///         任务永远不可能在自己阻塞期间完成 ⇒ 每次崩溃重启必烧满 5s；
+    ///     (b) 主线程冻结：房客 SaveLoaded 判定 ThinClient/Inert 时在**游戏主线程**调
+    ///         <c>ModEntry.StopEarlyServer()</c> → <c>StopServer()</c> → 本方法（游戏退出 Dispose 同理）
+    ///         ⇒ 主线程最长阻塞 5s，Windows 消息泵 5s 饥饿即判定"未响应"，且无异常无日志；
+    ///     (c) 环形等待：看门狗卡在 <c>await _startLock.WaitAsync()</c>（不接受 CancellationToken，
+    ///         取消不掉）时，(b) 的主线程与持锁线程的 <c>StartWatchdog()</c>→本方法 同时等这个任务
+    ///         ⇒ main → watchTask → _startLock → starter → watchTask 成环。
+    ///     现在只 Cancel + 摘引用：循环对取消是自限的（Task.Delay 被取消即 break），
+    ///     退出后由观察续体释放 CTS，谁都不需要同步等待谁。
+    /// </summary>
     private void StopWatchdog()
     {
-        _watchCts?.Cancel();
-
-        if (_watchTask != null)
-        {
-            try
-            {
-                _ = _watchTask.Wait(TimeSpan.FromSeconds(5));
-            }
-            catch (AggregateException)
-            {
-            }
-        }
-
-        _watchCts?.Dispose();
+        // 先摘引用再取消：并发的 StartWatchdog/StopWatchdog 不会重复处理同一个任务。
+        var cts = _watchCts;
+        var task = _watchTask;
         _watchCts = null;
         _watchTask = null;
+
+        if (cts == null)
+        {
+            return;
+        }
+
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 已被上一轮释放：无循环可停。
+            return;
+        }
+
+        if (task == null)
+        {
+            cts.Dispose();
+            return;
+        }
+
+        // 观察续体：吞掉循环退出时的取消异常（否则 unobserved task exception），并在退出后释放 CTS。
+        // 不 Wait/不 Join——调用方（可能是游戏主线程）绝不为后台循环的收尾买单。
+        _ = task.ContinueWith(
+            static (t, state) =>
+            {
+                _ = t.Exception; // 标记已观察
+                ((CancellationTokenSource)state!).Dispose();
+            },
+            cts,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
-    private async Task WatchdogLoopAsync(CancellationToken ct)
+    private async Task WatchdogLoopAsync(CancellationToken ct, int generation)
     {
         var restartAttempts = 0;
         DateTime? lastCrashTime = null;
+
+        // 代号过期 = 已被新一代看门狗接管（StopWatchdog 不再同步等待，旧循环可能刚醒来）。
+        bool IsStale() => generation != Volatile.Read(ref _watchdogGeneration);
 
         while (!ct.IsCancellationRequested)
         {
@@ -522,8 +606,15 @@ public class ServerProcessManager : IDisposable
             {
                 break;
             }
+            catch (ObjectDisposedException)
+            {
+                // 纵深防御：修复前 CTS 会被 StopWatchdog 就地 Dispose，循环下一轮 Task.Delay 注册令牌时
+                // 抛 ObjectDisposedException，而循环没有兜底 catch → 看门狗任务直接 fault 并**永久死亡**
+                // （服务器崩溃后再也没人重启）。CTS 生命周期现在挂在退出续体上，理论上到不了这里。
+                break;
+            }
 
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested || IsStale())
             {
                 break;
             }
@@ -579,8 +670,12 @@ public class ServerProcessManager : IDisposable
                 {
                     break;
                 }
+                catch (ObjectDisposedException)
+                {
+                    break; // 同上：不让 CTS 生命周期问题把看门狗打成永久 fault。
+                }
 
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || IsStale())
                 {
                     break;
                 }
@@ -590,11 +685,22 @@ public class ServerProcessManager : IDisposable
                     break;
                 }
 
-                StopServer();
+                // 死锁修复（2026-09-12）：这里**不能**调 StopServer()——它会走 StopWatchdog()，
+                // 而 StopWatchdog 原本同步等待的正是当前这个循环任务（自己等自己）。
+                // 循环自己收尾进程即可，看门狗由 StartServerAsync → StartWatchdog 重新武装。
+                StopServerCore(stopWatchdog: false);
                 var restarted = await StartServerAsync().ConfigureAwait(false);
                 if (restarted)
                 {
                     _monitor.Log("Agent Server restarted successfully.", LogLevel.Info);
+                }
+
+                // StartServerAsync 成功时会武装一个**新的**看门狗循环；本循环的职责已交接，
+                // 继续跑会造成双循环（双份重启决策）。ct 已被 StartWatchdog→StopWatchdog 取消，
+                // while 条件下一轮即退出；这里显式 break 让语义不依赖取消时序。
+                if (restarted)
+                {
+                    break;
                 }
             }
             else
@@ -730,8 +836,21 @@ public class ServerProcessManager : IDisposable
 
         if (disposing)
         {
+            // 先置位再停：StartServerAsync/EnsureRunningAsync 的入口守卫读到 _disposed 即返回，
+            // 收窄"正在 Dispose 却仍有线程 await _startLock.WaitAsync()"的窗口
+            //（对已释放信号量 WaitAsync 会抛 ObjectDisposedException）。
+            _disposed = true;
             StopServer();
-            _startLock.Dispose();
+
+            try
+            {
+                _startLock.Dispose();
+            }
+            catch (Exception ex)
+            {
+                // 仍有线程在 WaitAsync 上排队等这把信号量时释放它会抛；Dispose 绝不能把游戏搞崩。
+                _monitor.Log($"[ServerProcessManager] _startLock dispose skipped: {ex.Message}", LogLevel.Debug);
+            }
         }
 
         _disposed = true;

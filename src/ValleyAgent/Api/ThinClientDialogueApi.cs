@@ -50,11 +50,35 @@ public sealed class ThinClientDialogueApi
         _lastResponses.TryRemove(npcName, out _);
         _lastSources.TryRemove(npcName, out _);
 
+        // 死锁/冻结修复（2026-09-12）：快照采集必须在**调用方线程（主线程）**完成。
+        // WorldSnapshotBuilder.Build 裸读 Game1.getCharacterFromName（NetList 遍历）、
+        // location.characters / location.Objects.Values / location.warps、
+        // Game1.player.Items / friendshipData / Money——这些集合与 NetField 都不是线程安全的。
+        // 原来整段落在 Task.Run 的 ThreadPool 线程上，与主线程每 tick 的读写并发：
+        // Dictionary/NetList 扩容竞争会把桶链写成环，主线程随后的 TryGetValue/遍历
+        // 就变成**无异常、无日志的死循环**（= 2026-09-10 结案文档"候选 2"的机理，
+        // 而这条路径在房客端每次对话必走，是热路径而非冷路径）。
+        // 与 DialogueBoxInputPatch.SubmitInput 的"缺口③b"纪律对齐：主线程采快照，后台只等网络。
+        WorldSnapshot worldSnapshot;
+        try
+        {
+            worldSnapshot = WorldSnapshotBuilder.Build(npcName);
+        }
+        catch (Exception ex)
+        {
+            _pending.TryRemove(npcName, out _);
+            _monitor?.Log($"[ThinClientDialogueApi] {npcName}: snapshot build failed — {ex.GetType().Name}: {ex.Message}",
+                LogLevel.Error);
+            _lastResponses[npcName] = new DialogueResponse(
+                "（场景数据采集失败）", new List<ToolAction>(), "Neutral", string.Empty, string.Empty);
+            _lastSources[npcName] = DialogueResponseSource.Error;
+            return false;
+        }
+
         _ = Task.Run(async () =>
         {
             try
             {
-                var worldSnapshot = WorldSnapshotBuilder.Build(npcName);
                 var response = await _transport.SendAsync(npcName, playerInput, worldSnapshot).ConfigureAwait(false);
 
                 _lastResponses[npcName] = response;
