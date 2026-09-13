@@ -16,6 +16,9 @@ export interface CircuitBreakerConfig {
   onSuccess?: () => void;
   onOpen?: () => void;
   onClose?: () => void;
+  // 时钟注入（默认 Date.now）。测试必须注入假时钟：真实 sleep + Date.now 会被
+  // 系统对时回拨打乱 elapsed 计算，实测产生偶发假红。
+  now?: () => number;
 }
 
 export class CircuitBreaker {
@@ -26,6 +29,7 @@ export class CircuitBreaker {
   private readonly failureThreshold: number;
   private readonly openDurationMs: number;
   private readonly halfOpenMaxCalls: number;
+  private readonly now: () => number;
   private readonly onSuccess: (() => void) | undefined;
   private readonly onOpen: (() => void) | undefined;
   private readonly onClose: (() => void) | undefined;
@@ -34,6 +38,7 @@ export class CircuitBreaker {
     this.failureThreshold = config.failureThreshold ?? config.threshold ?? 5;
     this.openDurationMs = config.openDurationMs ?? config.recoveryTime ?? 30_000;
     this.halfOpenMaxCalls = config.halfOpenMaxCalls ?? 1;
+    this.now = config.now ?? Date.now;
     this.onSuccess = config.onSuccess;
     this.onOpen = config.onOpen;
     this.onClose = config.onClose;
@@ -74,7 +79,7 @@ export class CircuitBreaker {
 
   recordFailure(): void {
     this.failureCount++;
-    this.lastFailureTime = Date.now();
+    this.lastFailureTime = this.now();
 
     if (this.state === CircuitState.HALF_OPEN) {
       this.state = CircuitState.OPEN;
@@ -101,12 +106,12 @@ export class CircuitBreaker {
 
   forceOpen(): void {
     this.state = CircuitState.OPEN;
-    this.lastFailureTime = Date.now();
+    this.lastFailureTime = this.now();
   }
 
   private checkRecovery(): void {
     if (this.state === CircuitState.OPEN) {
-      const elapsed = Date.now() - this.lastFailureTime;
+      const elapsed = this.now() - this.lastFailureTime;
       if (elapsed >= this.openDurationMs) {
         this.state = CircuitState.HALF_OPEN;
         this.halfOpenCalls = 0;

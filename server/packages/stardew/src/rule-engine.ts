@@ -3,6 +3,9 @@ import type { DialogueRequest, DialogueResponse, ToolAction } from "./types";
 import { DEFAULT_EMOTION } from "./types";
 
 export class RuleEngine {
+  // 显式空构造：隐式构造函数会被 bun 的覆盖率计数判为未覆盖函数（funcs 50% 假红）
+  constructor() {}
+
   buildFallbackResponse(req: DialogueRequest, err: unknown): DialogueResponse {
     let speech: string;
     let emotion: string;
