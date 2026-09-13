@@ -61,6 +61,10 @@ $b64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($config))
 # ---- 4. 输出 ----
 Write-Host ""
 Write-Host "PASS: 已从 $config 生成 base64（长度 $($b64.Length)）" -ForegroundColor Green
+# 落盘一份供 gh secret set --body-file 使用（base64 是一整行，配完建议删除该文件）
+$b64File = Join-Path ([System.IO.Path]::GetTempPath()) "STEAM_CONFIG_VDF_BASE64.txt"
+[System.IO.File]::WriteAllText($b64File, $b64)
+Write-Host "已同时保存到 $b64File（gh secret set --body-file 可直接引用）" -ForegroundColor DarkGray
 try {
     Set-Clipboard -Value $b64
     Write-Host "已复制到剪贴板。去 GitHub 仓库 Settings → Secrets and variables → Actions → New repository secret：" -ForegroundColor Green
