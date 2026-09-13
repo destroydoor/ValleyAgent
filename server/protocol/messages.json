@@ -230,6 +230,12 @@
           "type": "string",
           "required": false,
           "description": "2026-08-16 联机：发起对话的玩家 ID 原样 echo，C# 据此记录 LastDialoguePlayerId（FOLLOW 目标解析）。可选。"
+        },
+        {
+          "name": "fallbackReason",
+          "type": "string",
+          "required": false,
+          "description": "2026-09-13 R2：fallback=true 时的机器可读降级原因：busy（per-NPC 会话锁超时）/ llm_error（LLM 生成失败）/ billing（LLM 计费失败）/ unavailable（LLM 不可用）。可选，缺省=旧客户端兼容。"
         }
       ]
     },

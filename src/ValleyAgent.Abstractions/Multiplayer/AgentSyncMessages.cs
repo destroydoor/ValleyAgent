@@ -129,6 +129,12 @@ namespace ValleyAgent.Multiplayer
         public bool Fallback { get; set; }
 
         /// <summary>
+        ///     2026-09-13 R2：降级原因（busy/llm_error/billing/unavailable，camelCase 对齐 TS wire 字段）。
+        ///     null = 旧 TS 客户端/旧主机未携带，farmhand 端按现有 fallback 行为渲染。
+        /// </summary>
+        public string? FallbackReason { get; set; }
+
+        /// <summary>
         ///     对应 DialogueRequestMessage.RequestId 的回填。房客精确匹配 pending；
         ///     null/空（旧主机）时房客退回 FIFO。带值但 pending 已清理（超时）→ 迟到回包直接丢弃，
         ///     绝不回退 FIFO——否则会窃取重试请求的回包。

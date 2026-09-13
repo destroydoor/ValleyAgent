@@ -336,7 +336,8 @@ public static class DialogueBoxInputPatch
                     npcName,
                     response.Speech ?? "...",
                     response.Actions ?? new List<ToolAction>(),
-                    response.Fallback == true));
+                    response.Fallback == true,
+                    response.FallbackReason));
                 // 深度告警：主线程泵停摆时回复堆积的早期信号（2026-09-11 生产化仪器）
                 QueueTelemetry.WarnIfDeep("dialogue-replies", _pendingReplies.Count, _monitor);
             }
@@ -377,18 +378,16 @@ public static class DialogueBoxInputPatch
                 continue;
             }
 
-            // 2026-08-16 决策 #3：规则引擎降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
-            // 代词按 NPC 性别区分（他/她/它），与 NPC 第一人称口吻区分开——这是系统提示不是 NPC 发言。
+            // 2026-08-16 决策 #3：降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
+            // 2026-09-13 R3：灰字文案单一来源在 TS（busy=正在和别人交流，LLM 失败=走神/说不出来等），
+            // C# 只负责灰字样式不维护话术；fallbackReason 仅用于日志留痕与房客广播透传。
+            // 保持 continue：降级消息仍不弹对话框。
             if (reply.Fallback)
             {
-                var pronoun = npc.Gender switch
-                {
-                    StardewValley.Gender.Male => "他",
-                    StardewValley.Gender.Female => "她",
-                    _ => "它"
-                };
-                Game1.chatBox?.addMessage($"{pronoun}正在和别人交流", Color.Gray);
-                _monitor?.Log($"[Chat] {reply.NpcName}: fallback system notice (busy)", LogLevel.Debug);
+                Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
+                _monitor?.Log(
+                    $"[Chat] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
+                    LogLevel.Debug);
                 continue;
             }
 
@@ -647,12 +646,14 @@ public static class DialogueBoxInputPatch
     /// <summary>待主线程渲染的 LLM 回复。</summary>
     private sealed class PendingReply
     {
-        public PendingReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool fallback = false)
+        public PendingReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool fallback = false,
+            string? fallbackReason = null)
         {
             NpcName = npcName;
             Speech = speech;
             Actions = actions;
             Fallback = fallback;
+            FallbackReason = fallbackReason;
         }
 
         public string NpcName { get; }
@@ -660,6 +661,8 @@ public static class DialogueBoxInputPatch
         public IReadOnlyList<ToolAction> Actions { get; }
         /// <summary>规则引擎降级响应（BUSY 等）：灰色系统提示渲染，不弹对话框。</summary>
         public bool Fallback { get; }
+        /// <summary>TS 降级原因（busy/llm_error/billing/unavailable），仅日志留痕。</summary>
+        public string? FallbackReason { get; }
     }
 
     /// <summary>

@@ -160,6 +160,39 @@ public class ProtocolWireContractTests
         Assert.Null(msg.PlayerId);
     }
 
+    [Fact]
+    public void DialogueResponse_FallbackReason_MapsFromCamelCaseWire()
+    {
+        // 2026-09-13 R2：fallback=true 时 TS 附带机器可读降级原因（busy/llm_error/billing/unavailable），
+        // C# 灰字诊断留痕据此区分"忙"与 LLM 故障（此前 C# 硬编码"正在和别人交流"误报 LLM 故障）。
+        var json = """
+            { "type": "dialogue_response", "requestId": "req-4", "npcName": "Abigail",
+              "speech": "（Abigail 正在和别人交流）", "emotion": "Neutral", "actions": [],
+              "fallback": true, "fallbackReason": "busy" }
+            """;
+
+        var msg = MessageProtocol.Deserialize<DialogueResponse>(json);
+
+        Assert.True(msg.Fallback);
+        Assert.Equal("busy", msg.FallbackReason);
+    }
+
+    [Fact]
+    public void DialogueResponse_MissingFallbackReason_OldClientDefaultsToNullWithoutThrowing()
+    {
+        // 旧 TS 客户端不携带 fallbackReason（R2 缺省语义）→ 反序列化不炸、字段为 null，
+        // C# 回退现有 fallback 行为，speech/fallback 标志不受影响。
+        var json = """
+            { "type": "dialogue_response", "requestId": "req-5", "npcName": "Abigail",
+              "speech": "你好", "emotion": "Neutral", "actions": [], "fallback": true }
+            """;
+
+        var msg = MessageProtocol.Deserialize<DialogueResponse>(json);
+
+        Assert.True(msg.Fallback);
+        Assert.Null(msg.FallbackReason);
+    }
+
     // ── 3. execute_adjust（TS→C# 原子批指令）──────────────────────────
 
     [Fact]

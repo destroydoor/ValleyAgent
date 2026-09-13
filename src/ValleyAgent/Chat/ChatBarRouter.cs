@@ -342,6 +342,20 @@ public static class ChatBarRouter
                 continue; // LLM 行使沉默权：路由命中 ≠ 必须回
             }
 
+            // 2026-09-13 R5（对话连续性修复）：TS 降级回包（BUSY / LLM 故障）是系统状态提示，不是 NPC 台词
+            // ——不走 ActiveSpeechRouter 的气泡/打字机渲染（否则 NPC 会用自己口吻"说出"占位提示），
+            // 改走聊天栏灰字，文案单一来源 = 回包自带的 TS speech（同 R3）。
+            // 主机与房客聊天栏回包都在本方法汇合渲染（房客经 transport 回包同样进 _pendingReplies），
+            // 一处改动双端生效，无需区分 IsFarmhand。
+            if (reply.Fallback)
+            {
+                Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
+                _monitor?.Log(
+                    $"[ChatBar] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
+                    LogLevel.Debug);
+                continue;
+            }
+
             ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
             _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
 
@@ -493,7 +507,9 @@ public static class ChatBarRouter
                 npcName,
                 response.Speech ?? string.Empty,
                 response.Actions ?? new List<ToolAction>(),
-                false));
+                false,
+                response.Fallback == true,
+                response.FallbackReason));
             // 深度告警：主线程泵停摆时聊天回复堆积的早期信号（2026-09-11 生产化仪器）
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }
@@ -524,17 +540,26 @@ public static class ChatBarRouter
     /// <summary>待主线程渲染的聊天栏回复。</summary>
     private sealed class PendingChatReply
     {
-        public PendingChatReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool isFailure)
+        public PendingChatReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool isFailure,
+            bool fallback = false, string? fallbackReason = null)
         {
             NpcName = npcName;
             Speech = speech;
             Actions = actions;
             IsFailure = isFailure;
+            Fallback = fallback;
+            FallbackReason = fallbackReason;
         }
 
         public string NpcName { get; }
         public string Speech { get; }
         public IReadOnlyList<ToolAction> Actions { get; }
         public bool IsFailure { get; }
+
+        /// <summary>2026-09-13 R5：TS 降级回包（BUSY/LLM 故障）→ 聊天栏灰字而非台词渲染。</summary>
+        public bool Fallback { get; }
+
+        /// <summary>降级原因（busy/llm_error/billing/unavailable），仅用于诊断日志留痕。</summary>
+        public string? FallbackReason { get; }
     }
 }

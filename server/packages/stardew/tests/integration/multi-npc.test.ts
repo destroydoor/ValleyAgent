@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { ProtocolAdapter } from "../../src/protocol-adapter";
+import { ProtocolAdapter, type ProtocolAdapterOptions } from "../../src/protocol-adapter";
 import { NpcPromptLoader } from "../../src/npc-prompt-loader";
 import { PromptBuilder } from "../../src/prompt-builder";
 import { VercelAIProvider } from "@valley/core";
@@ -12,7 +12,7 @@ import { resolve } from "path";
 
 const DATA_PATH = resolve(import.meta.dir, "../../data/npc_prompts.json");
 
-function makeAdapter(): { adapter: ProtocolAdapter; dir: string; registry: StardewAgentRegistry } {
+function makeAdapter(options?: ProtocolAdapterOptions): { adapter: ProtocolAdapter; dir: string; registry: StardewAgentRegistry } {
   const dir = mkdtempSync(join(tmpdir(), "valley-multi-npc-"));
   const loader = new NpcPromptLoader(DATA_PATH);
   const builder = new PromptBuilder(loader);
@@ -43,7 +43,7 @@ function makeAdapter(): { adapter: ProtocolAdapter; dir: string; registry: Stard
     llmProvider: provider,
     agentsDir: dir,
   });
-  const adapter = new ProtocolAdapter(registry);
+  const adapter = new ProtocolAdapter(registry, options);
   return { adapter, dir, registry };
 }
 
@@ -114,7 +114,8 @@ test("each NPC has independent memory file (no cross-contamination)", async () =
 });
 
 test("same NPC concurrent requests are serialized (lock rejects second)", async () => {
-  const { adapter, dir, registry } = makeAdapter();
+  // R1：adapter 默认等锁 15s，此测试要"立即 BUSY"——显式传 0 保持断言不变且不拖慢测试。
+  const { adapter, dir, registry } = makeAdapter({ dialogueLockTimeoutMs: 0 });
   try {
     await registry.acquireLock("Abigail");
 

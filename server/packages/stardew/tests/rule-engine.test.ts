@@ -76,3 +76,22 @@ test("buildFallbackResponse includes emote action", () => {
   expect(resp.actions.length).toBeGreaterThan(0);
   expect(resp.actions[0]!.tool).toBe("emote");
 });
+
+// R2（2026-09-13 design §6 S1/S2）：fallbackReason 机器可读降级原因——
+// 按异常类型分档，wire 层透传 C#/房客端用于灰字诊断。
+
+test("buildFallbackResponse maps error types to machine-readable fallbackReason", () => {
+  const engine = new RuleEngine();
+
+  const billing = engine.buildFallbackResponse(req, new LLMBillingError("insufficient quota"));
+  expect(billing.fallback).toBe(true);
+  expect(billing.fallbackReason).toBe("billing");
+
+  const unavailable = engine.buildFallbackResponse(req, new LLMUnavailableError("timeout"));
+  expect(unavailable.fallback).toBe(true);
+  expect(unavailable.fallbackReason).toBe("unavailable");
+
+  const generic = engine.buildFallbackResponse(req, new Error("something went wrong"));
+  expect(generic.fallback).toBe(true);
+  expect(generic.fallbackReason).toBe("llm_error");
+});

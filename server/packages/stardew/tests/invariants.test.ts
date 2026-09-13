@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { ProtocolAdapter } from "../src/protocol-adapter";
+import { ProtocolAdapter, type ProtocolAdapterOptions } from "../src/protocol-adapter";
 import { NpcPromptLoader } from "../src/npc-prompt-loader";
 import { PromptBuilder } from "../src/prompt-builder";
 import { VercelAIProvider, type ProviderToolCallResult } from "@valley/core";
@@ -38,7 +38,7 @@ interface FullStack {
   getLastSystemPrompt: () => string;
 }
 
-function makeFullStack(): FullStack {
+function makeFullStack(options?: ProtocolAdapterOptions): FullStack {
   const dir = mkdtempSync(join(tmpdir(), "valley-invariants-"));
   const loader = new NpcPromptLoader(DATA_PATH);
   const builder = new PromptBuilder(loader);
@@ -66,7 +66,7 @@ function makeFullStack(): FullStack {
     llmProvider: provider,
     agentsDir: dir,
   });
-  const adapter = new ProtocolAdapter(registry);
+  const adapter = new ProtocolAdapter(registry, options);
   return {
     adapter, registry, dir,
     setLlmBehavior: (fn) => { behavior = fn; },
@@ -270,7 +270,8 @@ test("I2: fallback dialogue_response does NOT carry friendshipDelta (fallback �
 });
 
 test("I2: busy dialogue_response does NOT carry friendshipDelta", async () => {
-  const { adapter, registry, dir } = makeFullStack();
+  // R1：adapter 默认等锁 15s，此测试要"立即 BUSY"——显式传 0 保持断言不变且不拖慢测试。
+  const { adapter, registry, dir } = makeFullStack({ dialogueLockTimeoutMs: 0 });
   try {
     // 占用 NPC 锁
     const locked = await registry.acquireLock("Abigail");

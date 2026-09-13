@@ -1,5 +1,5 @@
 import { test, expect, spyOn } from "bun:test";
-import { ProtocolAdapter } from "../src/protocol-adapter";
+import { ProtocolAdapter, type ProtocolAdapterOptions } from "../src/protocol-adapter";
 import { NpcPromptLoader } from "../src/npc-prompt-loader";
 import { PromptBuilder } from "../src/prompt-builder";
 import { VercelAIProvider } from "@valley/core";
@@ -12,7 +12,7 @@ import type { DirectorCommandMessage } from "../src/types";
 
 const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
 
-function makeAdapter(): { adapter: ProtocolAdapter; dir: string } {
+function makeAdapter(options?: ProtocolAdapterOptions): { adapter: ProtocolAdapter; dir: string } {
   const dir = mkdtempSync(join(tmpdir(), "valley-adapter-test-"));
   const loader = new NpcPromptLoader(DATA_PATH);
   const builder = new PromptBuilder(loader);
@@ -31,7 +31,7 @@ function makeAdapter(): { adapter: ProtocolAdapter; dir: string } {
     llmProvider: provider,
     agentsDir: dir,
   });
-  const adapter = new ProtocolAdapter(registry);
+  const adapter = new ProtocolAdapter(registry, options);
   return { adapter, dir };
 }
 
@@ -152,7 +152,8 @@ test("handleDialogue returns fallback on LLM failure", async () => {
 });
 
 test("handleDialogue rejects when NPC is locked (busy)", async () => {
-  const { adapter, dir } = makeAdapter();
+  // R1：adapter 默认等锁 15s，此测试要"立即 BUSY"——显式传 0 保持断言不变且不拖慢测试。
+  const { adapter, dir } = makeAdapter({ dialogueLockTimeoutMs: 0 });
   try {
     // Pre-acquire lock
     await adapter["registry"].acquireLock("Abigail");
@@ -172,6 +173,64 @@ test("handleDialogue rejects when NPC is locked (busy)", async () => {
     expect(resp.fallback).toBe(true);
     expect(resp.speech).toContain("正在和别人交流");
   } finally {
+    await adapter.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// R1（2026-09-13 design §3）：dialogueLockTimeoutMs 限时等待——等锁期间释放则正常对话，
+// 等满超时才回 BUSY fallback。
+
+test("handleDialogue waits for lock release and proceeds when dialogueLockTimeoutMs allows", async () => {
+  const { adapter, dir } = makeAdapter({ dialogueLockTimeoutMs: 800 });
+  try {
+    await adapter["registry"].acquireLock("Abigail");
+    // 持锁方 ~100ms 后释放；第二请求应等到锁并正常对话（非 fallback）。
+    setTimeout(() => adapter["registry"].releaseLock("Abigail"), 100);
+    const resp = await adapter.handleDialogue({
+      type: "dialogue",
+      requestId: "req-lock-wait",
+      npcName: "Abigail",
+      playerInput: "你好",
+      worldSnapshot: {
+        season: "summer", day: 28, time: "14:30", weather: "sunny",
+        location: "Town", npcTile: { x: 32, y: 18 },
+        nearbyObjects: "2 villagers", friendship: 250, npcState: "IDLE",
+        inventory: [], farmerName: "新来的农夫",
+      },
+    });
+    expect(resp.type).toBe("dialogue_response");
+    expect(resp.fallback).toBeUndefined();
+    expect(resp.speech).toBe("你好啊。");
+  } finally {
+    await adapter.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("handleDialogue returns busy fallback when lock wait times out", async () => {
+  const { adapter, dir } = makeAdapter({ dialogueLockTimeoutMs: 200 });
+  try {
+    await adapter["registry"].acquireLock("Abigail");
+    // 无人释放 → 等满 200ms 超时 → BUSY fallback（fallbackReason="busy"）。
+    const resp = await adapter.handleDialogue({
+      type: "dialogue",
+      requestId: "req-lock-timeout",
+      npcName: "Abigail",
+      playerInput: "你好",
+      worldSnapshot: {
+        season: "summer", day: 28, time: "14:30", weather: "sunny",
+        location: "Town", npcTile: { x: 32, y: 18 },
+        nearbyObjects: "2 villagers", friendship: 250, npcState: "IDLE",
+        inventory: [], farmerName: "新来的农夫",
+      },
+    });
+    expect(resp.type).toBe("dialogue_response");
+    expect(resp.fallback).toBe(true);
+    expect(resp.fallbackReason).toBe("busy");
+    expect(resp.speech).toContain("正在和别人交流");
+  } finally {
+    adapter["registry"].releaseLock("Abigail");
     await adapter.flushPendingSaves();
     rmSync(dir, { recursive: true, force: true });
   }

@@ -476,7 +476,10 @@ public static class GMCMIntegration
         gmcm.AddNumberOption(
             manifest,
             name: () => T("对话冷却（秒）", "Dialogue Cooldown (sec)", config),
-            tooltip: () => T("同一 NPC 相邻对话最小间隔 (1-60)", "Min gap between dialogue (1-60 s)", config),
+            tooltip: () => T(
+                "同一 NPC 相邻对话最小间隔 (1-60)；仅作用于外部 API/测试通道，玩家聊天由服务器会话锁自动串行",
+                "Min gap between dialogue (1-60 s). Only applies to the external API/test channel; player chat is serialized by the server session lock.",
+                config),
             getValue: () => config.DialogueCooldownSeconds,
             setValue: value => config.DialogueCooldownSeconds = Math.Clamp(value, 1, 60),
             min: 1,

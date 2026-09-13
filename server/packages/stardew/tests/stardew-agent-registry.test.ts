@@ -103,6 +103,56 @@ test("different NPCs can acquire lock simultaneously", async () => {
   }
 });
 
+// R1（2026-09-13 design §3）：acquireLock 限时等待——BUSY 前等锁而非秒拒。
+
+test("acquireLock with timeout waits for release and acquires", async () => {
+  const { registry, dir } = makeRegistry();
+  try {
+    const first = await registry.acquireLock("Abigail");
+    expect(first).toBe(true);
+
+    // 持锁方 ~150ms 后释放；等待方（上限 600ms）应占到锁而非失败。
+    setTimeout(() => registry.releaseLock("Abigail"), 150);
+    const started = Date.now();
+    const acquired = await registry.acquireLock("Abigail", 600);
+    const elapsed = Date.now() - started;
+
+    expect(acquired).toBe(true);
+    // 释放发生在 ~150ms，占到锁必晚于释放（下限放宽防 CI 抖动）；
+    // 上限证明确实等到了释放，而非等满超时。
+    expect(elapsed).toBeGreaterThanOrEqual(120);
+    expect(elapsed).toBeLessThan(600);
+    registry.releaseLock("Abigail");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("acquireLock with timeout returns false when lock never released", async () => {
+  const { registry, dir } = makeRegistry();
+  try {
+    const first = await registry.acquireLock("Abigail");
+    expect(first).toBe(true);
+
+    const started = Date.now();
+    const acquired = await registry.acquireLock("Abigail", 200);
+    const elapsed = Date.now() - started;
+
+    expect(acquired).toBe(false);
+    // 应实际等待约 200ms（下限放宽防 CI 抖动）；上限防实现退化成永久等待。
+    expect(elapsed).toBeGreaterThanOrEqual(150);
+    expect(elapsed).toBeLessThan(1500);
+
+    // 原持锁方不受影响：锁仍在，显式释放后可重新占到。
+    expect(await registry.acquireLock("Abigail")).toBe(false);
+    registry.releaseLock("Abigail");
+    expect(await registry.acquireLock("Abigail")).toBe(true);
+    registry.releaseLock("Abigail");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("hasAgent returns false for unknown NPC, true after getOrCreate", () => {
   const { registry, dir } = makeRegistry();
   try {

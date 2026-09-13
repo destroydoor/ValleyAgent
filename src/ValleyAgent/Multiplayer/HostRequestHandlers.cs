@@ -229,7 +229,9 @@ public class HostRequestHandlers
             actionsJson,
             response.Fallback == true,
             // 2026-09-09：回填房客请求 requestId，房客端精确配对（旧版房客忽略此字段，行为不变）
-            msg.RequestId);
+            msg.RequestId,
+            // 2026-09-13 R2：透传 TS 降级原因（busy/llm_error/billing/unavailable），房客端诊断留痕
+            response.FallbackReason);
         _monitor.Log($"[HostRequestHandlers] HandleDialogueRequest completed for {msg.NpcName}", LogLevel.Debug);
     }
 

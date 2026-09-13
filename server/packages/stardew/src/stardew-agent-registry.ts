@@ -6,6 +6,14 @@ import { AgentMemory } from "./agent-memory";
 import { TranscriptStore } from "./transcript-store";
 import { join } from "path";
 
+/** HH:MM:SS 时间戳，用于日志前缀（与 protocol-adapter 同款）。 */
+function timestamp(): string {
+  return new Date().toISOString().slice(11, 19);
+}
+
+/** 限时等待模式的轮询间隔 ms（2026-09-13 R1：BUSY 前等锁）。 */
+const LOCK_POLL_INTERVAL_MS = 250;
+
 /** Phase 1 E1-1 全量留痕配置。默认不启用——零构造、零保存开销。 */
 export interface TranscriptConfig {
   enabled: boolean;
@@ -119,11 +127,32 @@ export class StardewAgentRegistry {
    * Acquire dialogue lock for an NPC.
    * Returns true if acquired, false if NPC is already in dialogue.
    * Spec 5.5: 同一 NPC 同时只有一个 dialogue 请求
+   *
+   * 2026-09-13 R1（design §3）：持锁期=整个 ReAct 循环+工具执行+adjust 回执等待，
+   * 可达数十秒——BUSY 前允许限时等待（timeoutMs>0 时每 250ms 轮询，锁一释放立即占锁）。
+   * timeoutMs=0（缺省）保持历史语义"被占立即 false"，既有调用方/测试不受影响。
    */
-  async acquireLock(npcName: string): Promise<boolean> {
-    if (this.lockedNpcs.has(npcName)) return false;
-    this.lockedNpcs.add(npcName);
-    return true;
+  async acquireLock(npcName: string, timeoutMs = 0): Promise<boolean> {
+    if (!this.lockedNpcs.has(npcName)) {
+      this.lockedNpcs.add(npcName);
+      return true;
+    }
+    if (timeoutMs <= 0) return false;
+    console.log(`[${timestamp()}] [lock] ${npcName} busy, waiting up to ${timeoutMs}ms`);
+    // 单调算 deadline：先查后睡、醒来先查——锁一释放立即占锁返回；
+    // 末轮睡剩余时间，不会睡过 deadline，且 deadline 边界仍做最后一次锁检查。
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      if (!this.lockedNpcs.has(npcName)) {
+        this.lockedNpcs.add(npcName);
+        return true;
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise((r) => setTimeout(r, Math.min(LOCK_POLL_INTERVAL_MS, remaining)));
+    }
+    console.log(`[${timestamp()}] [lock] ${npcName} still busy after ${timeoutMs}ms wait, giving up`);
+    return false;
   }
 
   releaseLock(npcName: string): void {

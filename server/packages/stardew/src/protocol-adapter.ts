@@ -65,6 +65,12 @@ export interface ProtocolAdapterOptions {
    * 不注入时 morningPlan 走单玩家路径，行为等价 M3 前。
    */
   playerDirectory?: PlayerDirectory;
+  /**
+   * R1（2026-09-13 design §3）：BUSY 前对会话锁限时等待，默认 15s，250ms 轮询；
+   * 0 = 立即拒绝（保持旧行为）。15s < C# 侧 LLMTimeoutSeconds=120，等待先于
+   * LLM 超时放弃，不引入新的超时冲突。
+   */
+  dialogueLockTimeoutMs?: number;
 }
 
 /** adjust_result 回执等待超时（设计 §6：回执丢失 → 超时回滚 pending，TS 重发靠 instructionId 幂等兜底）。 */
@@ -592,9 +598,16 @@ export class ProtocolAdapter {
 
   async handleDialogue(req: DialogueRequest): Promise<DialogueResponse> {
     // Check NPC lock (spec 5.5: same NPC serial dialogue)
-    const locked = await this.registry.acquireLock(req.npcName);
+    // R1（2026-09-13 design §3）：持锁期可达数十秒（整个 ReAct 循环），BUSY 前限时等待
+    // 而非秒拒；默认 15s（< C# LLMTimeoutSeconds=120，不引入新超时冲突），0 = 立即拒绝。
+    const lockWaitStart = Date.now();
+    const locked = await this.registry.acquireLock(
+      req.npcName,
+      this.options?.dialogueLockTimeoutMs ?? 15_000,
+    );
     if (!locked) {
-      console.log(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked)`);
+      // 等了多久一并落日志——区分"秒拒"（配置为 0/锁真死等）与"等满超时"。
+      console.log(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked, waited ${Date.now() - lockWaitStart}ms)`);
       return this.buildBusyResponse(req);
     }
 
@@ -761,10 +774,12 @@ export class ProtocolAdapter {
       npcName: req.npcName,
       // 2026-08-16 决策 #3：BUSY 改灰色系统提示（C# 端按 NPC 性别渲染"他/她/它正在和别人交流"，
       // 这里只留占位文案；fallback=true 是 C# 走灰色 chatBox 路径的开关）。
+      // 2026-09-13 R2：补 fallbackReason="busy"——C#/房客端据此区分"忙"与 LLM 故障灰字，诊断不再被误导。
       speech: `（${req.npcName} 正在和别人交流）`,
       actions: [],
       emotion: DEFAULT_EMOTION,
       fallback: true,
+      fallbackReason: "busy",
     };
   }
 
