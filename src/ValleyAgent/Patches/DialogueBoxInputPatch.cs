@@ -37,9 +37,20 @@ public static class DialogueBoxInputPatch
 {
     // ESC 关闭时的最大模拟点击次数（补完打字机 + 翻完多页 + 关闭）
     private const int MaxEscCloseClicks = 8;
+
+    /// <summary>
+    ///     等待标记的陈旧上限（毫秒）。必须大于房客房对话链路的总超时预算
+    ///     （FarmhandDialogueTransport 默认 60s + 主机侧 LLM 重试余量），
+    ///     只兜"回包与超时兜底双双丢失"这种永久卡死，不干扰正常慢响应。
+    /// </summary>
+    private const long StaleWaitTimeoutMs = 90_000;
+
     private static string _activeAgentNpc = "";
     private static readonly StringBuilder _inputText = new();
     private static volatile bool _isWaitingForResponse;
+
+    /// <summary>_isWaitingForResponse 置位时刻（TickCount64，0 = 未在等待）。供 ResetStaleWait 自愈。</summary>
+    private static long _waitingSinceMs;
     private static IMonitor? _monitor;
     private static AgentService? _agentService;
     private static IAgentServerProvider? _agentServerProvider;
@@ -88,6 +99,7 @@ public static class DialogueBoxInputPatch
         _activeAgentNpc = npcName;
         _inputText.Clear();
         _isWaitingForResponse = false;
+        _waitingSinceMs = 0;
 
         // E2-2: 对话框对话开始即记录一次"与玩家交互"，供聊天栏路由第 4 层
         // "最近交互 + 距离"消费（30 秒内交互过且附近优先）。
@@ -112,6 +124,7 @@ public static class DialogueBoxInputPatch
         _activeAgentNpc = "";
         _inputText.Clear();
         _isWaitingForResponse = false;
+        _waitingSinceMs = 0;
         if (_savedChatButtons != null)
         {
             Game1.options.chatButton = _savedChatButtons;
@@ -299,6 +312,7 @@ public static class DialogueBoxInputPatch
         var npcName = _activeAgentNpc;
         NPCDialoguePatch.IncrementConversationCount(npcName);
         _isWaitingForResponse = true;
+        _waitingSinceMs = Environment.TickCount64;
         _inputText.Clear();
         _monitor?.Log($"[Chat] Player input to {npcName}: {text}", LogLevel.Debug);
 
@@ -358,51 +372,115 @@ public static class DialogueBoxInputPatch
     ///     主线程处理待渲染的 LLM 回复（每 tick 由 EventHandlerInitializer.OnUpdateTicked 调用）。
     ///     MonoGame/Game1 UI 操作只能在主线程执行，后台线程直接调 drawDialogue 会与渲染竞争。
     /// </summary>
+    /// <remarks>
+    ///     死锁修复（2026-09-12）：逐条兜底 + 陈旧等待自愈。
+    ///     原实现整条 while 无 try/catch，任一条回复渲染抛异常（setNewDialogue/drawDialogue/
+    ///     DispatchDialogueActions→PromoteToAgent 都可能抛）就会逃出循环，
+    ///     调用方（ThinClient 的 UpdateTicked 用一个 try 串起 4 个泵）随之跳过
+    ///     HostRequestHandlers 的发送泵 ⇒ 房客的请求再也发不出去 ⇒ 回包永远不来
+    ///     ⇒ <c>_isWaitingForResponse</c> 无人清除，输入框永久停在"等待回复"、
+    ///     Enter 与键盘输入全被前缀吞掉（只有 ESC 能救）。这是联机专属的 UI 硬死锁。
+    /// </remarks>
     public static void ProcessPendingReplies()
     {
         while (_pendingReplies.TryDequeue(out var reply))
         {
             _isWaitingForResponse = false;
+            _waitingSinceMs = 0;
 
-            // 对话已被玩家关闭（ESC/离开）→ 丢弃迟到回复
-            if (string.IsNullOrEmpty(_activeAgentNpc)
-                || !_activeAgentNpc.Equals(reply.NpcName, StringComparison.OrdinalIgnoreCase))
+            try
             {
-                continue;
+                RenderReply(reply);
             }
-
-            var npc = Game1.getCharacterFromName(reply.NpcName);
-            if (npc == null)
+            catch (Exception ex)
             {
-                continue;
+                // 单条回复失败只留痕，绝不影响队列其余条目与下游泵。
+                _monitor?.Log($"[Chat] Failed to render reply for {reply.NpcName}: {ex}", LogLevel.Error);
             }
-
-            // 2026-08-16 决策 #3：规则引擎降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
-            // 代词按 NPC 性别区分（他/她/它），与 NPC 第一人称口吻区分开——这是系统提示不是 NPC 发言。
-            if (reply.Fallback)
-            {
-                var pronoun = npc.Gender switch
-                {
-                    StardewValley.Gender.Male => "他",
-                    StardewValley.Gender.Female => "她",
-                    _ => "它"
-                };
-                Game1.chatBox?.addMessage($"{pronoun}正在和别人交流", Color.Gray);
-                _monitor?.Log($"[Chat] {reply.NpcName}: fallback system notice (busy)", LogLevel.Debug);
-                continue;
-            }
-
-            // 交给原版渲染：setNewDialogue + drawDialogue 会用原版字体、
-            // 原版打字机效果和原版排版显示回复（含换行与缩放）。
-            // 对话标记保持激活 → 玩家可继续输入下一轮（多轮对话）。
-            npc.setNewDialogue(new StardewValley.Dialogue(npc, null, reply.Speech));
-            Game1.drawDialogue(npc);
-
-            DispatchDialogueActions(npc, reply.Actions);
-
-            var preview = reply.Speech.Length > 80 ? reply.Speech.Substring(0, 80) : reply.Speech;
-            _monitor?.Log($"[Chat] LLM response for {reply.NpcName}: {preview}", LogLevel.Debug);
         }
+    }
+
+    private static void RenderReply(PendingReply reply)
+    {
+        // 对话已被玩家关闭（ESC/离开）→ 丢弃迟到回复
+        if (string.IsNullOrEmpty(_activeAgentNpc)
+            || !_activeAgentNpc.Equals(reply.NpcName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var npc = Game1.getCharacterFromName(reply.NpcName);
+        if (npc == null)
+        {
+            return;
+        }
+
+        // 2026-08-16 决策 #3：规则引擎降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
+        // 代词按 NPC 性别区分（他/她/它），与 NPC 第一人称口吻区分开——这是系统提示不是 NPC 发言。
+        if (reply.Fallback)
+        {
+            var pronoun = npc.Gender switch
+            {
+                StardewValley.Gender.Male => "他",
+                StardewValley.Gender.Female => "她",
+                _ => "它"
+            };
+            Game1.chatBox?.addMessage($"{pronoun}正在和别人交流", Color.Gray);
+            _monitor?.Log($"[Chat] {reply.NpcName}: fallback system notice (busy)", LogLevel.Debug);
+            return;
+        }
+
+        // 交给原版渲染：setNewDialogue + drawDialogue 会用原版字体、
+        // 原版打字机效果和原版排版显示回复（含换行与缩放）。
+        // 对话标记保持激活 → 玩家可继续输入下一轮（多轮对话）。
+        npc.setNewDialogue(new StardewValley.Dialogue(npc, null, reply.Speech));
+        Game1.drawDialogue(npc);
+
+        try
+        {
+            DispatchDialogueActions(npc, reply.Actions);
+        }
+        catch (Exception ex)
+        {
+            // 动作分发失败（含 PromoteToAgent 抛出的任何异常）不得回灌到渲染泵：
+            // 台词已经显示给玩家了，动作丢掉只降级为"说到没做到"，不能连带冻住输入框。
+            _monitor?.Log($"[Chat] Action dispatch failed for {reply.NpcName}: {ex}", LogLevel.Error);
+        }
+
+        var preview = reply.Speech.Length > 80 ? reply.Speech.Substring(0, 80) : reply.Speech;
+        _monitor?.Log($"[Chat] LLM response for {reply.NpcName}: {preview}", LogLevel.Debug);
+    }
+
+    /// <summary>
+    ///     陈旧等待自愈（死锁修复 2026-09-12）：等待标记置位后超过 <see cref="StaleWaitTimeoutMs"/>
+    ///     仍未收到任何回复（回包丢失 / 主线程泵被上游异常饿死 / transport 超时兜底也没入队），
+    ///     强制解除 <c>_isWaitingForResponse</c>，把"永久不能输入的对话框"降级为"这一轮没回上"。
+    ///     每 tick 由 OnUpdateTicked / ThinClient UpdateTicked 调用。
+    /// </summary>
+    public static void ResetStaleWait()
+    {
+        if (!_isWaitingForResponse)
+        {
+            return;
+        }
+
+        var since = _waitingSinceMs;
+        if (since == 0)
+        {
+            return;
+        }
+
+        var elapsed = Environment.TickCount64 - since;
+        if (elapsed < StaleWaitTimeoutMs)
+        {
+            return;
+        }
+
+        _isWaitingForResponse = false;
+        _waitingSinceMs = 0;
+        _monitor?.Log(
+            $"[Chat] {_activeAgentNpc}: waiting for response stalled {elapsed}ms (> {StaleWaitTimeoutMs}ms) — input unlocked",
+            LogLevel.Warn);
     }
 
     /// <summary>

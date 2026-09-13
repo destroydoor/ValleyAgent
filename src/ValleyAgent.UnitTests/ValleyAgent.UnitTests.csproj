@@ -34,9 +34,11 @@
     </ItemGroup>
 
     <!-- 联机测试引用 SMAPI Context/门控（AgentSyncBroadcaster 经 MultiplayerHelper 读 Context），
-         Context 静态构造与 0Harmony 的运行时依赖在 smapi-internal，需显式复制到测试输出 -->
+         Context 静态构造与 0Harmony 的运行时依赖在 smapi-internal，需显式复制到测试输出。
+         0Harmony 补齐（2026-09-13）：异常堆栈经过 HarmonyPatch 标注类型（如 NPCGiftPatch）时
+         ToString() 需解析特性 → 测试输出缺 0Harmony.dll 会抛 FileNotFoundException（死锁回归测试踩中） -->
     <ItemGroup>
-        <None Include="$(GamePath)\smapi-internal\SMAPI.Toolkit*.dll">
+        <None Include="$(GamePath)\smapi-internal\SMAPI.Toolkit*.dll;$(GamePath)\smapi-internal\0Harmony.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Visible>false</Visible>
         </None>

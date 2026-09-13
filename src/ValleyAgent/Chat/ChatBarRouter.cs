@@ -324,36 +324,57 @@ public static class ChatBarRouter
     {
         while (_pendingReplies.TryDequeue(out var reply))
         {
-            var npc = Game1.getCharacterFromName(reply.NpcName);
-            if (npc == null)
+            // 死锁修复（2026-09-12）：逐条兜底。异常逃出 while 会让本 tick 剩余回复
+            // 连同调用方下游的所有主线程泵一起被跳过（泵是串行责任链）。
+            try
             {
-                continue;
+                RenderReply(reply);
             }
-
-            if (reply.IsFailure)
+            catch (Exception ex)
             {
-                // §3.7 规则 3：失败也要灰色字，不要沉默（静默规则只保护正常流程）。
-                Game1.chatBox?.addMessage($"*{reply.NpcName} 没有回应*", Color.Gray);
-                continue;
+                _monitor?.Log($"[ChatBar] Failed to render reply for {reply.NpcName}: {ex}", LogLevel.Error);
             }
+        }
+    }
 
-            if (string.IsNullOrWhiteSpace(reply.Speech))
-            {
-                continue; // LLM 行使沉默权：路由命中 ≠ 必须回
-            }
+    private static void RenderReply(PendingChatReply reply)
+    {
+        var npc = Game1.getCharacterFromName(reply.NpcName);
+        if (npc == null)
+        {
+            return;
+        }
 
-            ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
-            _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
+        if (reply.IsFailure)
+        {
+            // §3.7 规则 3：失败也要灰色字，不要沉默（静默规则只保护正常流程）。
+            Game1.chatBox?.addMessage($"*{reply.NpcName} 没有回应*", Color.Gray);
+            return;
+        }
 
-            NPCDialoguePatch.IncrementConversationCount(reply.NpcName);
+        if (string.IsNullOrWhiteSpace(reply.Speech))
+        {
+            return; // LLM 行使沉默权：路由命中 ≠ 必须回
+        }
 
+        ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
+        _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
+
+        NPCDialoguePatch.IncrementConversationCount(reply.NpcName);
+
+        try
+        {
             // M3：房客不执行 actions —— 实体在主机权威，主机侧 HandleDialogueRequest
             // 已经执行过一次（含广播同步）；房客重复执行会造成双份效果。
             if (!IsFarmhand)
             {
                 DialogueBoxInputPatch.DispatchDialogueActions(npc, reply.Actions);
             }
-
+        }
+        catch (Exception ex)
+        {
+            // 动作分发（含 PromoteToAgent）失败不得回灌渲染泵：台词已经说出去了。
+            _monitor?.Log($"[ChatBar] Action dispatch failed for {reply.NpcName}: {ex}", LogLevel.Error);
         }
     }
 

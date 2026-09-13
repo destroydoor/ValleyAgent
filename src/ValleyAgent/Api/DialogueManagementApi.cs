@@ -330,8 +330,17 @@ public class DialogueManagementApi
 
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
+            // 死锁修复（2026-09-12）：原来只捕获 InvalidOperationException。
+            // TryStartDialogueRequest 已把 npcName 记进 _pendingDialogueRequests，而释放点
+            // 只有两处——Task.Run 里的 finally（异常发生在 Task.Run 之前就到不了）和这个 catch。
+            // 这段同步代码裸读 Game1.player.friendshipData / .Items / .UniqueMultiplayerID /
+            // Game1.getCharacterFromName：联机切图、玩家瞬态为 null、Net 字段未同步时抛的是
+            // NullReferenceException / KeyNotFoundException，不是 InvalidOperationException
+            // ⇒ 守卫永久泄漏 ⇒ 该 NPC 之后每次对话都被 "request already in flight" 拒绝，
+            //    直到返回标题才 ClearAllDialogueState。这是 NPC 级的永久逻辑死锁，
+            //    且主机是房客对话的唯一出口，一个 NPC 卡死对所有玩家生效。
             _monitor?.Log($"[Dialogue] {npcName}: sync exception — {ex.GetType().Name}: {ex.Message}", LogLevel.Error);
             _dialogueState.EndDialogueRequest(npcName);
             return false;

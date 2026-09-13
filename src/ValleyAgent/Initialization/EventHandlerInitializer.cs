@@ -1867,6 +1867,27 @@ public class EventHandlerInitializer
         }
     }
 
+    /// <summary>
+    ///     主线程泵的统一兜底执行器（死锁修复 2026-09-12）。
+    ///     OnUpdateTicked 里的排水段是一条**串行责任链**：后台线程只入队，回包渲染 /
+    ///     ModMessage 发送 / 好感落账 / execute_adjust 执行全靠每 tick 排干。
+    ///     链上任一环抛异常，下游所有环当 tick 全部失效——其中
+    ///     DialogueBoxInputPatch.ProcessPendingReplies 是 <c>_isWaitingForResponse</c>
+    ///     的唯一清除点，被跳过就意味着输入框永久停在"等待回复"、Enter 与键盘输入全被吞。
+    ///     所以每个泵独立兜底：单泵失败只丢当 tick 的一个动作，链不能断。
+    /// </summary>
+    private void Pump(string name, Action pump)
+    {
+        try
+        {
+            pump();
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"[Pump] '{name}' failed this tick (downstream pumps unaffected): {ex}", LogLevel.Error);
+        }
+    }
+
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
         // 只量"排水段"（TranscriptSink.Drain → ProcessPendingWsCommands）：这段全部是主线程队列消费，
@@ -1874,24 +1895,29 @@ public class EventHandlerInitializer
         var drainStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // E1-1: 排空 TranscriptSink 队列，在主线程写入 JSONL 文件
-        _transcriptSink?.Drain();
+        // 死锁修复（2026-09-12）：以下每个泵各自兜底。这些泵是串行责任链——
+        // 任一环抛异常，当 tick 下游全部泵（含 DialogueBoxInputPatch 的回复渲染，
+        // 即 _isWaitingForResponse 的唯一清除点）都被跳过，输入框会卡在"等待回复"。
+        Pump("transcript-sink", () => _transcriptSink?.Drain());
 
         // E2-3: 排空到期的长文分句聊天消息（主线程访问 Game1.chatBox）
-        SpeechDisplayRouter.Tick();
+        Pump("speech-display", SpeechDisplayRouter.Tick);
 
         // ThinClient 模式下 _agentService 为 null，但 farmhand 仍需要处理
         // 礼物响应、对话回复与 state_sync 命令的主线程队列，否则 UI 无法渲染。
-        NPCGiftPatch.ProcessMainThreadActions();
-        ValleyAgentApi.ProcessMainThreadActions();
+        Pump("gift-actions", NPCGiftPatch.ProcessMainThreadActions);
+        Pump("dialogue-api-actions", ValleyAgentApi.ProcessMainThreadActions);
         // 2026-08-23 审计 P0：房客中继链路（HostRequestHandlers）的 await 续体改状态也走主线程队列
-        Multiplayer.HostRequestHandlers.ProcessMainThreadActions();
-        DialogueBoxInputPatch.ProcessPendingReplies();
+        Pump("host-request-mainthread", Multiplayer.HostRequestHandlers.ProcessMainThreadActions);
+        Pump("dialogue-replies", DialogueBoxInputPatch.ProcessPendingReplies);
+        // 陈旧等待自愈：回包与超时兜底双双丢失时强制解锁输入框（防永久"等待回复"）
+        Pump("dialogue-stale-wait", DialogueBoxInputPatch.ResetStaleWait);
         // E2-2: 聊天栏路由的 LLM 回复主线程渲染（ActiveSpeechRouter，不打开对话框）
-        ChatBarRouter.ProcessPendingReplies();
+        Pump("chat-replies", ChatBarRouter.ProcessPendingReplies);
         // E5-2: 远程喊话延迟回应主线程渲染（NPC 听到喊话 3~8s 后回应）
-        ChatBarRouter.ProcessShoutReplies();
-        ProcessPendingMainThreadCommands();
-        ProcessPendingWsCommands();
+        Pump("shout-replies", ChatBarRouter.ProcessShoutReplies);
+        Pump("mainthread-commands", ProcessPendingMainThreadCommands);
+        Pump("ws-commands", ProcessPendingWsCommands);
 
         // 排水段耗时告警（节流 5s）：主线程泵停滞的细粒度信号，补看门狗 5s 阈值以下的盲区
         var drainMs = drainStopwatch.Elapsed.TotalMilliseconds;
