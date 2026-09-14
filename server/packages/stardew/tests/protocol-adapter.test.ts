@@ -237,59 +237,6 @@ test("handleDialogue returns busy fallback when lock wait times out", async () =
 });
 
 
-test("handleConsolidateDay returns ack with correct requestId", async () => {
-  const { adapter, dir } = makeAdapter();
-  try {
-    const resp = await adapter.handleConsolidateDay({
-      type: "consolidate_day",
-      npcName: "Abigail",
-      dateIso: "2026-08-03",
-      requestId: "req-consolidate",
-    });
-    expect(resp).toEqual({ type: "ack", requestId: "req-consolidate" });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("handleConsolidateDay is idempotent on same npcName|dateIso", async () => {
-  const { adapter, dir } = makeAdapter();
-  try {
-    await adapter.handleConsolidateDay({
-      type: "consolidate_day",
-      npcName: "Abigail",
-      dateIso: "2026-08-03",
-      requestId: "req-consolidate-1",
-    });
-    await adapter.handleConsolidateDay({
-      type: "consolidate_day",
-      npcName: "Abigail",
-      dateIso: "2026-08-03",
-      requestId: "req-consolidate-2",
-    });
-
-    const seen = (adapter as unknown as { seenConsolidations: Set<string> }).seenConsolidations;
-    expect(seen).toEqual(new Set(["Abigail|2026-08-03"]));
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("routeMessage routes consolidate_day to handleConsolidateDay", async () => {
-  const { adapter, dir } = makeAdapter();
-  try {
-    const resp = await adapter.routeMessage({
-      type: "consolidate_day",
-      npcName: "Haley",
-      dateIso: "2026-08-03",
-      requestId: "req-route-consolidate",
-    });
-    expect(resp).toEqual({ type: "ack", requestId: "req-route-consolidate" });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test("handleStateChanged updates registry actualState and returns ack", async () => {
   const { adapter, dir } = makeAdapter();
   try {

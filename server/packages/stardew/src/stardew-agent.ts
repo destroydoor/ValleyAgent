@@ -13,9 +13,6 @@ import { ConsoleLogSubscriber } from "./console-log-subscriber";
 import type { AgentRunTokens } from "./transcript-types";
 import type { SceneState, ToolAction, EconomyExecutor } from "./types";
 import { DEFAULT_EMOTION } from "./types";
-import type { Beat, GameContext } from "./types";
-import type { PlayerProfileManager } from "./player-profile";
-import type { GameContextManager } from "./game-context";
 
 export interface StardewAgentConfig {
   name: string;
@@ -39,8 +36,6 @@ export interface DialogueResult {
   rawText: string;
   toolCalls: Array<{ name: string; args: Record<string, unknown> }>;
   // §4.1.1 方案 B：LLM 通过 evaluate_friendship 工具输出的好感度评估。
-  // runDialogue / runBeat 都调 extractResult，因此两者都携带该字段；
-  // runBeat 不评估好感，字段默认 0/""，存在无害。
   friendshipDelta: number;
   friendshipReason: string;
 }
@@ -54,9 +49,6 @@ const TOOL_RESULT_FAILURE_IMPORTANCE = 5;
 // 单次对话好感 delta 钳制上限（2026-08-23 审计修复）：LLM 幻觉 ±2500 一句话就能
 // 打满/清空好感——单次变化封顶 ±100；累计 0..2500 的总钳制在 addFriendship 侧。
 const FRIENDSHIP_DELTA_LIMIT = 100;
-// Soft ceiling on ReAct turns for beat execution——目前唯一防跑飞的护栏。
-// （react-guard.ts 软刹车已实现+单测但从未接入生产调用链，2026-09-14 死代码删除，git 历史可找回。）
-const BEAT_MAX_TURNS = 8;
 
 /**
  * C# ActionResultReason 枚举（camelCase 字符串值）→ 中文映射。
@@ -96,47 +88,6 @@ function formatToolResultsText(records: ToolResultRecord[]): string {
     .join("\n");
 }
 
-/**
- * Map a GameContext's player-state + time fields into the SceneState shape
- * used by buildStardewTools + promptBuilder. The NPC's own tile/state come
- * from the GameContext.npcStates entry for this NPC (looked up by name).
- *
- * If the NPC is not found in npcStates, falls back to safe defaults so the
- * beat can still execute — the Director already validated availability, so
- * a missing entry here is a transient race (NPC just left the snapshot).
- */
-function sceneStateFromGameContext(ctx: GameContext, npcName: string): SceneState {
-  const npcEntry = ctx.npcStates.find((n) => n.name === npcName);
-  return {
-    season: ctx.time.season,
-    day: ctx.time.day,
-    timeStr: ctx.time.dayOfWeek === "" ? "06:00" : "10:00", // GameContext has no HH:MM field; use a reasonable default
-    weather: ctx.time.weather,
-    location: npcEntry?.location ?? ctx.playerState.location,
-    nearbyObjects: `玩家在 ${ctx.playerState.location}`,
-    farmerName: ctx.playerState.location, // placeholder; scene.farmerName is a nickname display field
-    friendship: npcEntry?.friendshipPoints ?? 0,
-    npcState: npcEntry?.currentState ?? "IDLE",
-    playerMoney: ctx.playerState.money ?? null,
-    inventory: ctx.playerState.inventory.map((i) => ({ ...i })),
-    npcTile: npcEntry?.tile ?? { x: 0, y: 0 },
-    // E0-6/E4-2: GameContext 的 npcStates 有 NPC 位置；NPC 钱包/背包 GameContext
-    // 尚无来源 → null（未知），prompt/工具走降级分支。
-    npcLocation: npcEntry?.location ?? null,
-    npcMoney: null,
-    npcInventory: null,
-    // Phase 1: 玩家手持物 GameContext 暂无来源 → null（未知），prompt 显示"没有手持可交易物品"。
-    playerHeldItem: null,
-    // Phase 2: 当前执行目标 GameContext 暂无来源 → null（未在执行目标）。
-    currentGoal: null,
-    // Phase 3 L2: GameContext 暂无来源 → null（未知），prompt L2 段走降级（平静/无）。
-    npcMood: null,
-    npcRecentEvents: null,
-    npcWorkingOn: null,
-    npcOwedMoney: null,
-  };
-}
-
 export class StardewAgent {
   readonly name: string;
   private readonly memory: AgentMemory;
@@ -156,8 +107,8 @@ export class StardewAgent {
   actualState?: string;
   // 最近一次状态转换原因（如 "travel_failed"/"evicted"/"task_completed"），可选供 prompt 渲染
   lastTransitionReason?: string;
-  // 当前对话玩家（runDialogue 设置、runBeat 清除）：extractResult 兜底台词与 speak 同权
-  // 进该玩家的关系桶；无 playerId（beat/旧调用）走世界桶。per-NPC 对话锁保证不串场。
+  // 当前对话玩家（runDialogue 设置）：extractResult 兜底台词与 speak 同权
+  // 进该玩家的关系桶；无 playerId 走世界桶。per-NPC 对话锁保证不串场。
   private dialoguePlayerId: string | undefined;
   private dialoguePlayerName: string | undefined;
 
@@ -329,168 +280,6 @@ export class StardewAgent {
       throw err;
     }
   }
-
-  /**
-   * Execute a Director-issued beat via ReAct (Task 9).
-   *
-   * Unlike runDialogue (driven by player input), runBeat is driven by a
-   * high-level directive from the narrative Director. The NPC is expected
-   * to autonomously act out the beat — at minimum calling speak + at least
-   * one other tool — to deliver the experience to the player.
-   *
-   * Soft-brake control: maxTurns=8 is the only active brake. The designed
-   * ReActGuard (token budget, failures, no-progress, etc.) is implemented
-   * and unit-tested but not yet wired into any production call path
-   * （2026-08-17 审计确认；设计保留待 Director 接线）。
-   *
-   * Failure-mode policy: same as runDialogue — OutputValidator retry on
-   * invalid Chinese / empty speech; throws after second failure so the
-   * caller can run beat-degradation fallback.
-   */
-  async runBeat(
-    beat: Beat,
-    gameCtx: GameContext,
-    profileMgr: PlayerProfileManager,
-    gameCtxMgr: GameContextManager,
-    economy?: EconomyExecutor,
-  ): Promise<DialogueResult> {
-    // beat 无对话玩家：显式清掉上一次 dialogue 留下的 playerId，兜底台词保持世界桶。
-    this.dialoguePlayerId = undefined;
-    this.dialoguePlayerName = undefined;
-    // Build scene state from GameContext.
-    const scene = sceneStateFromGameContext(gameCtx, beat.npcName);
-
-    // Build beat system prompt with profile + game-context summaries injected.
-    // M3：beat 是导演为某个玩家编排的（beat.context.playerId）→ 用该玩家的画像摘要；
-    // 无归属（单玩家/旧数据）→ 缺省玩家键，行为等价 M3 前。
-    const profileSummary = profileMgr.summarizeForDirector(beat.context.playerId);
-    const gameCtxSummary = gameCtxMgr.summarizeForDirector();
-    const systemPrompt = this.promptBuilder.buildBeatSystemPrompt(
-      this.memory,
-      scene,
-      this.name,
-      beat,
-      profileSummary,
-      gameCtxSummary,
-    );
-
-    // Phase 1 E1-1 留痕：run 生命周期 + 逐轮 turn。游戏日期取 C# 每日推送的
-    // 世界快照时间 lastUpdated 的 YYYY-MM-DD 前缀（无该字段时留空）。
-    const gameDate = /^\d{4}-\d{2}-\d{2}/.test(gameCtx.lastUpdated)
-      ? gameCtx.lastUpdated.slice(0, 10)
-      : undefined;
-    const recorder = this.transcriptStore
-      ? new RunTranscriptRecorder(this.transcriptStore, {
-          npcName: this.name,
-          trigger: "beat",
-          systemPrompt,
-          userInput: `导演指令：${beat.directive}`,
-          ...(gameDate !== undefined ? { gameDate } : {}),
-        })
-      : null;
-
-    try {
-      // Build tools with shared context (same as runDialogue).
-      const toolCtx: ToolContext = {
-        memory: this.memory,
-        scene,
-        // E4-2: NPC 自己的背包；scene.inventory 是玩家背包（同 runDialogue）。
-        inventory: (scene.npcInventory ?? []).map((i) => ({ ...i })),
-        givenToPlayer: [],
-        log: [],
-        ...(economy ? { economy } : {}),
-      };
-      const tools = buildStardewTools(toolCtx);
-      const registry = new ToolRegistry();
-      for (const t of tools) registry.register(t);
-
-      // Build AgentContext — seed with the Director's directive as user message.
-      const initialContext: AgentContext = {
-        messages: [
-          { role: "user", content: `导演指令：${beat.directive}\n导演意图：${beat.context.reasonGenerated}` },
-        ],
-        systemPrompt,
-        metadata: { beatId: beat.id },
-      };
-
-      // LLM token 用量累计（同 runDialogue，供 run 终态落库）。
-      const tokenUsage: AgentRunTokens = {};
-
-      // Build agentLoop config. shouldStopAfterTurn requires BOTH a speak tool
-      // AND at least one other tool — the beat is meant to be an action, not
-      // just a line of dialogue.
-      const loopConfig: AgentLoopConfig = {
-        tools: registry,
-        convertToLlm: this.makeConvertToLlm(systemPrompt),
-        llmCall: async (messages, toolList) => {
-          const result = await this.makeLlmCall(messages, toolList);
-          if (result.usage?.promptTokens !== undefined) {
-            tokenUsage.in = (tokenUsage.in ?? 0) + result.usage.promptTokens;
-          }
-          if (result.usage?.completionTokens !== undefined) {
-            tokenUsage.out = (tokenUsage.out ?? 0) + result.usage.completionTokens;
-          }
-          return result;
-        },
-        toolExecution: "sequential",
-        maxTurns: BEAT_MAX_TURNS,
-        shouldStopAfterTurn: (ctx, _turn) => {
-          let hasSpeak = false;
-          let hasOther = false;
-          for (const m of ctx.messages) {
-            if (m.role === "assistant" && m.toolCalls) {
-              for (const tc of m.toolCalls) {
-                if (SPEAK_TOOLS.has(tc.name)) hasSpeak = true;
-                else hasOther = true;
-              }
-            }
-          }
-          return hasSpeak && hasOther;
-        },
-      };
-
-      // First attempt
-      let result = await this.runOnce(initialContext, loopConfig, recorder);
-
-      // OutputValidator retry — same as runDialogue.
-      const firstCheck = this.validator.validateSpeechAndActions(result.speech, result.actions);
-      if (!firstCheck.valid) {
-        const badText = result.speech || result.rawText || "";
-        const retryMessage: AgentMessage = {
-          role: "user",
-          content: this.validator.buildRetryPrompt(badText),
-        };
-        const retryContext: AgentContext = {
-          ...initialContext,
-          messages: [...initialContext.messages, retryMessage],
-        };
-
-        result = await this.runOnce(retryContext, loopConfig, recorder);
-
-        const retryCheck = this.validator.validateSpeechAndActions(result.speech, result.actions);
-        if (!retryCheck.valid) {
-          throw new Error(
-            `Beat output validation failed after retry: ${retryCheck.reason ?? "unknown"}`,
-          );
-        }
-      }
-
-      // 终态留痕：completed。
-      recorder?.finalizeSuccess({
-        ...(result.speech ? { finalSpeech: result.speech } : {}),
-        actions: result.actions,
-        toolCalls: result.toolCalls,
-        tokens: tokenUsage,
-      });
-
-      return result;
-    } catch (err) {
-      // 失败也留痕：LLM 超时 / 校验重试失败 → status="error"。
-      recorder?.finalizeError(err);
-      throw err;
-    }
-  }
-
   /**
    * Run the agent loop once with the given context + config, returning the
    * extracted dialogue result. Throws on agent-loop error events.

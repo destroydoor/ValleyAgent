@@ -4,16 +4,9 @@ import { PromptBuilder } from "./prompt-builder";
 import { StardewAgentRegistry } from "./stardew-agent-registry";
 import type { TranscriptConfig, RegistryConfig } from "./stardew-agent-registry";
 import { ProtocolAdapter, type ProtocolAdapterOptions } from "./protocol-adapter";
-import { Director } from "./director";
-import { BeatStore } from "./beat-store";
-import { PlayerProfileManager } from "./player-profile";
-import { PlayerProfileStore } from "./player-profile-store";
 import { GameContextManager } from "./game-context";
 import { AgentLedger } from "./agent-ledger";
 import { EmotionEngine } from "./emotion-engine";
-import { ActivityLogStore } from "./activity-log-store";
-import { join, dirname } from "node:path";
-import { mkdirSync } from "node:fs";
 import { attachConsoleTee } from "./log-tee";
 
 // 2026-09-11 观测补强：VALLEY_SERVER_LOGFILE 由 C# 端在"可见控制台窗口"模式
@@ -49,10 +42,6 @@ export interface ServerConfig {
   llmCallOverride?: (messages: unknown, tools?: unknown) => Promise<ProviderToolCallResult>;
   /** Phase 1 E1-1 全量留痕。缺省 = 不启用（prod 默认零开销）。 */
   transcript?: TranscriptConfig;
-  /** 导演开关（false 时不构造 Director） */
-  enableDirector?: boolean;
-  /** 导演每日触发概率（默认 0.1）。仅 enableDirector !== false 时生效。 */
-  directorTriggerProbability?: number;
 }
 
 export interface ServerHandle {
@@ -130,57 +119,12 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
 
   const registry = new StardewAgentRegistry(registryConfig);
 
-  // --- 导演依赖项实例化（仅在 enableDirector !== false 时构造） ---
-  // 依赖：BeatStore、PlayerProfileManager（含 PlayerProfileStore）、GameContextManager、ActivityLogStore
-  // 全部使用 SQLite 持久化，dbDir = {dataPath}/director/
-  let director: Director | undefined;
-  let beatStore: BeatStore | undefined;
-  let profileMgr: PlayerProfileManager | undefined;
-  let activityStore: ActivityLogStore | undefined;
-  let gameCtxMgr: GameContextManager | undefined;
-  // activeWs 在 websocket open 回调中赋值，供 sendToCsharp 发送 allocate_agent 等主动消息
+  // 2026-09-14 砍除旧叙事 Director（morningPlan→beat→allocate_agent 产出无人消费，
+  // runBeat 从未接入生产；见 docs/plan/2026-09-12-architecture-drift-audit.md 建议 #1
+  // 的裁决）。GameContextManager 保留：game_context_sync 活链路在用。
+  const gameCtxMgr = new GameContextManager();
+  // activeWs 在 websocket open 回调中赋值，供 sendToCsharp 发送主动消息
   let activeWs: import("bun").ServerWebSocket<unknown> | null = null;
-
-  if (config.enableDirector !== false) {
-    const dbDir = join(dirname(config.dataPath), "director");
-    mkdirSync(dbDir, { recursive: true });
-    beatStore = new BeatStore(join(dbDir, "beats.sqlite"));
-    beatStore.init();
-    activityStore = new ActivityLogStore(join(dbDir, "activity.sqlite"));
-    activityStore.init();
-    const profileStore = new PlayerProfileStore(join(dbDir, "profiles.sqlite"));
-    profileStore.init();
-
-    // 复用 RegistryConfig 中的 provider/router 构造 directorCallLlm
-    const directorCallLlm = registryConfig.llmRouter
-      ? async (prompt: string) => {
-          const result = await registryConfig.llmRouter!.chatCompletion("director", [{ role: "user", content: prompt }]);
-          return {
-            text: result.content,
-            usage: {
-              promptTokens: result.usage?.promptTokens ?? 0,
-              completionTokens: result.usage?.completionTokens ?? 0,
-            },
-          };
-        }
-      : async (prompt: string) => {
-          const result = await registryConfig.llmProvider!.chatCompletion([{ role: "user", content: prompt }]);
-          return {
-            text: result.content,
-            usage: {
-              promptTokens: result.usage?.promptTokens ?? 0,
-              completionTokens: result.usage?.completionTokens ?? 0,
-            },
-          };
-        };
-
-    profileMgr = new PlayerProfileManager(profileStore, activityStore, { callLlm: directorCallLlm });
-    gameCtxMgr = new GameContextManager();
-    director = new Director(beatStore, profileMgr, gameCtxMgr, activityStore, { callLlm: directorCallLlm },
-      // E1-1 留痕活化：注入 registry 的 TranscriptStore（留痕未启用时为 null → undefined），
-      // morningPlan / milestoneReact 自动写 director_runs。
-      registry.getTranscriptStore() ?? undefined);
-  }
 
   // 2026-08-15 账本迁移（步骤 1）：权威经济账本（adjust_result 路由消费 + worldSnapshot 播种）。
   // 与 memory 同目录（agentsDir），文件 {npc}_ledger.json；步骤 1 不拦截任何工具，旧路径不动。
@@ -188,7 +132,6 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
   // 2026-08-15 步骤 3：确定性情绪引擎（零 LLM，事件驱动；人设参数走默认，可后续从数据注入）。
   const emotionEngine = new EmotionEngine();
 
-  // sendToCsharp 与 ledger 始终接线（即使 Director 未启用——execute_adjust 不依赖 Director）。
   const adapterOptions: ProtocolAdapterOptions = {
     sendToCsharp: (msg: unknown) => {
       if (activeWs && activeWs.readyState === 1) {
@@ -201,12 +144,8 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
     },
     ledger,
     emotionEngine,
+    gameCtxMgr,
   };
-  if (director && gameCtxMgr) {
-    adapterOptions.director = director;
-    adapterOptions.gameCtxMgr = gameCtxMgr;
-    adapterOptions.directorTriggerProbability = config.directorTriggerProbability ?? 0.1;
-  }
   const adapter = new ProtocolAdapter(registry, adapterOptions);
 
   const server = Bun.serve({
@@ -273,10 +212,6 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
       await adapter.flushPendingSaves();
       // 关闭留痕 store（checkpoint 刷 WAL），未启用时 no-op。
       registry.closeTranscriptStore();
-      // 关闭导演依赖 store（未启用时 undefined 跳过）
-      profileMgr?.close();
-      beatStore?.close();
-      activityStore?.close();
       server.stop();
     },
   };

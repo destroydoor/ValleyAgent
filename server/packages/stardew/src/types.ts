@@ -157,14 +157,6 @@ export interface StateChangedMessage {
   reason?: string;
 }
 
-export interface ConsolidateDayMessage {
-  type: "consolidate_day";
-  npcName: string;
-  dateIso: string;
-  // 可选，向后兼容未携带 requestId 的旧 C# 客户端。
-  requestId?: string;
-}
-
 /** C# DayStarted 时通知 TS 新的一天开始。 */
 export interface DayStartedMessage {
   type: "day_started";
@@ -338,7 +330,6 @@ export type IncomingMessage =
   | PingRequest
   | ActionResultMessage
   | StateChangedMessage
-  | ConsolidateDayMessage
   | DayStartedMessage
   | RouteShoutMessage
   | DirectorCommandMessage

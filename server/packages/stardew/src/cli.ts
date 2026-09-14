@@ -29,10 +29,6 @@ interface CliArgs {
   llmProvider: string;
   // 多 provider 模式
   llmConfigPath?: string;
-  // 导演开关
-  enableDirector?: boolean;
-  // 导演每日触发概率（0-1），缺省用 server 默认 0.1
-  directorTriggerProbability?: number;
   /** Phase 1 E1-1：提供该路径即启用全量留痕（transcript.sqlite 落于此目录）。 */
   transcriptDir?: string;
 }
@@ -63,9 +59,6 @@ function parseArgs(argv: string[]): CliArgs {
       case "--llm-provider": if (next) { args.llmProvider = next; i++; } break;
       case "--transcript-dir": if (next) { args.transcriptDir = next; i++; } break;
       case "--llm-config": if (next) { args.llmConfigPath = next; i++; } break;
-      case "--enable-director": args.enableDirector = true; break;
-      case "--disable-director": args.enableDirector = false; break;
-      case "--director-probability": if (next) { args.directorTriggerProbability = parseFloat(next); i++; } break;
       case "--help":
         console.log(`Usage: valley-ai-server [options]
 
@@ -80,9 +73,6 @@ Options:
   --llm-provider <name>      LLM provider (minimax|openai|deepseek)
   --transcript-dir <path>    Enable full-trace transcript store in this dir
   --llm-config <path>      Path to multi-provider runtime JSON (enables multi-provider mode)
-  --enable-director        Enable narrative director (default: enabled)
-  --disable-director       Disable narrative director (NPCs fully autonomous)
-  --director-probability <0-1>   Director daily trigger probability (default: 0.1)
   --help                     Show this help
 `);
         process.exit(0);
@@ -127,8 +117,6 @@ async function main() {
     ...(args.transcriptDir !== undefined
       ? { transcript: { enabled: true, dir: args.transcriptDir } }
       : {}),
-    ...(args.enableDirector !== undefined ? { enableDirector: args.enableDirector } : {}),
-    ...(args.directorTriggerProbability !== undefined ? { directorTriggerProbability: args.directorTriggerProbability } : {}),
     ...(args.llmConfigPath
       ? { llmRouterConfigPath: args.llmConfigPath }
       : {
