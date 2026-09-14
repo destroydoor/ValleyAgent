@@ -14,7 +14,7 @@ namespace ValleyAgent.RAG;
 ///     Supports both vanilla ([CP] ValleyTalk Base/assets/bio/) and SVE (ValleyTalk for SVE/assets/bio/) paths.
 ///     Files use Content Patcher format: {Changes:[{Entries:{Biography,Relationships,Traits,...}}]}.
 ///     Provides full personality profiles (biography, relationships, traits, preoccupations)
-///     that are far richer than the flat npcs.json used by RAGKnowledgeBase.
+///     that are far richer than a flat NPC data file (RAGKnowledgeBase 已于 2026-09-12 删除).
 /// </summary>
 public class ValleyTalkBioLoader
 {
@@ -46,7 +46,7 @@ public class ValleyTalkBioLoader
     /// <summary>
     ///     Load all bio/*.json files from the ValleyTalk mod directory.
     ///     Priority: SVE (ValleyTalk for SVE/assets/bio/) → Base ([CP] ValleyTalk Base/assets/bio/).
-    ///     Falls back to bundled npcs.json if neither is available.
+    ///     Both missing 时不做任何回退，直接空载（IsLoaded 保持 false）。
     /// </summary>
     public void Load()
     {
@@ -61,8 +61,8 @@ public class ValleyTalkBioLoader
             var bioDir = ResolveBioDirectory();
             if (string.IsNullOrEmpty(bioDir) || !Directory.Exists(bioDir))
             {
-                _monitor.Log("ValleyTalkBioLoader: bio directory not found (tried SVE and Base paths). " +
-                             "Falling back to bundled npcs.json.", LogLevel.Warn);
+                _monitor.Log("ValleyTalkBioLoader: bio directory not found (tried SVE and Base paths); " +
+                             "no bio data will be loaded.", LogLevel.Warn);
                 return;
             }
 

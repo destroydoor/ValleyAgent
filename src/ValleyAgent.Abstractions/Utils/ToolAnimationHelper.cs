@@ -13,7 +13,7 @@ namespace ValleyAgent.Utils
     /// </summary>
     public static class ToolAnimationHelper
     {
-        // ── Attack animations (borrowed from FightController) ──────────────
+        // ── Attack animations ──────────────
         // Uses standard NPC walking sprite frames to simulate a swing motion.
         private static readonly List<FarmerSprite.AnimationFrame>[] AttackAnimations = new[]
         {

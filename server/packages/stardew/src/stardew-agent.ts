@@ -54,9 +54,8 @@ const TOOL_RESULT_FAILURE_IMPORTANCE = 5;
 // 单次对话好感 delta 钳制上限（2026-08-23 审计修复）：LLM 幻觉 ±2500 一句话就能
 // 打满/清空好感——单次变化封顶 ±100；累计 0..2500 的总钳制在 addFriendship 侧。
 const FRIENDSHIP_DELTA_LIMIT = 100;
-// Soft ceiling on ReAct turns for beat execution.
-// 注（2026-08-17 审计）：react-guard.ts 软刹车已实现+单测但尚未接入生产调用链
-// （设计保留待 Director 接线）——目前唯一防跑飞的护栏就是这个 maxTurns。
+// Soft ceiling on ReAct turns for beat execution——目前唯一防跑飞的护栏。
+// （react-guard.ts 软刹车已实现+单测但从未接入生产调用链，2026-09-14 死代码删除，git 历史可找回。）
 const BEAT_MAX_TURNS = 8;
 
 /**
