@@ -1,6 +1,6 @@
 # ValleyAgent — 项目指南（AI 助手版）
 
-> **Last updated:** 2026-09-14（架构漂移审计收割：C# ~5,600 行死子系统 + TS react-guard 删除；**旧叙事 Director 砍除裁决**——morningPlan/beat 线产出无人消费，director.ts/beat-store/runBeat/BEAT 模板/PlayerDirectory 已删，协议 10 条 planned 死 schema 清理 + consolidate_day 降级 planned；C# 工具层与 directorContext 推送保留待未来造脑；审计底稿原在 arena 分支 `docs/plan/2026-09-12-architecture-drift-audit.md`，**未随仓交付**——2026-09-15 偏移度审查确认三处引用悬空，该次审计的可追溯性目前已断档，见 `docs/plan/2026-09-15-doc-code-drift-audit.md` §1 A9）
+> **Last updated:** 2026-09-14（架构漂移审计收割：C# ~5,600 行死子系统 + TS react-guard 删除；**旧叙事 Director 砍除裁决**——morningPlan/beat 线产出无人消费，director.ts/beat-store/runBeat/BEAT 模板/PlayerDirectory 已删，协议 10 条 planned 死 schema 清理 + consolidate_day 降级 planned；C# 工具层与 directorContext 推送保留待未来造脑；审计底稿 `docs/plan/2026-09-12-architecture-drift-audit.md` **未随仓交付**——完整内容在未合并分支 `arena/01a09648-valleyagent`（23,482 B / 234 行，PR #2 closed 未 merge），`main` 上三处引用悬空、可追溯性断档，恢复方案见 issue #12；2026-09-15 偏移度审查记录见 `docs/plan/2026-09-15-doc-code-drift-audit.md` §1 A9 / §6ter）
 > **卡死排查结论**：`docs/plan/2026-09-10-host-freeze-root-cause.md`（"每玩家一导演"=误读；6 轮 soak 无进程级冻结；FOLLOW 跨图缺陷族行为级实证并已修；U1/U2/U3 猜想台账与实机终验流程见附录 B）
 > **当前执行依据**：`docs/plan/2026-08-05-three-tier-architecture-execution-plan.md`
 > **架构修订设计**：`docs/design/2026-08-15-ts-ledger-reflex-architecture.md`（经济账本迁 TS + C# 反射执行，**四步全部完成（2026-08-15）**：adjust 执行器 + TS 账本 + 经济工具同步编排 + TS 情绪引擎 + 断线对账）
@@ -125,7 +125,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 
 **2026-09-14 裁决**：旧叙事 Director（director.ts morningPlan→beat→allocate_agent）因产出无人消费（runBeat 从未接入生产、beat 唯一副作用是保活占池）已整体砍除；C# 的 9 个 DirectorTools + `director_command` 通道 + DirectorContextBuilder 每日推送**保留**，作为未来"工具型 Director 造脑"的就绪层（B4 的按需建身体逻辑同样保留）。
 
-**就绪层的两个已登记缺口（2026-09-15 偏移审查 §3 实证，未修，等造脑时一并处理）**：①`ServerProcessManager.cs:291,301` 仍向 TS 透传 `--disable-director` / `--director-probability`，而 `cli.ts` 对未知参数**静默忽略**——即这两个上游配置项（`EnableDirector` / `Director.TriggerProbability`）目前对 TS 无实际效果；②`TestMod/Tests/Integration/DIR_DirectorBehaviorRecord.cs`（仍注册在 `V3TestRunner.cs:724`）每轮都在等已被砍除的 `morningPlan end` 日志，必跑到超时才收尾并产出空报告——造脑接线时应同时复活此测试或删除它。
+**就绪层的两个已登记缺口（2026-09-15 偏移审查 §3 实证，未修，等造脑时一并处理）**：①`ServerProcessManager.cs:291,301` 仍向 TS 透传 `--disable-director` / `--director-probability`，而 `cli.ts` 对未知参数**静默忽略**——即这两个上游配置项（`EnableDirector` / `Director.TriggerProbability`）目前对 TS 无实际效果；②`TestMod/Tests/Integration/DIR_DirectorBehaviorRecord.cs`（仍注册在 `V3TestRunner.cs:724`）每轮都在等已被砍除的 `morningPlan end` 日志，必跑到超时才收尾并产出空报告——造脑接线时应同时复活此测试或删除它（跟踪：issue #17）。
 
 ### 3.6 已知坑（详见旧版参考 §2.1.1）
 
@@ -133,7 +133,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 - `src/ValleyAgent/config.json` 不得作为 csproj 部署项（会覆盖用户配置）。
 - 服务器生命周期绑定 Mod 而非存档，返回标题不杀进程。
 - **导演日志静默 bug（2026-08-04）**：降级是行为上的（不崩溃），日志是可观测性的（必须可见）。任何 LLM 调用必须 log prompt 输入和 response 输出；任何决策分支必须 log 分支结果和原因；任何过滤/丢弃必须 log 被丢弃项和原因。
-- **配置项「可改但无效」陷阱（2026-09-15 登记）**：`ModConfig` 里有一批**消费者已删除的孤儿配置**——仍在 GMCM 面板可见、仍被 `Validate()` 钳制，但设置它们不产生任何效果（`ServerAddress` / `DevMode` / `DebugLogEnabled` / `CustomSystemPrompt` / `AIDailyTopicCount` / `StateRejectionCooldownTicks` / `MaxStateRejections` / `FallbackAI*Probability` / `TodayEventsMaxCount` / `Haggle.{Enabled,MaxRounds,HostileThreshold}`）。另有一批是**刻意的兼容垫片，勿删**（`AutoStartPythonServer` 等 5 个 `[Obsolete]` 项 + `ModelName` + `DialogueTemperature`，见 `ModConfig.cs` 顶部登记块与 `MigrateLegacyFields()`）。名单与摘除顺序见 `Config/ModConfig.cs` 顶注 + 偏移审查报告 §3 C4。
+- **配置项「可改但无效」陷阱（2026-09-15 登记）**：`ModConfig` 里有一批**消费者已删除的孤儿配置**——仍在 GMCM 面板可见、仍被 `Validate()` 钳制，但设置它们不产生任何效果（`ServerAddress` / `DevMode` / `DebugLogEnabled` / `CustomSystemPrompt` / `AIDailyTopicCount` / `StateRejectionCooldownTicks` / `MaxStateRejections` / `FallbackAI*Probability` / `TodayEventsMaxCount` / `Haggle.{Enabled,MaxRounds,HostileThreshold}`）。另有一批是**刻意的兼容垫片，勿删**（`AutoStartPythonServer` 等 5 个 `[Obsolete]` 项 + `ModelName` + `DialogueTemperature`，见 `ModConfig.cs` 顶部登记块与 `MigrateLegacyFields()`）。名单与摘除顺序见 `Config/ModConfig.cs` 顶注 + 偏移审查报告 §3 C4（摘除跟踪：issue #13）。
 
 ### 3.7 联机支持（2026-08-16 M1 已落地）
 

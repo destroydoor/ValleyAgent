@@ -236,12 +236,13 @@ Python 时代遗留（5）：AutoStartPythonServer、PythonExecutablePath、Pyth
 
 ### 明确未做（附理由）
 
-| 项 | 状态 | 理由 |
-|---|---|---|
-| C4 的 B 类孤儿配置摘除 | **未做** | 属 C# 源码改动，本环境**无 dotnet**，`TestMod`/`UnitTests` 均 `TreatWarningsAsErrors`，无法验证编译；已在代码与文档登记名单+顺序，等有编译环境一次做完 |
-| C5/C6 幽灵资产去留（`ValleyTalk.ApiTest`、根级 React 原型） | **未做** | 需用户决策（删/移/保留）；本轮只把它们**登记进 README 与报告**（从"无人知晓"变为"有据可查"） |
-| P2-14 697 处占位符逐个替换 | **部分做** | 已在 `docs/README.md` 写明占位符映射约定（`<REPO_ROOT>`=本仓根、`<VALLEYAI_ROOT>`=`server/`），并把两个**活文档**（`scripts/*README.md`）改成真实路径；历史计划/设计文档里的占位符**保留原样**（它们是当时的记录，批量改写会污染历史） |
-| A9 补回 `2026-09-12-architecture-drift-audit.md` | **未做** | 底稿内容不在本仓，无法凭空补写；已改为在 AGENTS 中明示"未随仓交付" |
+| 项 | 状态 | 跟踪 | 理由 |
+|---|---|---|---|
+| C4 的 B 类孤儿配置摘除 | **未做** | #13 | 属 C# 源码改动，本环境**无 dotnet**，`TestMod`/`UnitTests` 均 `TreatWarningsAsErrors`，无法验证编译；已在代码与文档登记名单+顺序，等有编译环境一次做完 |
+| C5/C6 幽灵资产去留（`ValleyTalk.ApiTest`、根级 React 原型） | **未做** | #14 | 需用户决策（删/移/保留）；本轮只把它们**登记进 README 与报告**（从"无人知晓"变为"有据可查"） |
+| C7 `CompatibilityStubs` 兼容壳去留 | **未做** | #15 | 静态复核已确认其宣称的引用方（Narrative/N1-N5 测试）**已不存在**；但删净需"删掉后编译"验证，本环境无 dotnet |
+| P2-14 占位符逐个替换（实测 709 处） | **部分做** | #16 | 已在 `docs/README.md` 写明占位符映射约定（`<REPO_ROOT>`=本仓根、`<VALLEYAI_ROOT>`=`server/`），并把两个**活文档**（`scripts/*README.md`）改成真实路径；历史计划/设计文档里的占位符**保留原样**（它们是当时的记录，批量改写会污染历史） |
+| A9 补回 `2026-09-12-architecture-drift-audit.md` | **未做** | #12 | 底稿**并未丢失**：完整内容在未合并分支 `arena/01a09648-valleyagent`（23,482 B），可单文件 `git checkout` 恢复（§6bis 原措辞"无法凭空补写"已被本行更正）；本轮仅在 AGENTS 中明示"未随仓交付" |
 
 ### 复验命令（本轮跑过的）
 
@@ -256,15 +257,36 @@ cd .. && python3 md-link-check         # 非占位符死链 0
 
 ---
 
+## 6ter. 遗留问题跟踪（GitHub Issues，2026-09-15 同日建立）
+
+§6bis「明确未做」与 §3/§7 中需要后续处理的项，已全部在 GitHub 建 issue 跟踪（仓库 issues 与 PR 共享编号，本批为 **#12–#19**）：
+
+| Issue | 标题 | 对应本章节 |
+|---|---|---|
+| [#12](https://github.com/destroydoor/ValleyAgent/issues/12) | 恢复 2026-09-12 架构偏移审计底稿（内容存于未合并分支 `arena/01a09648-valleyagent`） | §6bis A9 |
+| [#13](https://github.com/destroydoor/ValleyAgent/issues/13) | 摘除 B 类孤儿配置项——玩家能改、能保存，但无任何效果 | §6bis C4 |
+| [#14](https://github.com/destroydoor/ValleyAgent/issues/14) | 决策两个幽灵资产去留——`src/ValleyTalk.ApiTest/` 与根级 React 原型 | §6bis C5/C6 |
+| [#15](https://github.com/destroydoor/ValleyAgent/issues/15) | `CompatibilityStubs` 兼容壳去留——宣称的引用方已不存在（附 `GoalCompletionAuditor` 死链） | §3 C7 + 本轮新发现 |
+| [#16](https://github.com/destroydoor/ValleyAgent/issues/16) | 处理 709 处未替换的 `<REPO_ROOT>` / `<VALLEYAI_ROOT>` 占位符 | §6bis P2-14 / §5 D2 |
+| [#17](https://github.com/destroydoor/ValleyAgent/issues/17) | 就绪层两个缺口：`--disable-director` / `--director-probability` 被静默忽略 + DIR 测试空跑 | §3 就绪层（AGENTS §3.6 已登记） |
+| [#18](https://github.com/destroydoor/ValleyAgent/issues/18) | C# 门禁（`dotnet build -warnaserror` / `dotnet test`）未常态化，摘除类改动无处验证 | §7 C# 门禁 |
+| [#19](https://github.com/destroydoor/ValleyAgent/issues/19) | `check:test-dead` 全量重跑依赖游戏产出的 `logs/test_results`（gitignored），无法进 CI | §7 历史断言数字 |
+
+> **对 §6bis A9 的更正**：建 issue 时复查发现，该底稿**并非"无法补写"，而是从未随 PR #2（closed 未 merge）进入 `main`**——内容完整存在于分支 `arena/01a09648-valleyagent`（23,482 B / 234 行），可用 `git checkout <branch> -- <path>` 单文件恢复，详见 #12。§6bis 中"底稿内容不在本仓，无法凭空补写"的措辞以本条为准。
+
+> **对 §5 D2 计数的更新**：建 issue 时复测占位符为 **709 处**（`<REPO_ROOT>` 272/25 文件、`<VALLEYAI_ROOT>` 437/26 文件），与 §5 D2 原始计数 697 处的差值来自本轮新增内容（本报告自身 +10、`docs/README.md` +1、`2026-08-17` 设计 +1；`scripts/*README.md` 减 7），详见 #16。
+
+---
+
 ## 7. 本环境**未核实**项（勿当作结论）
 
-| 项 | 原因 |
-|---|---|
-| C# 门禁（`dotnet build` 0 警告 / `dotnet test` 657 通过） | 沙箱无 dotnet SDK；且 `Pathoschild.Stardew.ModBuildConfig` 需要真实游戏目录（`STARDREW_VALLEY_GAME_PATH`），Docker 才有 |
-| 游戏内 IT / Docker 三容器 E2E / soak | 需要游戏本体 + 真实 LLM key，本环境不具备 |
-| `check-dead-assertions.mjs` 重跑数字（273 条残留等） | 依赖 gitignored 的 `logs/test_results/` 历史断言日志，仓库内不存在 |
-| AGENTS 中"性能/体感/行为"类描述（卡死排查结论、体验打分） | 不可证伪，需实机 |
-| `Check: test-anti-cheat`、`check-privacy.mjs` | 未纳入本轮（不在文档声明的验证门槛里）；如需可单独跑 |
+| 项 | 原因 | 跟踪 |
+|---|---|---|
+| C# 门禁（`dotnet build` 0 警告 / `dotnet test` 657 通过） | 沙箱无 dotnet SDK；且 `Pathoschild.Stardew.ModBuildConfig` 需要真实游戏目录（`STARDREW_VALLEY_GAME_PATH`），Docker 才有。`.github/workflows/ci.yml` 当前**只有 TS job**，无 dotnet 步骤 | #18 |
+| 游戏内 IT / Docker 三容器 E2E / soak | 需要游戏本体 + 真实 LLM key，本环境不具备 | #18（同属"需要真实环境"的验证面） |
+| `check-dead-assertions.mjs` 重跑数字（273 条残留等） | 依赖 gitignored 的 `logs/test_results/` 历史断言日志，仓库内不存在 | #19 |
+| AGENTS 中"性能/体感/行为"类描述（卡死排查结论、体验打分） | 不可证伪，需实机 | — |
+| `check-privacy.mjs` | 未纳入本轮（不在文档声明的验证门槛里）；如需可单独跑。`check:anti-cheat` 已跑通 PASS，见 §6bis | — |
 
 ---
 

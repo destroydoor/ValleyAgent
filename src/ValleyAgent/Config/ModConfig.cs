@@ -33,7 +33,7 @@ public enum LanguageMode
 //   PythonServerStartupTimeoutSeconds / PythonServerMaxRestartAttempts（均已 [Obsolete]，包在
 //   #pragma warning disable CS0618 内）、ModelName → LlmModel、DialogueTemperature（存档兼容）。
 //   删除它们等于放弃老 config.json 的迁移，需连 MigrateLegacyFields + scripts/docker/prep-mods.ps1
-//   一起改（该脚本会写 AutoStartPythonServer=false）。
+//   一起改（该脚本会写 AutoStartPythonServer=false）。**A 类不在 #13 的摘除范围内。**
 //
 // 【B 类：消费者已被删除的孤儿配置 —— 待摘除，需一次带编译验证的改动】
 //   ServerAddress（直连 LLM 通路已禁，改走 TS Agent Server）、DevMode、DebugLogEnabled、
@@ -44,6 +44,7 @@ public enum LanguageMode
 //   面板上**——即玩家能改、能保存，但不产生任何效果。
 //   摘除顺序：ModConfig 属性 → Validate 钳制 → GMCMIntegration 条目 → CopyFrom 复制，
 //   并在有 dotnet 的环境跑 `dotnet build`（TestMod/UnitTests 均 TreatWarningsAsErrors）。
+//   摘除进度跟踪：GitHub issue #13（"配置项可改但无效"）。
 // ────────────────────────────────────────────────────────────────────────────
 public class ModConfig
 {
