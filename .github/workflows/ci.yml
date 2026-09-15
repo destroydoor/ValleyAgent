@@ -5,25 +5,26 @@
 # 覆盖：
 #   ts     — TS 四连（test / typecheck / check:protocol）+ 隐私扫描。
 #   csharp — C# 单测在 docker/Dockerfile.unittests 容器内跑，解除 PR #3 的
-#            "C# 不进 CI" 决策。原决策的障碍只有一个：UnitTests 经
-#            ModBuildConfig 引用游戏 dll（$(GamePath)\smapi-internal），
-#            游戏文件有版权不能进仓库、匿名 steamcmd 下载 413150 已实证
-#            不可行（付费 depot 报 No subscription）。解除路径与 JunimoServer、
-#            game-ci 同款：拥有游戏的 Steam 账号凭据进 GitHub Secrets，
-#            CI 运行时下载 Linux depot + 装 SMAPI，再以只读卷挂进单测容器。
-#            游戏目录按 Steam buildid 缓存（actions/cache 为仓库私有，fork
-#            不可见，不属于对外分发），版本不变时免登录免下载。
+#            "C# 不进 CI" 决策。原决策的障碍：UnitTests 经 ModBuildConfig
+#            引用游戏 dll（$(GamePath)\smapi-internal），游戏文件有版权
+#            不能进公开仓库，匿名 steamcmd 下载 413150 也不可行（付费
+#            depot 报 No subscription）。
+#            解除路径 = 私有镜像仓（取代 #6 的 Steam 凭据方案）：把本机
+#            docker/linux-game（Linux depot，686MB）推到一个 **私有**
+#            GitHub 仓库，CI 用只读 PAT 拉取，装 SMAPI 后以只读卷挂进
+#            单测容器。版权文件仅存私有仓 + 用户自有 License 内的使用，
+#            不构成对外分发；Steam 账号凭据不进 GitHub。
 #   游戏内 IT / 联机 E2E（Dockerfile.gameit + compose）不进 CI：需真实 LLM
 #   key、存档与多容器编排，继续走本地（scripts/test/run_farmhand_e2e.ps1）。
 #
 # Secrets（Settings → Secrets and variables → Actions 配齐后 csharp job 自动启用；
 # 缺省时 job 跳过并留 notice，PR 保持绿）：
-#   STEAM_USERNAME           拥有 Stardew Valley 的 Steam 账号（建议专用小号）
-#   STEAM_PASSWORD           该账号密码
-#   STEAM_CONFIG_VDF_BASE64  steamcmd 自己的 config/config.vdf 的 base64——内含
-#                            ssfn 机器授权，使 CI 登录免 Steam Guard 验证码。
-#                            生成方式：本地跑一次 scripts/ci/export-steam-config.ps1；
-#                            若日后改密/登出导致失效，重跑一次重新导出即可。
+#   STARDW_GAME_REPO  私有游戏镜像仓全名，如 destroydoor/stardew-game-files
+#   STARDW_GAME_PAT   只读访问该私有仓的 PAT（细粒度令牌：仅该仓库 +
+#                     Contents: Read-only 即可）
+#   一次性准备：跑 scripts/ci/push-game-files.ps1 建仓并推送游戏文件
+#   （脚本输出 PAT 配置指引）。游戏更新后重跑一次即换新（单提交镜像，
+#   仓库体积不膨胀；镜像仓 HEAD 即被测版本，无需缓存与版本探测）。
 #
 # matrix 含 windows-latest：专抓 EBUSY 类 Windows 文件锁缺陷（PR #2 实测踩过）。
 name: CI
@@ -85,15 +86,14 @@ jobs:
     steps:
       - id: check
         env:
-          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
-          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
-          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF_BASE64 }}
+          GAME_REPO: ${{ secrets.STARDW_GAME_REPO }}
+          GAME_PAT: ${{ secrets.STARDW_GAME_PAT }}
         run: |
-          if [ -n "$STEAM_USERNAME" ] && [ -n "$STEAM_PASSWORD" ] && [ -n "$STEAM_CONFIG_VDF" ]; then
+          if [ -n "$GAME_REPO" ] && [ -n "$GAME_PAT" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::C# 测试 job 已跳过：需配置 STEAM_USERNAME / STEAM_PASSWORD / STEAM_CONFIG_VDF_BASE64 secrets（生成方式见 ci.yml 头部注释）"
+            echo "::notice::C# 测试 job 已跳过：需配置 STARDW_GAME_REPO / STARDW_GAME_PAT secrets（准备步骤见 ci.yml 头部注释）"
           fi
 
   csharp:
@@ -101,75 +101,36 @@ jobs:
     needs: csharp-guard
     if: needs.csharp-guard.outputs.enabled == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
-      GAME_DIR: ${{ runner.temp }}/stardew-game
-      STEAMCMD_DIR: ${{ runner.temp }}/steamcmd
-      STEAM_HOME: ${{ runner.temp }}/steam-home
+      GAME_DIR: ${{ github.workspace }}/game-files
       SMAPI_VERSION: "4.3.2"
-      SDV_APPID: "413150"
     steps:
       - uses: actions/checkout@v4
 
-      # 缓存键 = Steam 当前 buildid；探测失败退化为按月（代价：每月多一次下载）。
-      - name: Probe Steam buildid (cache key)
-        id: probe
-        run: |
-          buildid="$(curl -fsSL --retry 3 --max-time 20 "https://api.steamcmd.net/v1/info/${SDV_APPID}" \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"][sys.argv[1]]["depots"]["branches"]["public"]["buildid"])' "${SDV_APPID}" 2>/dev/null || true)"
-          if [ -z "$buildid" ]; then
-            buildid="fallback-$(date +%Y%m)"
-            echo "::warning::api.steamcmd.net 不可用，缓存键退化为按月（buildid=$buildid）"
-          fi
-          echo "buildid=$buildid" >> "$GITHUB_OUTPUT"
-
-      - name: Restore game dir cache
-        id: game-cache
-        uses: actions/cache@v4
+      # 只读 PAT 拉私有镜像仓；镜像仓内容即测试所针对的游戏版本，
+      # 用户重推（push-game-files.ps1）即换新，无需缓存与版本探测。
+      - name: Checkout game files (private mirror)
+        uses: actions/checkout@v4
         with:
-          path: ${{ runner.temp }}/stardew-game
-          key: stardew-linux-${{ env.SDV_APPID }}-${{ steps.probe.outputs.buildid }}
+          repository: ${{ secrets.STARDW_GAME_REPO }}
+          token: ${{ secrets.STARDW_GAME_PAT }}
+          path: game-files
 
-      - name: Download game (steamcmd) + install SMAPI
-        if: steps.game-cache.outputs.cache-hit != 'true'
-        env:
-          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
-          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
-          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF_BASE64 }}
+      # 镜像仓按设计存裸游戏文件（无 SMAPI）；已有 SMAPI 时跳过安装，两态都兼容。
+      - name: Install SMAPI (skip if mirror already has it)
         run: |
           set -euo pipefail
-          sudo apt-get update -qq && sudo apt-get install -y -qq lib32gcc-s1 unzip
-
-          mkdir -p "$STEAMCMD_DIR" && cd "$STEAMCMD_DIR"
-          curl -fsSL --retry 3 "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar xz
-
-          # ssfn 机器授权随 config.vdf 注入，登录免 Steam Guard 验证码。
-          # steamcmd 的 config 解析路径在不同安装形态下有 cwd / ~/Steam / ~/.steam
-          # 三种口径，全部预置，命中哪处都行。
-          for cfg in "$STEAMCMD_DIR/config" "$STEAM_HOME/Steam/config" "$STEAM_HOME/.steam/config"; do
-            mkdir -p "$cfg"
-            printf '%s' "$STEAM_CONFIG_VDF" | base64 -d > "$cfg/config.vdf"
-          done
-
-          mkdir -p "$GAME_DIR"
-          set +e
-          HOME="$STEAM_HOME" timeout 1800 "$STEAMCMD_DIR/steamcmd" \
-            +@ShutdownOnFailedCommand 1 \
-            +force_install_dir "$GAME_DIR" \
-            +login "$STEAM_USERNAME" "$STEAM_PASSWORD" \
-            +app_update "$SDV_APPID" validate \
-            +quit 2>&1 | tee "$STEAMCMD_DIR/steamcmd.log"
-          set -e
-          grep -q "Logged in OK" "$STEAMCMD_DIR/steamcmd.log" \
-            || { echo "::error::Steam 登录失败（检查三个 secrets；若改密/登出致 ssfn 失效，重跑 scripts/ci/export-steam-config.ps1 重新导出）"; exit 1; }
-
-          # 非交互安装 SMAPI（printf 应答安装器菜单，配方同 JunimoServer docker 构建）
-          curl -fsSL --retry 5 "https://github.com/Pathoschild/SMAPI/releases/download/${SMAPI_VERSION}/SMAPI-${SMAPI_VERSION}-installer.zip" -o /tmp/smapi.zip
-          unzip -q /tmp/smapi.zip -d /tmp/smapi
-          printf '2\n\n' | "/tmp/smapi/SMAPI ${SMAPI_VERSION} installer/internal/linux/SMAPI.Installer" --install --game-path "$GAME_DIR"
-          rm -rf /tmp/smapi /tmp/smapi.zip
-
-          test -f "$GAME_DIR/Stardew Valley.dll" || { echo "::error::游戏下载不完整（缺 Stardew Valley.dll）"; exit 1; }
+          if [ -f "$GAME_DIR/smapi-internal/StardewModdingAPI.dll" ]; then
+            echo "镜像仓已含 SMAPI，跳过安装"
+          else
+            curl -fsSL --retry 5 "https://github.com/Pathoschild/SMAPI/releases/download/${SMAPI_VERSION}/SMAPI-${SMAPI_VERSION}-installer.zip" -o /tmp/smapi.zip
+            unzip -q /tmp/smapi.zip -d /tmp/smapi
+            # 非交互安装（printf 应答安装器菜单，配方同 JunimoServer docker 构建）
+            printf '2\n\n' | "/tmp/smapi/SMAPI ${SMAPI_VERSION} installer/internal/linux/SMAPI.Installer" --install --game-path "$GAME_DIR"
+            rm -rf /tmp/smapi /tmp/smapi.zip
+          fi
+          test -f "$GAME_DIR/Stardew Valley.dll" || { echo "::error::游戏文件不完整（缺 Stardew Valley.dll），请重跑 scripts/ci/push-game-files.ps1"; exit 1; }
           test -f "$GAME_DIR/smapi-internal/SMAPI.Toolkit.dll" || { echo "::error::SMAPI 安装不完整（缺 smapi-internal/SMAPI.Toolkit.dll）"; exit 1; }
 
       - name: Build unit-test image
