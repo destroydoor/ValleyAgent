@@ -244,7 +244,8 @@ public class F_FollowCrossMap : V3TestBase
         {
             // Phase 2 end: player warped @600（~675 完成），NPC 走到 Farm 出口（~25格≈13s）+
             // 旅行 180 tick + 从 BusStop 入口走向玩家
-            Assert("player_on_busstop", string.Equals(playerLoc, "BusStop", StringComparison.OrdinalIgnoreCase),
+            AssertEx("player_on_busstop", string.Equals(playerLoc, "BusStop", StringComparison.OrdinalIgnoreCase),
+                "SafeWarp.Farmer 落点守卫失败或剧情事件把玩家拉走（WarpTargetGuard 拒绝落点/事件重定向），tick=2800 时玩家不在 BusStop",
                 $"tick={tick} player={playerLoc} (expected BusStop)");
             Assert("npc_on_busstop", string.Equals(npcLoc, "BusStop", StringComparison.OrdinalIgnoreCase),
                 $"tick={tick} npc={npcLoc} (expected BusStop)");
@@ -272,7 +273,9 @@ public class F_FollowCrossMap : V3TestBase
         else if (tick == 7700)
         {
             // 最终稳态：玩家与 NPC 都在 Farm，且 NPC 已跟到玩家附近
-            Assert("final_same_map", isSameMap, $"tick={tick} player={playerLoc} npc={npcLoc}");
+            AssertEx("final_same_map", isSameMap,
+                "FOLLOW 跨图跟随断裂（FOLLOW 缺陷族）：玩家已回到 Farm 但 NPC 仍滞留在 Town/BusStop 或旅行中途被丢下",
+                $"tick={tick} player={playerLoc} npc={npcLoc}");
             Assert("final_near_player", dist < 50f, $"tick={tick} dist={dist:F1}");
         }
 

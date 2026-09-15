@@ -141,7 +141,8 @@ public class IT04_F5_EvictionNotification : IntegrationTestBase
 
             var promoted = _allocationManager.ForceAllocate(evictor);
             _evicted = _evictedNpcName != null;
-            Assert("eviction_triggered", _evicted,
+            AssertEx("eviction_triggered", _evicted,
+                "AgentAllocationManager 淘汰链失效：满池 [Min,Max] 下 ForceAllocate 未触发 OnAgentDeallocated（KeepUntil/override 过滤把应淘汰者豁免），evictedNpc 仍为 null",
                 $"ForceAllocate({evictor})={promoted}, evictedNpc={_evictedNpcName ?? "(none)"}");
 
             _allocationManager.OnAgentDeallocated -= OnDeallocated;
@@ -151,7 +152,8 @@ public class IT04_F5_EvictionNotification : IntegrationTestBase
         if (CurrentTick == 90 && _evicted && !_asserted)
         {
             _asserted = true;
-            Assert("evicted_npc_name_captured", !string.IsNullOrEmpty(_evictedNpcName),
+            AssertEx("evicted_npc_name_captured", !string.IsNullOrEmpty(_evictedNpcName),
+                "OnAgentDeallocated 事件参数缺 NpcName（AgentAllocationEventArgs.NpcName 未赋值），事件触发了但名字没捕获到",
                 $"evictedNpc={_evictedNpcName}");
 
             // chatBox "告别离开" 消息由 DialogueBoxInputPatch.PromoteToAgent 内部写入，

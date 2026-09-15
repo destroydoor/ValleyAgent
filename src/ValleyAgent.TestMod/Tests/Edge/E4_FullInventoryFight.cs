@@ -130,12 +130,12 @@ public class E4_FullInventoryFight : V3TestBase
             Monitor.Log($"[E4] tick {CurrentTick}: player inv={invCount}, monster={_monster?.Health ?? -1}",
                 LogLevel.Info);
 
-            // Check if monster died
+            // Check if monster died（_monsterDied 供结尾战利品断言使用）
             if (_monster != null && (_monster.Health <= 0 || _monster.currentLocation == null))
             {
                 _monsterDied = true;
-                Assert("Monster was killed", _monster.Health <= 0 || _monster.currentLocation == null,
-                    "monster died or despawned");
+                // 原 "Monster was killed" 断言已删（2026-09-14 死断言清理）：
+                // 与外层 if 条件完全相同，构造性恒真。
             }
         }
 
@@ -148,12 +148,8 @@ public class E4_FullInventoryFight : V3TestBase
             Monitor.Log($"[E4] 600tick check: inv={_inventoryCountAfter}, debris={_debrisCountAfter}",
                 LogLevel.Info);
 
-            // Monster loot should appear as debris (drops on ground)
-            if (_debrisCountAfter > _debrisCountBefore)
-            {
-                Assert("Loot dropped on ground", _debrisCountAfter > _debrisCountBefore,
-                    $"debris {_debrisCountBefore} to {_debrisCountAfter}");
-            }
+            // 原 "Loot dropped on ground" 断言已删（2026-09-14 死断言清理）：
+            // 与外层 if 条件相同，构造性恒真；结尾的 "Monster loot appeared on ground" 已覆盖该语义。
         }
 
         // Check final state at 1200 ticks
@@ -163,17 +159,21 @@ public class E4_FullInventoryFight : V3TestBase
             _debrisCountAfter = Game1.currentLocation?.debris.Count ?? 0;
 
             // Core assertions
-            Assert("Player inventory stayed at 12 after fight", _inventoryCountAfter == 12,
+            AssertEx("Player inventory stayed at 12 after fight", _inventoryCountAfter == 12,
+                "怪物战利品被 SDV 拾取逻辑塞进玩家背包（可堆叠槽位合并），背包数量偏离 Setup 填满的 12",
                 $"count={_inventoryCountAfter}");
 
             // 战利品可能出现在地面上（debris）或丢失（背包满时 SDV 原版行为）
             var hasLootOnGround = _debrisCountAfter > _debrisCountBefore;
-            Assert("Monster loot appeared on ground", hasLootOnGround || _monsterDied,
+            AssertEx("Monster loot appeared on ground", hasLootOnGround || _monsterDied,
+                "FIGHT 从未真正开打：slime 存活（Health>0 且仍在 characters）且 debris 无增长，" +
+                "说明 NPC 未参与战斗而非'背包满战利品丢失'",
                 hasLootOnGround
                     ? $"debris {_debrisCountBefore} → {_debrisCountAfter}"
                     : $"monsterDied={_monsterDied} debris unchanged ({_debrisCountBefore}) — loot may be lost (acceptable: full inventory)");
 
-            Assert("NPC participated in fight", _npc != null);
+            // 原 "NPC participated in fight" 断言已删（2026-09-14 死断言清理）：
+            // Setup 中 _npc==null 已走 Skip 提前返回，Update 里断言 _npc!=null 构造性恒真。
 
             return true;
         }

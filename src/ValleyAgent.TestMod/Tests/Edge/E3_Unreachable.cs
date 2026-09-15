@@ -85,8 +85,8 @@ public class E3_Unreachable : V3TestBase
             loc.resourceClumps.Add(clump);
         }
 
-        Assert("ResourceClump barriers created", loc.resourceClumps.Count > 0,
-            $"count={loc.resourceClumps.Count}");
+        // 原 "ResourceClump barriers created" 断言已删（2026-09-14 死断言清理）：
+        // 紧跟无条件 Add 循环断言 Count>0 属构造性恒真，checker 判死。
     }
 
     public override bool Update()
@@ -126,7 +126,8 @@ public class E3_Unreachable : V3TestBase
         }
 
         var loc = _npc.currentLocation;
-        Assert("NPC currentLocation not null", loc != null,
+        AssertEx("NPC currentLocation not null", loc != null,
+            "不可达目标导致寻路失败清理路径把 NPC 从地图移除（despawn），currentLocation 变 null",
             $"loc={loc?.NameOrUniqueName ?? "null"}");
 
         // Detect stuck: NPC hasn't moved meaningfully
@@ -139,7 +140,8 @@ public class E3_Unreachable : V3TestBase
         }
 
         // Verify no crash (NPC still alive and has a location)
-        Assert("NPC has not crashed", _npc.currentLocation != null,
+        AssertEx("NPC has not crashed", _npc.currentLocation != null,
+            "寻路失败后的 NPC 清理/复活逻辑把 Haley 移出 characters（同 F2 Teardown 记录过的死亡链），NPC 被销毁",
             $"location={_npc.currentLocation?.NameOrUniqueName ?? "null"}");
 
         // Success: test completes after TimeoutTicks (we're observing behavior, not demanding success)

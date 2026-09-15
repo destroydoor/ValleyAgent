@@ -106,9 +106,10 @@ public class F8_StateDurationBypass : V3TestBase
         // 全部轮次完成后断言
         if (_round >= 10 && tick >= 10 * 200 + 60)
         {
-            Assert(
+            AssertEx(
                 "ForceTransition_duration_bypass_blocked",
                 _illegalTransitionsSucceeded == 0,
+                "ForceTransition 绕过持续时间守卫（历史漏洞）：1 tick 内的非法转换成功到达目标状态，_illegalTransitionsSucceeded>0",
                 $"ForceTransition 绕过: {_illegalTransitionsSucceeded}/{_totalTransitions}次非法转换成功。" +
                 "持续时间守卫已在状态机转换层强制执行。" +
                 $"违规详情：{string.Join("; ", _violationLog.Take(5))}");
@@ -118,10 +119,8 @@ public class F8_StateDurationBypass : V3TestBase
                 true,
                 $"完成{_totalTransitions}次转换测试，无崩溃");
 
-            Assert(
-                "At_least_10_rounds_executed",
-                _round >= 10,
-                $"执行了{_round}轮测试");
+            // 原 "At_least_10_rounds_executed" 断言已删（2026-09-14 死断言清理）：
+            // 外层 if 守卫即 `_round >= 10`，断言同条件构造性恒真。
 
             return true;
         }

@@ -116,21 +116,25 @@ public class IT07_G1_ConsecutiveFailureFallback : IntegrationTestBase
                 Assert("fallback_dislike_no_throw", false, $"GetLocalGiftFallback(6, Trash) threw: {ex.Message}");
             }
 
-            Assert("fallback_love_nonempty", !string.IsNullOrEmpty(fallbackLove),
+            AssertEx("fallback_love_nonempty", !string.IsNullOrEmpty(fallbackLove),
+                "GetLocalGiftFallback 对 love 档返回 null/空（G1 事故的 null 前缀拼回退文本路径回归）",
                 $"fallbackLove={fallbackLove ?? "(null)"}");
-            Assert("fallback_dislike_nonempty", !string.IsNullOrEmpty(fallbackDislike),
+            AssertEx("fallback_dislike_nonempty", !string.IsNullOrEmpty(fallbackDislike),
+                "GetLocalGiftFallback 对 dislike 档返回 null/空（本地回退表缺 dislike 档条目）",
                 $"fallbackDislike={fallbackDislike ?? "(null)"}");
 
             // 验证文本包含礼物名（确认走的是有意义的回退路径，而非空字符串）
             if (fallbackLove != null)
             {
-                Assert("fallback_love_mentions_item", fallbackLove.Contains("Tulip"),
+                AssertEx("fallback_love_mentions_item", fallbackLove.Contains("Tulip"),
+                    "回退文本是通用模板、未插值礼物名（string.Format 槽位丢失），love 回退对任何礼物内容相同",
                     $"fallbackLove={fallbackLove}");
             }
 
             if (fallbackDislike != null)
             {
-                Assert("fallback_dislike_mentions_item", fallbackDislike.Contains("Trash"),
+                AssertEx("fallback_dislike_mentions_item", fallbackDislike.Contains("Trash"),
+                    "dislike 回退文本未插值礼物名（模板槽位丢失），回退语义退化",
                     $"fallbackDislike={fallbackDislike}");
             }
         }
@@ -145,7 +149,8 @@ public class IT07_G1_ConsecutiveFailureFallback : IntegrationTestBase
             var dict = field?.GetValue(null) as ConcurrentDictionary<string, int>;
 
             var hasEntry = dict != null && dict.TryGetValue(NpcName, out var count) && count >= 2;
-            Assert("consecutive_failures_state_set", hasEntry,
+            AssertEx("consecutive_failures_state_set", hasEntry,
+                "_consecutiveFailures 计数器未累计（送礼失败路径没写计数或字段改名反射找不到），G1 连续失败熔断的前置状态缺失",
                 hasEntry ? $"count={dict![NpcName]}" : "state not set or count < 2");
         }
 

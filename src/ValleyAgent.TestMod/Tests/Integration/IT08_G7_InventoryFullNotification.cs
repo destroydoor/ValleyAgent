@@ -140,12 +140,14 @@ public class IT08_G7_InventoryFullNotification : IntegrationTestBase
                 var result = _adjustExecutor.Execute(message);
 
                 // 背包满 → 玩家收物步提交失败 → INVENTORY_FULL
-                Assert("inventory_full_rejected", !result.Success && result.FailureCode == ProtocolV2.AdjustFailureCode.InventoryFull,
+                AssertEx("inventory_full_rejected", !result.Success && result.FailureCode == ProtocolV2.AdjustFailureCode.InventoryFull,
+                    "AdjustExecutor 物理校验漏判背包满：满背包下玩家收物步仍提交成功（4-op 原子批的 INVENTORY_FULL 分支被绕过）",
                     result.Success ? "batch succeeded despite full inventory" : $"rejected: {result.FailureCode}");
 
                 // 原子回滚：第一步（NPC 扣物）已提交后被回滚
                 var npcTulipAfter = CountNpcTulip(_agent);
-                Assert("rollback_npc_item_restored", npcTulipAfter == _npcTulipBefore,
+                AssertEx("rollback_npc_item_restored", npcTulipAfter == _npcTulipBefore,
+                    "回滚缺失：第二步失败后第一步（NPC 扣物）未回补，NPC 郁金香数量少于 _npcTulipBefore（G7 零副作用承诺被破坏）",
                     $"npc tulip after failed batch = {npcTulipAfter} (expected {_npcTulipBefore}, 回滚生效)");
             }
             catch (Exception ex)
@@ -164,7 +166,8 @@ public class IT08_G7_InventoryFullNotification : IntegrationTestBase
 
             var hasTulip = Game1.player.Items.Any(i => i is Object obj &&
                 (obj.QualifiedItemId == TulipItemId || obj.ItemId == TulipItemId));
-            Assert("no_tulip_in_inventory", !hasTulip,
+            AssertEx("no_tulip_in_inventory", !hasTulip,
+                "失败批的物品仍进了玩家背包（校验与提交顺序错位：先入包后判满），hasTulip=true",
                 hasTulip ? "tulip unexpectedly in player inventory" : "tulip not in player inventory (正确)");
         }
 

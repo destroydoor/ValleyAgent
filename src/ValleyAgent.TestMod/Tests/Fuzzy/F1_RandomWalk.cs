@@ -229,18 +229,22 @@ public class F1_RandomWalk : V3TestBase
         var finalPos = _npc.Tile;
         var posChanged = Vector2.Distance(finalPos, _initialPos) >= 1.0f;
 
-        Assert("NPC_moved_at_least_once", posChanged,
+        AssertEx("NPC_moved_at_least_once", posChanged,
+            "MoveTo 全部返回失败且 fallback PathFindController 未产生位移（寻路服务失灵），NPC 停在初始格 1 格以内",
             $"Initial: {_initialPos}, Final: {finalPos}");
-        Assert("PathFindController_existed_at_some_point", _controllerExistedOnce,
+        AssertEx("PathFindController_existed_at_some_point", _controllerExistedOnce,
+            "MovementService.MoveTo 从未成功创建 controller（返回非 Success/AlreadyMoving 且 fallback 分支未命中），全程 controller=null",
             "Controller was observed at least once");
         Assert("Decision_queue_no_error", !_hadError,
             _hadError ? "Exception occurred during random walks" : "No exception during random walks");
-        Assert("Stuck_count_less_than_3", _stuckCount < 3,
+        AssertEx("Stuck_count_less_than_3", _stuckCount < 3,
+            "连续多轮随机目标都走不动（stuck 检测在 120 tick 无位移时累计 3 次以上），寻路或通行判定有系统性故障",
             $"stuckCount={_stuckCount}");
-        Assert("Final_tile_walkable",
+        AssertEx("Final_tile_walkable",
             _npc.currentLocation?.isTilePassable(
                 new Location((int)finalPos.X * 64, (int)finalPos.Y * 64),
                 Game1.viewport) ?? false,
+            "NPC 最终停在了不可通行瓦片上（setTileLocation 直接落格绕过了通行校验，或移动把 NPC 挤进障碍物）",
             $"Final tile {finalPos} walkable check");
 
         _monitor.Log(

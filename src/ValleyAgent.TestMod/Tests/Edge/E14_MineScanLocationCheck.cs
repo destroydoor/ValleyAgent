@@ -180,16 +180,18 @@ public class E14_MineScanLocationCheck : V3TestBase
             var mountainSees = !string.IsNullOrEmpty(_mountainScanResult);
 
             // 核心漏洞：ForceMiningLocation 不影响 ScanEnvironment
-            Assert(
+            AssertEx(
                 "ForceMiningLocation_flag_affects_ScanEnvironment",
                 !farmBlind,
+                "ForceMiningLocation 标志未传达到 MineHandler.ScanEnvironment（IsMiningLocation 硬守卫压过标志），Farm 上放置的石头扫描结果为 NULL",
                 $"ForceMiningLocation=true 但 Farm 扫描结果='{_farmScanResult ?? "NULL"}'。" +
                 "如果标志正确传递到 ScanEnvironment，Farm 上应能扫描到石头。");
 
             // 对照
-            Assert(
+            AssertEx(
                 "Mountain_scan_baseline_works",
                 mountainSees,
+                "采矿基线崩塌：Mountain（合法采矿位置）扫描返回 NULL——MineHandler 位置判定或石头注册失效",
                 $"Mountain扫描结果='{_mountainScanResult ?? "NULL"}'");
 
             Assert(

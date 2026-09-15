@@ -132,10 +132,11 @@ public class F_MineRealCombat : V3TestBase
             _ = EventCleanup.ClearActiveEvents(Monitor, $"{TestName} post-warp suppression");
         }
 
-        // ── tick 300：剧情事件已清理（B 任务验证点） ──
+        // ── tick 300：剧情事件已清理（B 任务验证点，抑制窗口 180 tick 已结束） ──
         if (tick == 300)
         {
-            Assert("no_event_lingering_after_mine_warp", !EventCleanup.IsEventActive,
+            AssertEx("no_event_lingering_after_mine_warp", !EventCleanup.IsEventActive,
+                "Marlon 入矿剧情在抑制窗口（180 tick）结束后被游戏重新拉起，ClearActiveEvents 清不掉导致 eventUp=true",
                 $"eventUp={Game1.eventUp} currentEvent={Game1.currentLocation?.currentEvent != null}");
         }
 

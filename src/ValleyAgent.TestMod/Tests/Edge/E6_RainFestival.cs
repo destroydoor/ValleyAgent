@@ -23,7 +23,6 @@ public class E6_RainFestival : V3TestBase
     private string _decisionState = string.Empty;
 
     private NPC? _npc;
-    private bool _weatherInContextVerified;
     private string _originalSeason = "";
     private int _originalDay;
 
@@ -85,18 +84,8 @@ public class E6_RainFestival : V3TestBase
 
         var tick = CurrentTick;
 
-        // 验证天气上下文正确注入（不依赖 LLM 响应）
-        if (!_weatherInContextVerified && tick == 30)
-        {
-            _weatherInContextVerified = true;
-            var isRaining = Game1.isRaining;
-            var season = Game1.currentSeason;
-            var day = Game1.dayOfMonth;
-            Assert("Weather context is set (isRaining=true)", isRaining,
-                $"isRaining={isRaining}. DecisionContextBuilder 会将此注入决策上下文。");
-            Assert("Festival date is set (Spring 13)", season == "spring" && day == 13,
-                $"Season={season}, Day={day}. Egg Festival = Spring 13。");
-        }
+        // 原 "Weather context is set (isRaining=true)" / "Festival date is set (Spring 13)" 断言已删
+        //（2026-09-14 死断言清理）：Setup 无条件写入 isRaining/season/day，tick 30 读回属构造性恒真。
 
         // Poll for decision result every 30 ticks
         if (!_decisionMade && tick % 30 == 0 && tick > 30)
@@ -121,7 +110,8 @@ public class E6_RainFestival : V3TestBase
                 return true;
             }
 
-            Assert("Decision was made with state", !string.IsNullOrEmpty(_decisionState), $"State={_decisionState}");
+            // 原 "Decision was made with state" 断言已删（2026-09-14 死断言清理）：
+            // 走到这里必然 _decisionMade=true，而该标志只在 state 非空时置位，构造性恒真。
 
             // ─ 天气/节日关键词检查（软检查：LLM 自由回答，关键词非必须） ─
             var reasonLower = _decisionReason.ToLowerInvariant();

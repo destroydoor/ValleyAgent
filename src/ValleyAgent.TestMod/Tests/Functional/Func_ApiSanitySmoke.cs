@@ -161,9 +161,10 @@ public class Func_ApiSanitySmoke : V3TestBase
                 _failed == 0,
                 $"通过={_passed} 失败={_failed} 共={_passed + _failed}");
 
-            Assert(
+            AssertEx(
                 "At_least_10_API_calls_tested",
                 _passed + _failed >= 10,
+                "IValleyAgentApi 表面收缩（API 方法被删除或前置 Skip 提前退出），CheckApi 实际执行数跌破 10",
                 $"只测试了{_passed + _failed}个API");
 
             return true;

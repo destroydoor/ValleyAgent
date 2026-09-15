@@ -90,7 +90,10 @@ public class E1_LongPathfind : V3TestBase
         {
             _lastAssertTick = CurrentTick;
             _controllerSeen = _controllerSeen || hasController;
-            Assert("NPC_stays_in_range", dist < 50f, $"tick={CurrentTick} dist={dist:F1}");
+            AssertEx("NPC_stays_in_range", dist < 50f,
+                "FOLLOW 寻路失控：controller 持续把 NPC 往反方向带或长距离寻路失败后 NPC 被卡在远处，" +
+                "玩家与 NPC 距离拉大到 50 格以上（dist 超限即触发）",
+                $"tick={CurrentTick} dist={dist:F1}");
         }
 
         return CurrentTick >= TimeoutTicks;
@@ -98,7 +101,9 @@ public class E1_LongPathfind : V3TestBase
 
     public override void Teardown()
     {
-        Assert("NPC_has_controller_at_some_point", _controllerSeen, "controller was seen at some check point");
+        AssertEx("NPC_has_controller_at_some_point", _controllerSeen,
+            "FOLLOW 状态从未生成 PathFindController（TrySetAgentState 被拒或 AgentBrain 未接线寻路），" +
+            "全程 hasController=false");
         Monitor.Log("[E1] Teardown.", LogLevel.Info);
     }
 }

@@ -176,27 +176,32 @@ public class Func_IllegalTransitionAudit : V3TestBase
                 illegalSuccesses.Select(r => $"{r.From}→{r.To}"));
 
             // 核心断言
-            Assert(
+            AssertEx(
                 "No_illegal_transition_succeeds",
                 illegalSuccesses.Count == 0,
+                "TrySetAgentState 经 ForceTransition 绕过 AllowedTransitions（E10 记录的漏洞面）：任一非法状态对实际到达目标态，illegalSuccesses>0",
                 $"总{illegalPairs}个非法转换中{illegalSuccesses.Count}个成功: {bypassSummary}。" +
                 "如果>0，说明 API 使用 ForceTransition 绕过了 AllowedTransitions 规则。");
 
-            Assert(
+            AssertEx(
                 "All_legal_transitions_succeed",
                 legalFailures.Count == 0,
+                "合法转换被误拦（AllowedTransitions 表缺项或拒绝路径误伤合法对），legalFailures>0",
                 $"总{legalPairs}个合法转换中{legalFailures.Count}个失败: " +
                 $"{string.Join(", ", legalFailures.Select(r => $"{r.From}→{r.To}"))}");
 
-            Assert(
+            AssertEx(
                 "Full_transition_matrix_covered",
                 totalPairs >= AllStates.Length * (AllStates.Length - 1),
+                "审计中途因无法进入 from 态大量跳过（_skippedPairs 膨胀），覆盖对数低于全矩阵 N×(N-1)",
                 $"覆盖 {totalPairs}/{AllStates.Length * (AllStates.Length - 1)} 个状态对（自转已跳过）");
 
-            Assert(
-                "Audit_complete_without_crash",
-                true,
-                $"审计总转换={totalPairs}, 合法={legalPairs}, 非法={illegalPairs}, 绕过={illegalSuccesses.Count}, 误拦={legalFailures.Count}, 跳过={_skippedPairs}");
+            // 原 "Audit_complete_without_crash" 心跳断言已删（2026-09-14 死断言清理，K' 降级）：
+            // Assert(true) 心跳型——标记"审计全矩阵跑到收尾"，无失败语义；
+            // 原 detail 统计文案改为下行日志承载，历史键由 checker allowlist 抑制。
+            Monitor.Log(
+                $"[Func_Audit] 审计总转换={totalPairs}, 合法={legalPairs}, 非法={illegalPairs}, 绕过={illegalSuccesses.Count}, 误拦={legalFailures.Count}, 跳过={_skippedPairs}",
+                LogLevel.Info);
 
             return true;
         }

@@ -103,7 +103,8 @@ public class IT01_SetState_HaleyEvent : IntegrationTestBase
                 $"second read state={state2}");
 
             // 确认不是 IDLE（避免 no-op 路径误判通过）
-            Assert("state_not_IDLE", state != "IDLE",
+            AssertEx("state_not_IDLE", state != "IDLE",
+                "set_state 动作是 no-op：CommandExecutor 未把 FOLLOW 写进状态机，GetAgentState 仍返回 IDLE",
                 "state was IDLE — action was a no-op");
         }
 

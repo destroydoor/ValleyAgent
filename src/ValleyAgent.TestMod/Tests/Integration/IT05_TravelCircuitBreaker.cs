@@ -123,7 +123,8 @@ public class IT05_TravelCircuitBreaker : IntegrationTestBase
 
             // 熔断开启时：startedTravel=false 且 result=null
             var blockedByBreaker = !startedTravel && result == null;
-            Assert("travel_blocked_by_circuit_breaker", blockedByBreaker,
+            AssertEx("travel_blocked_by_circuit_breaker", blockedByBreaker,
+                "旅行熔断器失效：熔断开启状态下 NavigateToTaskLocation 仍发起旅行（startedTravel=true 或返回非 null 结果）",
                 $"startedTravel={startedTravel}, result={result ?? "(null)"}");
 
             // 事件/节日也会阻止旅行 — 排除该干扰
@@ -139,7 +140,8 @@ public class IT05_TravelCircuitBreaker : IntegrationTestBase
         {
             _asserted = true;
             var npc = Game1.getCharacterFromName(NpcName);
-            Assert("npc_still_accessible_after_block", npc != null);
+            AssertEx("npc_still_accessible_after_block", npc != null,
+                "熔断阻止路径把 NPC 错误清理出 characters（同 F2 记录过的死亡清理链），getCharacterFromName 返回 null");
 
             var state = Api.GetAgentState(NpcName);
             Assert("state_still_readable", !string.IsNullOrEmpty(state), $"state={state}");

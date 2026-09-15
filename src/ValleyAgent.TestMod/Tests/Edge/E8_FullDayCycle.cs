@@ -15,7 +15,6 @@ namespace ValleyAgent.TestMod.Tests.Edge;
 /// </summary>
 public class E8_FullDayCycle : V3TestBase
 {
-    private readonly bool _noErrors = true;
     private IValleyAgentApi? _api;
     private bool _decisionMade;
     private string _eveningState = string.Empty;
@@ -191,9 +190,12 @@ public class E8_FullDayCycle : V3TestBase
                 var health = _api.GetNpcHealth(_npc.Name);
                 var onMap = _npc.currentLocation != null;
 
-                Assert("DayEnd cleanup processed without error", _noErrors, "No setup errors");
                 Assert("NPC is alive after full day cycle", health > 0, $"Health={health}");
-                Assert("NPC is on map after day cycle", onMap, $"OnMap={onMap}");
+                // 原 "DayEnd cleanup processed without error" 断言已删（2026-09-14 死断言清理）：
+                // 断言对象是 private readonly bool _noErrors = true 字面量字段，构造性恒真。
+                AssertEx("NPC is on map after day cycle", onMap,
+                    "跨天 DayEnd 清理把 NPC 从地图移除后未在次日重新放置（characters 不含 NPC），currentLocation 变 null",
+                    $"OnMap={onMap}");
                 // 放宽状态断言：IDLE/THINKING/FOLLOW 均为合法状态
                 Assert("NPC in valid state after day end",
                     finalState is "IDLE" or "THINKING" or "FOLLOW",

@@ -288,9 +288,10 @@ public class E13_FarmScanLocationCheck : V3TestBase
 
             // 验证修复：FarmHandler.ScanEnvironment 现在有位置守卫，
             // 在非农场位置应返回 null
-            Assert(
+            AssertEx(
                 "FarmHandler_ScanEnvironment_has_location_check",
                 !townScanFoundCrops,
+                "位置守卫被回退：FarmHandler.ScanEnvironment 在 Town 等非农场位置仍返回作物信息（IsFarmLocation 检查被移除/改写）",
                 $"Town扫描结果='{_townScanResult ?? "NULL"}'。" +
                 "FarmHandler.ScanEnvironment 在非农场位置应返回 null（有位置守卫）。");
 
@@ -299,17 +300,19 @@ public class E13_FarmScanLocationCheck : V3TestBase
             // NPC 不可能执行收获。作物数量减少可能是 SDV 引擎行为（如季节变化、作物枯萎），
             // 不应归因于 FarmHandler。
             var npcCannotHarvestOnNonFarm = !townScanFoundCrops;
-            Assert(
+            AssertEx(
                 "NPC_did_not_harvest_crops_on_non_farm_location",
                 npcCannotHarvestOnNonFarm,
+                "同上：Town 扫描守卫失效（townScanFoundCrops=true）时本断言同步失败——ScanEnvironment 返回非 null 意味着 FindFarmingTarget 可锁定 Town 作物",
                 $"Town作物被收获={_townCropsHarvested}。ScanEnvironment位置守卫={!townScanFoundCrops}。" +
                 "ScanEnvironment 返回 null 时，FindFarmingTarget 也不会找到目标，NPC 不可能收获。" +
                 (_townCropsHarvested ? "（注意：作物减少可能是 SDV 引擎行为，非 FarmHandler 收获）" : ""));
 
             // 对照：Farm 位置扫描正常
-            Assert(
+            AssertEx(
                 "Farm_scan_and_harvest_baseline_works",
                 !string.IsNullOrEmpty(_farmScanResult) || _farmCropsHarvested,
+                "Farm 基线崩塌：农场位置扫描返回 NULL 且 Phase2 观察窗口内 _farmCropsHarvested=false（收获链与扫描链同时失灵）",
                 $"Farm扫描结果='{_farmScanResult ?? "NULL"}'。Farm收获={_farmCropsHarvested}。" +
                 (!string.IsNullOrEmpty(_farmScanResult) ? "" : "（Farm扫描返回NULL但作物存在——可能是NPC位置问题）"));
 

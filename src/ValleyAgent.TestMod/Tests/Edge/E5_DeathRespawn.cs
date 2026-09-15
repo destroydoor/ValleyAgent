@@ -164,7 +164,9 @@ public class E5_DeathRespawn : V3TestBase
             var onMap = Game1.currentLocation?.characters?.Contains(_npc) == true;
 
             Assert("NPC is alive (health > 0)", health > 0, $"Health={health}");
-            Assert("NPC is on map", onMap, $"OnMap={onMap}");
+            AssertEx("NPC is on map", onMap,
+                "TryRevive 后 NPC 未被重新加入当前地图 characters（复活链漏掉 re-add，getCharacterFromName 仍返回实例但不在图上）",
+                $"OnMap={onMap}");
             Assert("NPC is in IDLE state", state == "IDLE", $"State={state}");
 
             // 清理史莱姆
