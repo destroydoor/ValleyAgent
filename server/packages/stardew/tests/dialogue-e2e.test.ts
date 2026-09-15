@@ -15,7 +15,6 @@ async function withServer<T>(fn: (port: number) => Promise<T>): Promise<T> {
     hostname: "127.0.0.1",
     dataPath: DATA_PATH,
     agentsDir: dir,
-    enableDirector: false,
     llmConfig: {
       provider: "minimax",
       apiKey: "fake",
@@ -119,7 +118,6 @@ test("server persists memory after dialogue", async () => {
       hostname: "127.0.0.1",
       dataPath: DATA_PATH,
       agentsDir: dir,
-      enableDirector: false,
       llmConfig: {
         provider: "minimax", apiKey: "fake", model: "fake",
         baseUrl: "http://localhost:9999",

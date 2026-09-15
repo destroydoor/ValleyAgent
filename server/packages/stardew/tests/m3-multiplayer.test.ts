@@ -13,12 +13,10 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { EmotionEngine } from "../src/emotion-engine";
 import { PlayerProfileStore, LEGACY_PLAYER_ID } from "../src/player-profile-store";
-import { PlayerProfileManager } from "../src/player-profile";
-import { PlayerDirectory } from "../src/player-directory";
-import { Director } from "../src/director";
-import { BeatStore } from "../src/beat-store";
-import { ActivityLogStore } from "../src/activity-log-store";
-import { GameContextManager } from "../src/game-context";
+// 2026-09-15 偏移审查 C1：`../src/player-directory`（PlayerDirectory）、`../src/director`（Director）、
+// `../src/beat-store`（BeatStore）三个模块已随旧叙事 Director 于 2026-09-14 砍除；
+// PlayerProfileManager / ActivityLogStore / GameContextManager 在本文件从未使用。
+// 这些 import 未被任何断言引用（bun 转译丢弃 → 运行期掩盖），类型检查可见，故删除。
 import { ProtocolAdapter } from "../src/protocol-adapter";
 import { TranscriptStore } from "../src/transcript-store";
 import { StardewAgentRegistry } from "../src/stardew-agent-registry";
@@ -28,7 +26,7 @@ import { VercelAIProvider } from "@valley/core";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import type { GameContext, PlayerProfile } from "../src/types";
+import type { PlayerProfile } from "../src/types";
 
 const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
 

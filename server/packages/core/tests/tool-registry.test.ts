@@ -138,21 +138,22 @@ test("validateCall returns invalid for unknown tool", () => {
 
 test("execute calls the tool function and returns result", async () => {
   const registry = new ToolRegistry();
-  let capturedArgs: Record<string, unknown> | null = null;
+  // TS 无法跟踪闭包内赋值（会一直窄化到 null），用数组收集后按下标断言
+  const captured: Array<Record<string, unknown>> = [];
   registry.register({
     name: "speak",
     description: "Say something",
     visibility: "llm_visible",
     parameters: Type.Object({ text: Type.String() }),
     execute: async (args) => {
-      capturedArgs = args;
+      captured.push(args);
       return { content: "said: " + (args.text as string) };
     },
   });
 
   const result = await registry.execute("speak", { text: "hello" });
   expect(result.content).toBe("said: hello");
-  expect(capturedArgs).toEqual({ text: "hello" });
+  expect(captured[0]).toEqual({ text: "hello" });
 });
 
 test("execute returns isError for thrown exception", async () => {

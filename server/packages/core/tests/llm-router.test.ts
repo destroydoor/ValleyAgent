@@ -1,8 +1,7 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
 import { LlmRouter, type LlmRouterConfig } from "../src/llm-router";
-import { VercelAIProvider, LLMBillingError, LLMUnavailableError } from "../src/llm-provider";
-import type { LlmMessage } from "../src/types";
-import { loadRouterConfig, validateRouterConfig } from "../src/llm-router";
+import { LLMBillingError, LLMUnavailableError } from "../src/llm-provider";
+import { loadRouterConfig } from "../src/llm-router";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
@@ -56,7 +55,6 @@ describe("LlmRouter.withFallback", () => {
   test("primary 成功 → 不调 fallback", async () => {
     const router = new LlmRouter(makeRouterConfig());
     const primarySpy = mock(() => Promise.resolve({ content: "ok", usage: {} }));
-    const fallbackProvider = router.getProvider("director");
     const fallbackSpy = mock(() => Promise.resolve({ content: "fallback", usage: {} }));
     // 注入 override 到 primary provider
     router.getProvider("director")._setCallOverride(primarySpy as any);

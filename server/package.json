@@ -6,9 +6,12 @@
   ],
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p packages/stardew/tsconfig.json && tsc -p packages/core/tsconfig.tests.json",
     "check:imports": "depcruise --config .dependency-cruiser.cjs packages/core/src",
-    "check:protocol": "bun run scripts/check-protocol-contract.ts"
+    "check:protocol": "bun run scripts/check-protocol-contract.ts",
+    "check:test-dead": "cd .. && node scripts/check-dead-assertions.mjs",
+    "check:anti-cheat": "cd .. && node scripts/check-test-anti-cheat.mjs",
+    "check:privacy": "cd .. && node scripts/check-privacy.mjs"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
