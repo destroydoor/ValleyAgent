@@ -230,6 +230,12 @@
           "type": "string",
           "required": false,
           "description": "2026-08-16 联机：发起对话的玩家 ID 原样 echo，C# 据此记录 LastDialoguePlayerId（FOLLOW 目标解析）。可选。"
+        },
+        {
+          "name": "fallbackReason",
+          "type": "string",
+          "required": false,
+          "description": "2026-09-13 R2：fallback=true 时的机器可读降级原因：busy（per-NPC 会话锁超时）/ llm_error（LLM 生成失败）/ billing（LLM 计费失败）/ unavailable（LLM 不可用）。可选，缺省=旧客户端兼容。"
         }
       ]
     },
@@ -292,139 +298,13 @@
       ]
     },
     {
-      "type": "decision",
-      "direction": "csharp_to_ts",
-      "transport": "request_response",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] LLM 决策管道。原 DecideAsync 通过 SendRequestAsync 发送并等 60s 响应，TS routeMessage 无 case -> 60s 超时。批次A已删除 C# 发送端，决策路径改为 RuleBasedDecisionEngine 唯一路径。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "decision"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true,
-          "description": "SendRequestAsync 自动注入"
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（DecisionRequest 类字段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "gift_eval",
-      "direction": "csharp_to_ts",
-      "transport": "request_response",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] 礼物评估管道。原 EvaluateGiftAsync 通过 SendRequestAsync 发送并等 60s 响应，TS 不路由 -> 60s 超时。批次A已删除 C# 发送端，HostGiftTransport 改用本地 GiftReactionResult 兜底反应文本。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "gift_eval"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（GiftEvalRequest 类字段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "rag_query",
-      "direction": "csharp_to_ts",
-      "transport": "request_response",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] RAG 查询管道。原 QueryRagAsync 通过 SendRequestAsync 发送并等 60s 响应，TS 不路由 -> 60s 超时。批次A已删除 C# 发送端。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "rag_query"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（RagQueryRequest 类字段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "state_sync",
-      "direction": "csharp_to_ts",
-      "transport": "request_response",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] 游戏状态同步管道。原 EventHandlerInitializer 通过 SendTestMessageAsync 发送并等响应，TS 不路由 -> 60s 超时（Task.Run 包裹吞异常）。批次A已删除 C# 发送端及 StateSyncSender 类。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "state_sync"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true,
-          "description": "SendTestMessageAsync 自动注入"
-        },
-        {
-          "name": "timestamp",
-          "type": "long",
-          "required": true,
-          "description": "Unix 毫秒时间戳"
-        },
-        {
-          "name": "npcs",
-          "type": "NpcState[]",
-          "required": true,
-          "description": "NPC 状态列表：name/location/position/health/maxHealth/state/inventory/friendship/emotion/nearbyObjects/memory/structuredMemory"
-        },
-        {
-          "name": "gameState",
-          "type": "GameState",
-          "required": true,
-          "description": "游戏状态：time/season/day/year/weather/playerPosition/playerLocation"
-        }
-      ]
-    },
-    {
       "type": "consolidate_day",
       "direction": "csharp_to_ts",
       "transport": "fire_and_forget",
-      "status": "active",
-      "routed_by_ts": true,
-      "sent_by_csharp": true,
-      "description": "日终记忆凝练。C# EventHandlerInitializer 在 OnDayEnding 和 OnDayStarted（跳睡眠补跑）通过 SendMessageAsync 发送；TS routeMessage 路由到幂等日志处理并返回 ack，Phase 1 接入实际 LLM 日结。",
+      "status": "planned",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "[2026-09-14 降级 planned] 记忆日结（逐 Agent LLM 日终凝练）从未实现：C# 每日发送端与 TS 存根已删（审计 M-3，\"active 协议消息两端空转\"）。实现日结时连同 sender/handler 一并恢复。",
       "fields": [
         {
           "name": "type",
@@ -523,96 +403,6 @@
           "type": "string",
           "required": true,
           "description": "选择原因（机器可读）"
-        }
-      ]
-    },
-    {
-      "type": "emotion_sync",
-      "direction": "csharp_to_ts",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] NPC 情绪同步管道。原 Brain.OnEmotionSynced 事件触发 SendMessageAsync 发送，TS 不路由 -> 静默丢弃。批次A已删除 C# 订阅与发送端。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "emotion_sync"
-        },
-        {
-          "name": "npcName",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "emotion",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "intensity",
-          "type": "unknown",
-          "required": true,
-          "description": "unknown - 待补（实际类型未实证）"
-        },
-        {
-          "name": "source",
-          "type": "unknown",
-          "required": true,
-          "description": "unknown - 待补（实际类型未实证）"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true,
-          "description": "Guid N 格式"
-        }
-      ]
-    },
-    {
-      "type": "memory_sync",
-      "direction": "csharp_to_ts",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "[已删除] NPC 记忆同步管道。原 Brain.OnMemorySynced 事件触发 SendMessageAsync 发送，TS 不路由 -> 静默丢弃。批次A已删除 C# 订阅与发送端。保留 schema 条目作为历史记录。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "memory_sync"
-        },
-        {
-          "name": "npcName",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "text",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "importance",
-          "type": "unknown",
-          "required": true,
-          "description": "unknown - 待补（实际类型未实证）"
-        },
-        {
-          "name": "entryType",
-          "type": "unknown",
-          "required": true,
-          "description": "unknown - 待补（实际类型未实证）"
-        },
-        {
-          "name": "requestId",
-          "type": "string",
-          "required": true,
-          "description": "Guid N 格式"
         }
       ]
     },
@@ -796,98 +586,6 @@
           "type": "string",
           "required": true,
           "description": "Guid N 格式，C# 回执可回带"
-        }
-      ]
-    },
-    {
-      "type": "beat_plan",
-      "direction": "ts_to_csharp",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "Director 节拍计划推送（设计文档规划）。TS Director 制定当日节拍序列后推送给 C#。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "beat_plan"
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（设计阶段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "beat_start",
-      "direction": "ts_to_csharp",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "节拍开始（Director 相关，设计文档规划）。TS Director 通知 C# 某个节拍开始执行。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "beat_start"
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（设计阶段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "beat_end",
-      "direction": "ts_to_csharp",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "节拍结束（Director 相关，设计文档规划）。TS Director 通知 C# 某个节拍执行结束。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "beat_end"
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（设计阶段未实证）"
-        }
-      ]
-    },
-    {
-      "type": "day_end",
-      "direction": "ts_to_csharp",
-      "transport": "fire_and_forget",
-      "status": "planned",
-      "routed_by_ts": false,
-      "sent_by_csharp": false,
-      "description": "日终汇总（Director 相关，设计文档规划）。TS Director 推送当日叙事汇总给 C#。",
-      "fields": [
-        {
-          "name": "type",
-          "type": "string",
-          "required": true,
-          "value": "day_end"
-        },
-        {
-          "name": "payload",
-          "type": "unknown",
-          "required": false,
-          "description": "unknown - 待补（设计阶段未实证）"
         }
       ]
     },

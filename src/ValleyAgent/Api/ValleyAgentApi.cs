@@ -113,7 +113,7 @@ public class ValleyAgentApi : IValleyAgentApi
 
     public static int DialogueCooldownMs
     {
-        get => SharedStateOrNull?.DialogueCooldownMs ?? 30000;
+        get => SharedStateOrNull?.DialogueCooldownMs ?? 3000;
         set
         {
             if (SharedStateOrNull != null)
@@ -203,7 +203,7 @@ public class ValleyAgentApi : IValleyAgentApi
 
     int IValleyAgentApi.DialogueCooldownMs
     {
-        get => SharedStateOrNull?.DialogueCooldownMs ?? 30000;
+        get => SharedStateOrNull?.DialogueCooldownMs ?? 3000;
         set
         {
             if (SharedStateOrNull != null)

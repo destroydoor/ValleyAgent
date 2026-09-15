@@ -158,11 +158,13 @@ public class IT12_SetGoal_ChopTree : IntegrationTestBase
             }
 
             var goalActive = _agent.Brain.PendingGoal != null;
-            Assert("goal_created", goalActive,
+            AssertEx("goal_created", goalActive,
+                "set_goal 工具调用后 PendingGoal 仍为 null（GoalExecutor.CreateGoal 未接线或参数解析失败）",
                 goalActive ? $"PendingGoal={_agent.Brain.PendingGoal?.Type}" : "PendingGoal null");
 
             var state = _agent.StateMachine.CurrentStateFlag;
-            Assert("state_executing_goal", state == AgentState.EXECUTING_GOAL,
+            AssertEx("state_executing_goal", state == AgentState.EXECUTING_GOAL,
+                "set_goal 创建目标后状态机未进入 EXECUTING_GOAL（ForceTransition 缺失或被守卫拦截）",
                 $"state={state} (expected EXECUTING_GOAL)");
         }
 
@@ -179,13 +181,15 @@ public class IT12_SetGoal_ChopTree : IntegrationTestBase
                 $"npc wood {_woodAtGoalStart} → {woodNow} (gained {woodGained}, expected ≥ {GoalQuantity})");
 
             // reportBack=false → 完成后直接收尾：目标清空 + 离开执行态
-            Assert("goal_cleared_after_complete", pending == null,
+            AssertEx("goal_cleared_after_complete", pending == null,
+                "目标完成后 PendingGoal 未清空（FinalizeSuccess 漏掉清目标步骤），残留目标会污染后续 set_goal",
                 pending == null ? "PendingGoal cleared" : $"PendingGoal still {pending?.Type}/{pending?.Status}");
 
             // 状态断言放宽：完成后 ForceIdle(IDLE)，但玩家紧邻 NPC 时可能随后被触发 TALK
             //（测试场景玩家固定在 NPC 旁 1 格）。核心断言是"已离开 EXECUTING_GOAL 执行态"，
             // 强制 IDLE 会因 TALK 竞态产生误导性失败。
-            Assert("state_left_executing", state != AgentState.EXECUTING_GOAL,
+            AssertEx("state_left_executing", state != AgentState.EXECUTING_GOAL,
+                "目标完成后状态机滞留 EXECUTING_GOAL（收尾 ForceTransition 未执行或被 STATE_DURATIONS 拦住）",
                 $"state={state} (expected to leave EXECUTING_GOAL after reportBack=false)");
         }
 
@@ -193,7 +197,9 @@ public class IT12_SetGoal_ChopTree : IntegrationTestBase
         {
             _asserted = true;
             var apiState = Api!.GetAgentState(NpcName);
-            Assert("state_still_readable", !string.IsNullOrEmpty(apiState), $"state={apiState}");
+            AssertEx("state_still_readable", !string.IsNullOrEmpty(apiState),
+                "set_goal 全流程跑完后 AgentBrain 被拆除（OnAgentDeallocated 误回收），GetAgentState 返回空串",
+                $"state={apiState}");
         }
 
         return CurrentTick >= 330;

@@ -153,9 +153,11 @@ public class E11_FightRadiusUnenforced : V3TestBase
                 (distantScanCount > 1 ? "远处怪物未被过滤——SearchRadius 未实施。" : ""));
 
             // 对照：近处怪物应被扫描到
-            Assert(
+            AssertEx(
                 "Near_monster_detected_as_baseline",
                 nearHadMonster,
+                "FightHandler.ScanEnvironment 扫描链失效（location.characters 未注册怪物或扫描提前返回 null），" +
+                "3 格内怪物都扫不到，对照基线崩塌",
                 $"距离3格的怪物扫描结果: '{_nearScanResult ?? "NULL"}'。" +
                 "近距离怪物应被检测到，作为对照验证扫描功能正常。");
 

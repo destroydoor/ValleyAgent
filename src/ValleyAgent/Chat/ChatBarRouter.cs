@@ -28,8 +28,8 @@ namespace ValleyAgent.Chat;
 ///     M3 多玩家化（2026-09-13）：支持 farmhand（ThinClient）形态——
 ///     房客没有本地 AgentServerProvider/AgentService，但同样需要在聊天栏跟在场 NPC 说话。
 ///     房客形态的差异只有三处：
-///     - 在场候选只取主机广播的 Agent 名单（RemoteRenderer），而不是全部村民；
 ///     - 对话请求经 IDialogueTransport（FarmhandDialogueTransport）转发主机，不直连 LLM；
+///     - 在场候选与主机同语义：全部在场村民（对话不需要身体，广播名单只用于远程状态渲染）；
 ///     - 远程喊话（依赖 AgentService 的全员候选）在房客侧静默跳过。
 ///     主机形态一条代码路径不变（transport/renderer 为 null）。
 /// </summary>
@@ -41,10 +41,9 @@ public static class ChatBarRouter
     private static CommandExecutor? _commandExecutor;
     private static ModConfig? _config;
 
-    // M3：房客（ThinClient）形态依赖——对话转发到主机的传输层 + 主机广播的 Agent 名单缓存。
-    // 两者都只在 InitializeFarmhand 注入；主机形态恒为 null，走原路径。
+    // M3：房客（ThinClient）形态依赖——对话转发到主机的传输层。
+    // 只在 InitializeFarmhand 注入；主机形态恒为 null，走原路径。
     private static IDialogueTransport? _dialogueTransport;
-    private static AgentRemoteRenderer? _remoteRenderer;
 
     // E5-2: 远程喊话调度器（玩家喊到不在场 NPC 时安排延迟回应）与 4 层确定性路由。
     private static ShoutReplyScheduler? _shoutReplyScheduler;
@@ -91,6 +90,7 @@ public static class ChatBarRouter
         ProactiveSpeechQuota? proactiveSpeechQuota = null,
         NpcScheduleService? scheduleService = null,
         IDialogueTransport? dialogueTransport = null,
+        // remoteRenderer 参数保留（M3 房客初始化调用形态不变）；路由器不再按广播名单过滤在场候选。
         AgentRemoteRenderer? remoteRenderer = null)
     {
         _monitor = monitor;
@@ -99,7 +99,6 @@ public static class ChatBarRouter
         _commandExecutor = commandExecutor;
         _config = config;
         _dialogueTransport = dialogueTransport;
-        _remoteRenderer = remoteRenderer;
 
         if (config != null)
         {
@@ -117,7 +116,7 @@ public static class ChatBarRouter
 
     /// <summary>
     ///     M3：房客（ThinClient）形态初始化。房客没有本地 LLM 通道与 AgentService，
-    ///     对话经 transport 转发主机，在场候选取主机广播的 Agent 名单。
+    ///     对话经 transport 转发主机，在场候选为全部在场村民。
     ///     由 ModEntry.InitializeThinClientMode 调用（此前房客完全不初始化路由器 →
     ///     聊天栏输入被 ChatBoxInputPatch 捕获后静默丢弃，即"客户端没有主机的功能"）。
     /// </summary>
@@ -357,6 +356,20 @@ public static class ChatBarRouter
             return; // LLM 行使沉默权：路由命中 ≠ 必须回
         }
 
+        // 2026-09-13 R5（对话连续性修复）：TS 降级回包（BUSY / LLM 故障）是系统状态提示，不是 NPC 台词
+        // ——不走 ActiveSpeechRouter 的气泡/打字机渲染（否则 NPC 会用自己口吻"说出"占位提示），
+        // 改走聊天栏灰字，文案单一来源 = 回包自带的 TS speech（同 R3）。
+        // 主机与房客聊天栏回包都在本方法汇合渲染（房客经 transport 回包同样进 _pendingReplies），
+        // 一处改动双端生效，无需区分 IsFarmhand。
+        if (reply.Fallback)
+        {
+            Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
+            _monitor?.Log(
+                $"[ChatBar] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
+                LogLevel.Debug);
+            return;
+        }
+
         ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
         _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
 
@@ -444,14 +457,8 @@ public static class ChatBarRouter
                 continue;
             }
 
-            // M3：房客只看主机广播过的 Agent NPC——房客本地没有 AgentService，
-            // 给非 Agent 村民发请求会在主机侧被拒（TryGenerateDialogue 返回 false），
-            // 玩家侧表现为"说了话没人理"，不如一开始就不进候选。
-            if (IsFarmhand && _remoteRenderer?.GetRemoteState(npc.Name) == null)
-            {
-                continue;
-            }
-
+            // 对话不需要身体：全部在场村民都是对话候选（房客经 transport 转发主机，同语义）。
+            // 身体只影响动作执行——回复里的身体类动作由主机侧 promote 兜底，不在此过滤。
             var distance = (int)(Math.Abs(npc.Tile.X - player.Tile.X) + Math.Abs(npc.Tile.Y - player.Tile.Y));
             var isFollowing = IsFollowing(npc.Name);
             var lastInteraction = _lastInteractionTimes.TryGetValue(npc.Name, out var ts) ? ts : DateTime.MinValue;
@@ -514,7 +521,9 @@ public static class ChatBarRouter
                 npcName,
                 response.Speech ?? string.Empty,
                 response.Actions ?? new List<ToolAction>(),
-                false));
+                false,
+                response.Fallback == true,
+                response.FallbackReason));
             // 深度告警：主线程泵停摆时聊天回复堆积的早期信号（2026-09-11 生产化仪器）
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }
@@ -545,17 +554,26 @@ public static class ChatBarRouter
     /// <summary>待主线程渲染的聊天栏回复。</summary>
     private sealed class PendingChatReply
     {
-        public PendingChatReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool isFailure)
+        public PendingChatReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool isFailure,
+            bool fallback = false, string? fallbackReason = null)
         {
             NpcName = npcName;
             Speech = speech;
             Actions = actions;
             IsFailure = isFailure;
+            Fallback = fallback;
+            FallbackReason = fallbackReason;
         }
 
         public string NpcName { get; }
         public string Speech { get; }
         public IReadOnlyList<ToolAction> Actions { get; }
         public bool IsFailure { get; }
+
+        /// <summary>2026-09-13 R5：TS 降级回包（BUSY/LLM 故障）→ 聊天栏灰字而非台词渲染。</summary>
+        public bool Fallback { get; }
+
+        /// <summary>降级原因（busy/llm_error/billing/unavailable），仅用于诊断日志留痕。</summary>
+        public string? FallbackReason { get; }
     }
 }

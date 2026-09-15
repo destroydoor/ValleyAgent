@@ -84,19 +84,21 @@ public class IT02_StateChanged_ActualStateMirror : IntegrationTestBase
             Assert("state_switched_to_follow", ok, $"TrySetAgentState(FOLLOW)={ok}");
         }
 
-        // Phase 2: 验证状态确实切换 + broadcaster 实例可用 + 联机守卫检测
+        // Phase 2: 验证状态确实切换 + 联机守卫检测
         if (CurrentTick == 90 && !_asserted)
         {
             _asserted = true;
             var state = Api.GetAgentState(NpcName);
             Assert("state_is_follow", state == "FOLLOW", $"state={state}");
 
-            // broadcaster 实例非 null（Host 模式下应该注册）
-            Assert("broadcaster_instance_available", _broadcaster != null);
+            // 原 "broadcaster_instance_available" 断言已删（2026-09-14 死断言清理）：
+            // Update 入口守卫 `_broadcaster == null → return true` 保证走到这里必非 null，构造性恒真。
 
             // 联机守卫：单机模式下 SendMessage 不会被调用（这是设计意图）
             var isMultiplayer = StardewModdingAPI.Context.IsMultiplayer;
-            Assert("single_player_guard_active", !isMultiplayer,
+            AssertEx("single_player_guard_active", !isMultiplayer,
+                "本测试被放进联机会话运行（Context.IsMultiplayer=true）——单机前提被破坏，" +
+                "broadcaster 会真正发出消息，'单机静默'语义不再适用",
                 $"IsMultiplayer={isMultiplayer} — 单机下 broadcaster 静默是设计意图");
         }
 

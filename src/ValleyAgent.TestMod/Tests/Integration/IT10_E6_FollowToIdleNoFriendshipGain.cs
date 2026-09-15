@@ -88,7 +88,8 @@ public class IT10_E6_FollowToIdleNoFriendshipGain : IntegrationTestBase
             var friendshipAfter = Api.GetNpcFriendshipPoints(NpcName);
             var delta = friendshipAfter - _friendshipBefore;
 
-            Assert("friendship_unchanged", delta == 0,
+            AssertEx("friendship_unchanged", delta == 0,
+                "FOLLOW→IDLE 循环误发好感度回执（E6 回归：状态转换路径混入 friendship delta），GetNpcFriendshipPoints 前后不等",
                 $"before={_friendshipBefore} after={friendshipAfter} delta={delta} (expected 0)");
 
             // 二次确认：再走一次 FOLLOW→IDLE，friendship 仍不应变
@@ -96,7 +97,8 @@ public class IT10_E6_FollowToIdleNoFriendshipGain : IntegrationTestBase
             var idleOk2 = Api.TrySetAgentState(NpcName, "IDLE");
             var friendshipAfter2 = Api.GetNpcFriendshipPoints(NpcName);
             var delta2 = friendshipAfter2 - _friendshipBefore;
-            Assert("friendship_unchanged_after_second_cycle", delta2 == 0,
+            AssertEx("friendship_unchanged_after_second_cycle", delta2 == 0,
+                "第二轮循环触发好感度变化（首轮漏网、次轮命中），状态机收尾仍有副作用",
                 $"second cycle: follow={followOk2} idle={idleOk2} delta={delta2}");
         }
 

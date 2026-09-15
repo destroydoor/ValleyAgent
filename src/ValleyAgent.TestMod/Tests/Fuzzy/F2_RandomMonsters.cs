@@ -258,16 +258,16 @@ public class F2_RandomMonsters : V3TestBase
 
         var finalMonsters = loc?.characters.OfType<Monster>().Count() ?? 0;
 
-        Assert("Monster_count_greater_than_zero_at_some_point", _monstersSpawnedOnce,
+        AssertEx("Monster_count_greater_than_zero_at_some_point", _monstersSpawnedOnce,
+            "生成循环从未在 location.characters 里观察到 Monster（spawn 分支未执行或 GreenSlime 添加即被引擎清除），maxMonstersSeen=0",
             $"maxMonstersSeen={_maxMonstersSeen}");
         Assert("NPC_health_decreased_at_least_once", _healthDecreasedOnce || _npcDied,
             $"healthDecreased={_healthDecreasedOnce}, died={_npcDied}");
-        Assert("Handler_no_crash", !_hadError,
+        AssertEx("Handler_no_crash", !_hadError,
+            "F2 fuzz 期间 FightHandler/状态机抛 InvalidOperationException/NullReferenceException 等被 Update 的 catch 捕获（_hadError=true）",
             _hadError ? "Exception occurred during monster fuzz test" : "No exception during monster fuzz test");
-        // 断言：所有生成怪物被清除（不准有残留）
-        Assert("All_spawned_monsters_cleared",
-            finalMonsters == 0,
-            $"spawnCount={_spawnCount}, finalMonsters={finalMonsters}, maxSeen={_maxMonstersSeen}");
+        // 原 "All_spawned_monsters_cleared" 断言已删（2026-09-14 死断言清理）：
+        // Teardown 先手动移除全部怪物、再统计 finalMonsters 断言 ==0，构造性恒真。
 
         _monitor.Log(
             $"[F2] Final: spawns={_spawnCount}, maxMonsters={_maxMonstersSeen}, healthDecreased={_healthDecreasedOnce}, finalMonsters={finalMonsters}",

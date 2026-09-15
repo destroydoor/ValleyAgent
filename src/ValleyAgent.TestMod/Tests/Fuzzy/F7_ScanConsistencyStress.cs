@@ -219,9 +219,10 @@ public class F7_ScanConsistencyStress : V3TestBase
         // 全部位置测试完成后断言
         if (_locationIndex >= TestLocations.Length && tick >= TestLocations.Length * 400 + 60)
         {
-            Assert(
+            AssertEx(
                 "No_NullReferenceException_during_scanning",
                 _nullRefErrors == 0,
+                "跨图压力扫描时 Handler.ScanEnvironment 对未初始化的地物/角色集合解引用抛 NullReferenceException（RecordScanCrash 累计 _nullRefErrors>0）",
                 $"NRE 次数={_nullRefErrors} / {_totalScans}次扫描。异常：{string.Join("; ", _anomalies)}");
 
             // 已知设计行为（非缺陷）：
@@ -233,10 +234,8 @@ public class F7_ScanConsistencyStress : V3TestBase
                 true,
                 $"扫描不匹配记录={_scanMismatches}/{_totalScans}。全部为 Handler location guard 正常过滤: {string.Join("; ", _anomalies.Take(5))}");
 
-            Assert(
-                "All_locations_tested",
-                _locationIndex >= TestLocations.Length,
-                $"测试了 {_locationIndex}/{TestLocations.Length} 个位置");
+            // 原 "All_locations_tested" 断言已删（2026-09-14 死断言清理）：
+            // 外层 if 守卫条件即 `_locationIndex >= TestLocations.Length`，断言同条件构造性恒真。
 
             return true;
         }

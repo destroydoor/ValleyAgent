@@ -110,7 +110,10 @@ namespace ValleyAgent.WebSocket
         // 2026-08-20 Phase 2：对齐 protocol/messages.json dialogue_response 字段（原缺失，契约漂移修复）。
         // npcName（schema required）与 memorySideEffect（"recorded" 标记）此前被反序列化静默丢弃。
         string? NpcName = null,
-        string? MemorySideEffect = null
+        string? MemorySideEffect = null,
+        // 2026-09-13 R2：fallback=true 时的机器可读降级原因（busy/llm_error/billing/unavailable，可选），
+        // 随房客广播透传，供灰字诊断留痕区分"忙"与 LLM 故障。
+        string? FallbackReason = null
     );
 
     /// <summary>

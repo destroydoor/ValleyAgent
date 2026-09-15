@@ -169,7 +169,8 @@ public class IT03_F3_TravelFailureRecovery : IntegrationTestBase
             _triggered = true;
 
             var callbackBound = Navigator.OnTravelFailed != null;
-            Assert("on_travel_failed_callback_bound", callbackBound,
+            AssertEx("on_travel_failed_callback_bound", callbackBound,
+                "ServiceInitializer 漏接 OnTravelFailed（委托注入断链），Navigator.OnTravelFailed 为 null——F3 旅行失败将无人收尾转 IDLE",
                 callbackBound
                     ? "callback injected by ServiceInitializer"
                     : "callback is null — ServiceInitializer did not wire OnTravelFailed");
@@ -223,7 +224,8 @@ public class IT03_F3_TravelFailureRecovery : IntegrationTestBase
                         : "NPC still invisible — CancelTravel did not clear IsInvisible");
 
             // NPC 实例仍可访问（未因旅行失败被销毁）
-            Assert("npc_still_accessible", npc != null);
+            AssertEx("npc_still_accessible", npc != null,
+                "旅行失败/CancelTravel 清理路径把 Haley 移出 characters（NPC 实例被销毁，getCharacterFromName 返回 null）");
         }
 
         return CurrentTick >= 150;

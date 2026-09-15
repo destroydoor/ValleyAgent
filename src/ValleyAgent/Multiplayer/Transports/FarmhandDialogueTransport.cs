@@ -144,11 +144,14 @@ public class FarmhandDialogueTransport : IDialogueTransport
     private void Complete(string npcName, DialogueResponseMessage msg, TaskCompletionSource<DialogueResponse> tcs)
     {
         var actions = ParseActions(msg.ActionsJson ?? msg.Action) ?? new List<ToolAction>();
+        // 2026-09-13 R3：FallbackReason 必须随广播回包落回本地 record，
+        // 否则房客侧最后一跳丢字段，灰字诊断留痕（busy vs LLM 故障）在房客端失明。
         var response = new DialogueResponse(
             msg.Text ?? "",
             actions,
             msg.Emotion ?? "Neutral",
-            Fallback: msg.Fallback
+            Fallback: msg.Fallback,
+            FallbackReason: msg.FallbackReason
         );
         tcs.TrySetResult(response);
     }

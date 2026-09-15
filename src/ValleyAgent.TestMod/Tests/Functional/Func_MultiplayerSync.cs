@@ -90,25 +90,30 @@ public class Func_MultiplayerSync : V3TestBase
     {
         // 单机模式断言
         var isSinglePlayer = !StardewModdingAPI.Context.IsMultiplayer;
-        Assert("SinglePlayer_ShouldRunAgentLogic",
+        AssertEx("SinglePlayer_ShouldRunAgentLogic",
             MultiplayerHelper.ShouldRunAgentLogic,
+            "模式判定反转：单机（isSinglePlayer=true）时 ShouldRunAgentLogic 仍为 false——ShouldRunAgentLogic 的取反/联机分支写反",
             $"ShouldRunAgentLogic={MultiplayerHelper.ShouldRunAgentLogic}, IsMultiplayer={MultiplayerHelper.IsMultiplayer}");
 
-        Assert("SinglePlayer_NotFarmhand",
+        AssertEx("SinglePlayer_NotFarmhand",
             !MultiplayerHelper.IsFarmhand,
+            "单机会话被误判为房客（IsFarmhand=true）——Game1.IsClient/IsMaster 判定分支写反",
             $"IsFarmhand={MultiplayerHelper.IsFarmhand}");
 
-        Assert("SinglePlayer_NotSplitScreenFarmhand",
+        AssertEx("SinglePlayer_NotSplitScreenFarmhand",
             !MultiplayerHelper.IsSplitScreenFarmhand,
+            "单机无分屏却被判为分屏房客（Game1.player.IsSplitScreen 判定失效）",
             $"IsSplitScreenFarmhand={MultiplayerHelper.IsSplitScreenFarmhand}");
 
-        Assert("SinglePlayer_NotRemoteFarmhand",
+        AssertEx("SinglePlayer_NotRemoteFarmhand",
             !MultiplayerHelper.IsRemoteFarmhand,
+            "单机被判为远程房客（IsRemoteFarmhand 的 active/远端实例判定失效）",
             $"IsRemoteFarmhand={MultiplayerHelper.IsRemoteFarmhand}");
 
         // ScreenId 在单机模式下应为 0
-        Assert("SinglePlayer_ScreenIdIsZero",
+        AssertEx("SinglePlayer_ScreenIdIsZero",
             MultiplayerHelper.ScreenId == 0,
+            "单机 ScreenId 非 0（Game1.game1.IsSplitScreen 或 Game1.GetCurrentScreenId 语义变化）",
             $"ScreenId={MultiplayerHelper.ScreenId}");
 
         // 逻辑一致性：IsFarmhand 意味着不应该运行 Agent 逻辑
@@ -160,13 +165,8 @@ public class Func_MultiplayerSync : V3TestBase
             }
         };
 
-        Assert("AgentStateMessage_TwoAgents",
-            stateMsg.Agents.Count == 2,
-            $"Expected 2 agents, got {stateMsg.Agents.Count}");
-
-        Assert("AgentStateMessage_HaleyState",
-            stateMsg.Agents[0].State == "FARM" && stateMsg.Agents[0].Health == 80,
-            $"State={stateMsg.Agents[0].State}, Health={stateMsg.Agents[0].Health}");
+        // 原 AgentStateMessage_TwoAgents / AgentStateMessage_HaleyState 断言已删
+        //（2026-09-14 死断言清理）：对象初始化器刚写入的字段立即读回断言，构造性恒真。
 
         Assert("AgentStateMessage_HaleyFacingMoving",
             stateMsg.Agents[0].FacingDirection == 1 && stateMsg.Agents[0].IsMoving,
@@ -180,9 +180,8 @@ public class Func_MultiplayerSync : V3TestBase
             PlayerId = 12345L,
             WorldSnapshotJson = "{\"season\":\"spring\"}"
         };
-        Assert("DialogueRequestMessage_Fields",
-            dlgReq.NpcName == "Haley" && dlgReq.PlayerMessage == "你好！" && dlgReq.PlayerId == 12345L,
-            $"NpcName={dlgReq.NpcName}, PlayerMessage={dlgReq.PlayerMessage}");
+        // 原 DialogueRequestMessage_Fields 断言已删（2026-09-14 死断言清理）：
+        // 初始化器回声，构造性恒真。
         Assert("DialogueRequestMessage_WorldSnapshot",
             dlgReq.WorldSnapshotJson == "{\"season\":\"spring\"}",
             $"WorldSnapshotJson={dlgReq.WorldSnapshotJson}");
@@ -197,9 +196,8 @@ public class Func_MultiplayerSync : V3TestBase
             ActionsJson = "[{\"tool\":\"emote\"}]",
             TargetPlayerId = 12345L
         };
-        Assert("DialogueResponseMessage_Fields",
-            dlgResp.NpcName == "Haley" && dlgResp.Action == "FOLLOW",
-            $"NpcName={dlgResp.NpcName}, Action={dlgResp.Action}");
+        // 原 DialogueResponseMessage_Fields 断言已删（2026-09-14 死断言清理）：
+        // 初始化器回声，构造性恒真。
         Assert("DialogueResponseMessage_ActionsJson",
             dlgResp.ActionsJson == "[{\"tool\":\"emote\"}]",
             $"ActionsJson={dlgResp.ActionsJson}");
@@ -212,9 +210,8 @@ public class Func_MultiplayerSync : V3TestBase
             Quantity = 1,
             PlayerId = 12345L
         };
-        Assert("GiftRequestMessage_Fields",
-            giftReq.ItemId == "(O)16" && giftReq.Quantity == 1,
-            $"ItemId={giftReq.ItemId}, Quantity={giftReq.Quantity}");
+        // 原 GiftRequestMessage_Fields 断言已删（2026-09-14 死断言清理）：
+        // 初始化器回声，构造性恒真。
 
         // NpcActionMessage
         var actionMsg = new NpcActionMessage
@@ -225,67 +222,28 @@ public class Func_MultiplayerSync : V3TestBase
             Text = "太棒了！",
             DurationMs = 1000
         };
-        Assert("NpcActionMessage_Fields",
-            actionMsg.ActionType == "emote" && actionMsg.EmoteId == 24,
-            $"ActionType={actionMsg.ActionType}, EmoteId={actionMsg.EmoteId}");
+        // 原 NpcActionMessage_Fields 断言已删（2026-09-14 死断言清理）：
+        // 初始化器回声，构造性恒真。
 
-        // MessageTypes 常量
-        Assert("MessageTypes_AgentState",
-            true,
+        // MessageTypes 常量（原为 Assert(true) 死断言，2026-09-14 清理改为真实相等断言）
+        AssertEx("MessageTypes_AgentState",
+            MessageTypes.AgentState == "AgentState",
+            "MessageTypes.AgentState 常量被改名（≠'AgentState'）——主机/房客 SMAPI 消息按字符串路由，改名即互收不到",
             $"Expected 'AgentState', got '{MessageTypes.AgentState}'");
-        Assert("MessageTypes_DialogueRequest",
-            true,
+        AssertEx("MessageTypes_DialogueRequest",
+            MessageTypes.DialogueRequest == "DialogueRequest",
+            "MessageTypes.DialogueRequest 常量被改名（≠'DialogueRequest'）——对话请求消息路由将断裂",
             $"Expected 'DialogueRequest', got '{MessageTypes.DialogueRequest}'");
     }
 
     /// <summary>
     ///     测试 AgentStateSnapshot 的字段映射完整性。
+    ///     原 Snapshot_AllFieldsSet / Snapshot_DeadAgent 初始化器回声断言已删（2026-09-14 死断言清理）；
+    ///     快照真实字段映射由 TestAgentRemoteRendererFlow 的 HandleAgentStateMessage 链路覆盖。
     /// </summary>
     private void TestAgentStateSnapshotMapping()
     {
-        var snapshot = new AgentStateSnapshot
-        {
-            NpcName = "Sebastian",
-            State = "MINE",
-            Health = 90,
-            MaxHealth = 100,
-            Emotion = "Excited",
-            Location = "UndergroundMine20",
-            PosX = 10f,
-            PosY = 20f,
-            IsDead = false,
-            FacingDirection = 2,
-            IsMoving = true
-        };
-
-        // 验证所有字段都正确赋值
-        Assert("Snapshot_AllFieldsSet",
-            snapshot.NpcName == "Sebastian" &&
-            snapshot.State == "MINE" &&
-            snapshot.Health == 90 &&
-            snapshot.MaxHealth == 100 &&
-            snapshot.Emotion == "Excited" &&
-            snapshot.Location == "UndergroundMine20" &&
-            Math.Abs(snapshot.PosX - 10f) < 0.001f &&
-            Math.Abs(snapshot.PosY - 20f) < 0.001f &&
-            !snapshot.IsDead &&
-            snapshot.FacingDirection == 2 &&
-            snapshot.IsMoving,
-            "One or more fields not correctly set");
-
-        // 死亡状态
-        var deadSnapshot = new AgentStateSnapshot
-        {
-            NpcName = "Haley",
-            State = "IDLE",
-            Health = 0,
-            MaxHealth = 100,
-            Emotion = "Neutral",
-            IsDead = true
-        };
-        Assert("Snapshot_DeadAgent",
-            deadSnapshot.IsDead && deadSnapshot.Health == 0,
-            $"IsDead={deadSnapshot.IsDead}, Health={deadSnapshot.Health}");
+        // 快照构造本身不再断言字段回声（构造性恒真）。
     }
 
     /// <summary>
@@ -295,10 +253,8 @@ public class Func_MultiplayerSync : V3TestBase
     {
         var renderer = new AgentRemoteRenderer(Monitor);
 
-        // 初始状态为空
-        Assert("Renderer_InitialStateEmpty",
-            renderer.GetAllRemoteStates().Count == 0,
-            $"Expected 0 remote states, got {renderer.GetAllRemoteStates().Count}");
+        // 原 "Renderer_InitialStateEmpty" 断言已删（2026-09-14 死断言清理）：
+        // 刚 new 出的实例其状态字典必为空（实例字段，无静态共享），构造性恒真。
 
         // 接收 AgentStateMessage
         var stateMsg = new AgentStateMessage
@@ -323,18 +279,21 @@ public class Func_MultiplayerSync : V3TestBase
 
         // 查询缓存
         var haleyState = renderer.GetRemoteState("Haley");
-        Assert("Renderer_HaleyCached",
+        AssertEx("Renderer_HaleyCached",
             haleyState != null,
+            "HandleAgentStateMessage 未缓存消息中的快照（解析或键写入分支断链），GetRemoteState('Haley') 返回 null",
             "Haley state should be cached after HandleAgentStateMessage");
 
-        Assert("Renderer_HaleyStateCorrect",
+        AssertEx("Renderer_HaleyStateCorrect",
             haleyState!.State == "FARM" && haleyState.Health == 80,
+            "缓存写入时字段映射错位（State/Health 拷贝错或被后续覆写）",
             $"State={haleyState.State}, Health={haleyState.Health}");
 
         // 不存在的 NPC
         var samState = renderer.GetRemoteState("Sam");
-        Assert("Renderer_UnknownNpcNull",
+        AssertEx("Renderer_UnknownNpcNull",
             samState == null,
+            "GetRemoteState 对未缓存键返回了非 null 对象（字典 miss 分支被改为返回默认实例）",
             "Unknown NPC should return null");
 
         // 接收对话响应
@@ -348,14 +307,16 @@ public class Func_MultiplayerSync : V3TestBase
         renderer.HandleDialogueResponse(dlgResp);
 
         var dequeued = renderer.DequeueDialogueResponse("Haley");
-        Assert("Renderer_DialogueResponseDequeued",
+        AssertEx("Renderer_DialogueResponseDequeued",
             dequeued != null && dequeued.Text == "你好！",
+            "HandleDialogueResponse 未入队或入队时 Text 丢失，DequeueDialogueResponse 取不到该回复",
             $"Dequeued response: {dequeued?.Text ?? "null"}");
 
         // 二次 Dequeue 应为 null
         var dequeued2 = renderer.DequeueDialogueResponse("Haley");
-        Assert("Renderer_DialogueResponseConsumed",
+        AssertEx("Renderer_DialogueResponseConsumed",
             dequeued2 == null,
+            "Dequeue 后消息未从 pending 队列移除（重复消费），二次 Dequeue 仍返回同一条",
             "Second dequeue should return null");
 
         // NPC 动作
@@ -368,14 +329,16 @@ public class Func_MultiplayerSync : V3TestBase
         renderer.HandleNpcAction(actionMsg);
 
         var dequeuedAction = renderer.DequeueAction();
-        Assert("Renderer_ActionDequeued",
+        AssertEx("Renderer_ActionDequeued",
             dequeuedAction != null && dequeuedAction.ActionType == "emote",
+            "HandleNpcAction 未入动作队列或 ActionType 映射丢失，DequeueAction 取不到动作",
             $"ActionType={dequeuedAction?.ActionType ?? "null"}");
 
         // Clear
         renderer.Clear();
-        Assert("Renderer_ClearWorks",
+        AssertEx("Renderer_ClearWorks",
             renderer.GetAllRemoteStates().Count == 0,
+            "Clear 未清空状态字典（只清了部分集合），Clear 后仍有残留远程状态",
             $"After clear, expected 0 states, got {renderer.GetAllRemoteStates().Count}");
     }
 
@@ -395,8 +358,9 @@ public class Func_MultiplayerSync : V3TestBase
             }
         };
         renderer.HandleAgentStateMessage(oldMsg);
-        Assert("FullSync_OldStateExists",
+        AssertEx("FullSync_OldStateExists",
             renderer.GetRemoteState("OldNPC") != null,
+            "HandleAgentStateMessage 基线写入失效（全量同步前置状态不存在），OldNPC 未被缓存",
             "Old NPC should exist before full sync");
 
         // 发送 FullSync（会清除旧状态）
@@ -433,32 +397,38 @@ public class Func_MultiplayerSync : V3TestBase
         renderer.HandleFullSyncMessage(fullSync);
 
         // 旧状态应被清除
-        Assert("FullSync_OldStateCleared",
+        AssertEx("FullSync_OldStateCleared",
             renderer.GetRemoteState("OldNPC") == null,
+            "HandleFullSyncMessage 未执行'清旧再写新'（增量合并语义回归），OldNPC 残留",
             "Old NPC should be cleared after full sync");
 
         // 新状态应存在
         var haley = renderer.GetRemoteState("Haley");
-        Assert("FullSync_HaleyExists",
+        AssertEx("FullSync_HaleyExists",
             haley != null,
+            "全量同步未写入 Agents 列表（列表遍历或键路由断链），Haley 不存在",
             "Haley should exist after full sync");
 
-        Assert("FullSync_HaleyFriendship",
+        AssertEx("FullSync_HaleyFriendship",
             haley!.Friendship == 500,
+            "AgentFullState → 缓存映射丢失 Friendship 字段（赋值遗漏或被默认值覆盖）",
             $"Expected Friendship=500, got {haley.Friendship}");
 
-        Assert("FullSync_HaleyNickname",
+        AssertEx("FullSync_HaleyNickname",
             haley.FarmerNickname == "小农",
+            "FarmerNickname 字段映射丢失（per-player 昵称字段被改名/漏拷）",
             $"Expected FarmerNickname='小农', got '{haley.FarmerNickname}'");
 
-        Assert("FullSync_HaleyMemory",
+        AssertEx("FullSync_HaleyMemory",
             haley.RecentMemory.Count == 2,
+            "RecentMemory 列表映射丢失（深拷贝缺失或引用被清空）",
             $"Expected 2 memories, got {haley.RecentMemory.Count}");
 
         // Abigail 也应存在
         var abigail = renderer.GetRemoteState("Abigail");
-        Assert("FullSync_AbigailExists",
+        AssertEx("FullSync_AbigailExists",
             abigail != null && abigail.State == "MINE",
+            "多 Agent 全量同步只写入首个 Agent（遍历中断/覆盖），Abigail 缺失或状态错",
             $"Abigail state: {abigail?.State ?? "null"}");
     }
 

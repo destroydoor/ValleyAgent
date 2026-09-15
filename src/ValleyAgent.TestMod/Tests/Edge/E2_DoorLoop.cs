@@ -131,7 +131,9 @@ public class E2_DoorLoop : V3TestBase
 
                 // Verify no null location
                 var loc = _npc.currentLocation;
-                Assert("NPC.currentLocation not null after warp", loc != null,
+                AssertEx("NPC.currentLocation not null after warp", loc != null,
+                    "Game1.warpCharacter 后 NPC 未被加入目标地图（地图卸载/过门竞态导致 currentLocation 为 null）——" +
+                    "FOLLOW 跨图缺陷族的门口场景复现",
                     $"loc={loc?.NameOrUniqueName ?? "null"}");
             }
             catch (InvalidOperationException ex)
@@ -155,14 +157,16 @@ public class E2_DoorLoop : V3TestBase
         if (CurrentTick % 100 == 0 && _npc != null)
         {
             var loc = _npc.currentLocation;
-            Assert("Location check", loc != null && loc.NameOrUniqueName != null,
+            AssertEx("Location check", loc != null && loc.NameOrUniqueName != null,
+                "快速过门循环中途 NPC 的 currentLocation 被置空（warp 竞态把 NPC 从旧图移除但未加入新图）",
                 $"loc={loc?.NameOrUniqueName ?? "null"}");
 
             // Verify position resets correctly
             if (!_inside)
             {
                 var dist = Vector2.Distance(_npc.Tile, new Vector2(_outdoorTile.X, _outdoorTile.Y));
-                Assert($"NPC position reset correctly (cycle {_cycleCount})", dist < 5f,
+                AssertEx($"NPC position reset correctly (cycle {_cycleCount})", dist < 5f,
+                    "warp 回 Farm 的落点被占用/守卫改写（WarpTargetGuard 拒绝入口格），NPC 停在离预期出口 5 格以外",
                     $"dist={dist:F1} from expected {_outdoorTile}");
             }
         }
@@ -170,7 +174,8 @@ public class E2_DoorLoop : V3TestBase
         // Success after TargetCycles completed (NPC is outside after last cycle)
         if (_cycleCount >= TargetCycles && !_inside)
         {
-            Assert("Completed all cycles", _cycleCount >= TargetCycles && _errors == 0,
+            AssertEx("Completed all cycles", _cycleCount >= TargetCycles && _errors == 0,
+                "过门循环中 warp 抛 InvalidOperationException/NullReferenceException/ArgumentException 被 catch 累计，_errors>0",
                 $"{_cycleCount} cycles, {_errors} errors");
             return true;
         }

@@ -11,13 +11,11 @@ import type {
   PongResponse,
   ActionResultMessage,
   StateChangedMessage,
-  ConsolidateDayMessage,
   RouteShoutMessage,
   RouteShoutResponse,
   OutgoingMessage,
   DayStartedMessage,
   GameContextSyncMessage,
-  AllocateAgentMessage,
   DirectorCommandMessage,
   ExecuteAdjustMessage,
   AdjustResultMessage,
@@ -29,10 +27,8 @@ import type {
 import { AgentLedger } from "./agent-ledger";
 import type { AgentMemory } from "./agent-memory";
 import { EmotionEngine } from "./emotion-engine";
-import { PlayerDirectory } from "./player-directory";
 import { MEMORY_SIDE_EFFECT_RECORDED, DEFAULT_EMOTION } from "./types";
 import { MorningShoutRouter } from "./morning-shout-router";
-import type { Director } from "./director";
 import type { GameContextManager } from "./game-context";
 
 const SERVER_VERSION = "0.1.0";
@@ -49,8 +45,6 @@ function truncate(s: string, max: number): string {
 
 export interface ProtocolAdapterOptions {
   sendToCsharp?: (msg: unknown) => void;
-  director?: Director;
-  directorTriggerProbability?: number;
   gameCtxMgr?: GameContextManager;
   /** 2026-08-15 账本迁移（步骤 1）：权威经济账本（adjust_result 路由 + worldSnapshot 播种）。 */
   ledger?: AgentLedger;
@@ -61,10 +55,11 @@ export interface ProtocolAdapterOptions {
   /** 2026-08-15 步骤 3：确定性情绪引擎（事件驱动，Director mood 覆盖权）。 */
   emotionEngine?: EmotionEngine;
   /**
-   * M3 多玩家化：观察式玩家名录（换日导演编排时按此名单 per-player 组 prompt）。
-   * 不注入时 morningPlan 走单玩家路径，行为等价 M3 前。
+   * R1（2026-09-13 design §3）：BUSY 前对会话锁限时等待，默认 15s，250ms 轮询；
+   * 0 = 立即拒绝（保持旧行为）。15s < C# 侧 LLMTimeoutSeconds=120，等待先于
+   * LLM 超时放弃，不引入新的超时冲突。
    */
-  playerDirectory?: PlayerDirectory;
+  dialogueLockTimeoutMs?: number;
 }
 
 /** adjust_result 回执等待超时（设计 §6：回执丢失 → 超时回滚 pending，TS 重发靠 instructionId 幂等兜底）。 */
@@ -80,7 +75,6 @@ interface PendingAdjustWaiter {
 }
 export class ProtocolAdapter {
   private readonly ruleEngine = new RuleEngine();
-  private readonly seenConsolidations = new Set<string>();
   // 2026-09-11 观测补强：同一游戏日多次 day_started 的重复计数（联机下已知现象，
   // 此前重复跑 morningPlan 无任何日志标记——"每玩家一个导演"误读的直接来源）。
   // adapter 是长生命周期单例（server.ts 只 new 一次），Map 每天仅增 1 key，无增长忧。
@@ -95,8 +89,6 @@ export class ProtocolAdapter {
   // 故在此按 callId 记住是谁的动作，handleActionResult 消费后即时删除
   // （与 pendingGoals 同生命周期；换日随情绪一起清空，防 callId 无回执时无界增长）。
   private readonly pendingActionPlayers = new Map<string, string>();
-  // M3 多玩家化：观察式玩家名录（不注入时退化为单玩家编排，测试可注入定制实例）。
-  private readonly playerDirectory: PlayerDirectory;
   // 2026-08-15 账本迁移（步骤 1）：execute_adjust 回执等待表（instructionId → waiter）。
   // sendAdjust 挂等待；adjust_result 到达时按 instructionId 解析（超时 10s 回滚 pending）。
   private readonly pendingAdjusts = new Map<string, PendingAdjustWaiter>();
@@ -109,7 +101,6 @@ export class ProtocolAdapter {
     private readonly registry: StardewAgentRegistry,
     private readonly options?: ProtocolAdapterOptions,
   ) {
-    this.playerDirectory = options?.playerDirectory ?? new PlayerDirectory();
   }
 
   async handleHello(req: HelloRequest): Promise<HelloResponse> {
@@ -165,62 +156,29 @@ export class ProtocolAdapter {
 
   /**
    * Handle day_started (fire-and-forget) from C# DayStarted event.
-   * Rolls against directorTriggerProbability (default 0.1). If triggered,
-   * calls director.morningPlan() and sends one allocate_agent message per
-   * produced beat via sendToCsharp. Returns ack — C# does not register a
-   * pending request for this type.
+   * 换日只需做无条件的引擎复位；旧叙事 Director（morningPlan→beat→allocate_agent）
+   * 已于 2026-09-14 砍除（beat 唯一消费方是 allocate_agent 保活，产出无人消费）。
+   * Returns ack — C# does not register a pending request for this type.
    */
   async handleDayStarted(req: DayStartedMessage): Promise<{ type: "ack"; requestId: string }> {
     // 2026-09-11 观测补强：重复 day_started 只告警不去重（去重是行为修复，本批
-    // 仅观测——已知联机现象：情绪重置 + 导演 morningPlan 会对该日期重复执行）。
+    // 仅观测——已知联机现象：换日情绪重置会对该日期重复执行）。
     const seen = (this.seenDayStartedDates.get(req.dateIso) ?? 0) + 1;
     this.seenDayStartedDates.set(req.dateIso, seen);
     if (seen > 1) {
-      console.warn(`[protocol] duplicate day_started date=${req.dateIso} (count=${seen}) — known multiplayer artifact: emotion reset + director morningPlan will run again for this date`);
+      console.warn(`[protocol] duplicate day_started date=${req.dateIso} (count=${seen}) — known multiplayer artifact: emotion reset will run again for this date`);
     }
     // 2026-08-17 步骤 3 补全：换日重置所有 NPC 情绪回 baseline（引擎枚举 day_started
     // 事件类别、resetDay 产出 source:"day_started"，但此前从未接线——昨天的情绪
-    // 会一直挂进今天的 prompt。重置与 Director 是否接线无关，放最前无条件执行）。
+    // 会一直挂进今天的 prompt。放最前无条件执行）。
     this.options?.emotionEngine?.resetAll();
     // M3：换日同时清空动作归属暂存表（情绪已整体回 baseline，残留的 callId → playerId
     // 只可能来自永远等不到回执的动作，留着是无界增长）。
     this.pendingActionPlayers.clear();
-    // directorContext 由 C# DirectorContextBuilder 拼装（阶段 3）；接收即记录长度，
-    // 内容消费留给工具型 Director（morningPlan 走 GameContextManager 结构化通道）。
+    // directorContext 由 C# DirectorContextBuilder 拼装（阶段 3，工具型 Director 的燃料，
+    // 保留）；接收即记录长度，内容消费留给未来工具型 Director 造脑。
     const dctxLen = req.directorContext?.length;
     console.log(`[${timestamp()}] [recv] day_started date=${req.dateIso} directorContext=${dctxLen !== undefined ? `${dctxLen} chars` : "(none)"}`);
-    const director = this.options?.director;
-    const sendToCsharp = this.options?.sendToCsharp;
-    if (!director || !sendToCsharp) {
-      console.log(`[${timestamp()}] [director] skipped: director=${director ? "yes" : "no"} sendToCsharp=${sendToCsharp ? "yes" : "no"}`);
-      return { type: "ack", requestId: req.requestId };
-    }
-    const probability = this.options?.directorTriggerProbability ?? 0.1;
-    const roll = Math.random();
-    if (roll >= probability) {
-      console.log(`[${timestamp()}] [director] skipped: probability=${probability} roll=${roll.toFixed(4)} (未命中，跳过 morningPlan)`);
-      return { type: "ack", requestId: req.requestId };
-    }
-    console.log(`[${timestamp()}] [director] triggered: probability=${probability} roll=${roll.toFixed(4)} (命中，调用 morningPlan)`);
-    try {
-      // M3：联机下按已知玩家名单逐个编排（每人一份画像、各自一次 LLM 调用，
-      // 全局 beat 预算与玩家数上限由 Director 内部钉住）。名单为空 → 单玩家路径。
-      const playerIds = this.playerDirectory.listPlayerIds();
-      const beats = await director.morningPlan({ playerIds });
-      console.log(`[${timestamp()}] [director] morningPlan 返回 ${beats.length} 个 beat`);
-      for (const beat of beats) {
-        const msg: AllocateAgentMessage = {
-          type: "allocate_agent",
-          requestId: crypto.randomUUID(),
-          npcName: beat.npcName,
-          keepUntilIso: beat.windowEnd,
-        };
-        console.log(`[${timestamp()}] [send] allocate_agent npc=${beat.npcName} keepUntil=${beat.windowEnd} directive="${beat.directive}"`);
-        sendToCsharp(msg);
-      }
-    } catch (err) {
-      console.error(`[${timestamp()}] [director] morningPlan 失败:`, err);
-    }
     return { type: "ack", requestId: req.requestId };
   }
 
@@ -504,17 +462,6 @@ export class ProtocolAdapter {
     return { type: "ack", requestId: req.requestId };
   }
 
-  /** Phase 1 将在此接入逐 NPC 的 LLM 日结器。 */
-  async handleConsolidateDay(req: ConsolidateDayMessage): Promise<{ type: "ack"; requestId: string }> {
-    const key = `${req.npcName}|${req.dateIso}`;
-    const duplicate = this.seenConsolidations.has(key);
-    this.seenConsolidations.add(key);
-    const id = (req as { requestId?: string }).requestId ?? "unknown";
-    console.log(`[${timestamp()}] [consolidate] ${req.npcName} date=${req.dateIso}${duplicate ? " (duplicate, skipped)" : ""}`);
-    // Phase 1（E1-1 TranscriptStore）将在这里接入实际的逐 Agent LLM 日结。
-    return { type: "ack", requestId: id };
-  }
-
   /**
    * E5-2 喊话歧义兜底路由。C# 4 层确定性路由全空时发送；本方法用轻量路由
    * （MorningShoutRouter，最多 1 次 LLM 调用，断线走确定性兜底）选目标。
@@ -592,9 +539,16 @@ export class ProtocolAdapter {
 
   async handleDialogue(req: DialogueRequest): Promise<DialogueResponse> {
     // Check NPC lock (spec 5.5: same NPC serial dialogue)
-    const locked = await this.registry.acquireLock(req.npcName);
+    // R1（2026-09-13 design §3）：持锁期可达数十秒（整个 ReAct 循环），BUSY 前限时等待
+    // 而非秒拒；默认 15s（< C# LLMTimeoutSeconds=120，不引入新超时冲突），0 = 立即拒绝。
+    const lockWaitStart = Date.now();
+    const locked = await this.registry.acquireLock(
+      req.npcName,
+      this.options?.dialogueLockTimeoutMs ?? 15_000,
+    );
     if (!locked) {
-      console.log(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked)`);
+      // 等了多久一并落日志——区分"秒拒"（配置为 0/锁真死等）与"等满超时"。
+      console.log(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked, waited ${Date.now() - lockWaitStart}ms)`);
       return this.buildBusyResponse(req);
     }
 
@@ -613,10 +567,6 @@ export class ProtocolAdapter {
       const toolResults: ToolResultRecord[] = this.registry.drainToolResults(req.npcName);
 
       const scene = decodeWorldSnapshot(req.worldSnapshot);
-
-      // M3 多玩家化：登记发起玩家（换日导演编排按此名单 per-player 取画像；
-      // 单机只有一个 playerId，行为等价现状）。
-      this.playerDirectory.observe(req.playerId, scene.farmerName);
 
       // 2026-08-15 账本迁移（步骤 1）：首次见 NPC 从 worldSnapshot 播种权威账本
       // （npcMoney/npcInventory 镜像基线；步骤 2 后权威性移交账本本身）。播种后保存。
@@ -761,10 +711,12 @@ export class ProtocolAdapter {
       npcName: req.npcName,
       // 2026-08-16 决策 #3：BUSY 改灰色系统提示（C# 端按 NPC 性别渲染"他/她/它正在和别人交流"，
       // 这里只留占位文案；fallback=true 是 C# 走灰色 chatBox 路径的开关）。
+      // 2026-09-13 R2：补 fallbackReason="busy"——C#/房客端据此区分"忙"与 LLM 故障灰字，诊断不再被误导。
       speech: `（${req.npcName} 正在和别人交流）`,
       actions: [],
       emotion: DEFAULT_EMOTION,
       fallback: true,
+      fallbackReason: "busy",
     };
   }
 
@@ -786,7 +738,8 @@ export class ProtocolAdapter {
       case "dialogue": return this.handleDialogue(m as DialogueRequest);
       case "action_result": return this.handleActionResult(m as ActionResultMessage);
       case "state_changed": return this.handleStateChanged(m as StateChangedMessage);
-      case "consolidate_day": return this.handleConsolidateDay(m as ConsolidateDayMessage);
+      // consolidate_day：2026-09-14 降级 planned（记忆日结从未实现，C# 发送端已删，
+      // 实现时连同 sender/handler 一并恢复）——两端都不实现，未知类型走 default。
       case "day_started": return this.handleDayStarted(m as DayStartedMessage);
       case "game_context_sync": return this.handleGameContextSync(m as GameContextSyncMessage);
       case "route_shout": return this.handleRouteShout(m as RouteShoutMessage);

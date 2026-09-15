@@ -59,6 +59,14 @@ public class EventHandlerInitializer
     private const double MaxDecisionAgeSeconds = 30.0;
 
     /// <summary>
+    ///     B5 空闲回收的 manual override 空闲阈值（设计 §3.4，本 PR 不做配置）。
+    ///     必须明显大于单轮对话间隔：房客中继对话主机无感知关闭时机
+    ///     （EndTopicConversation 不触发），靠"每轮中继对话 UpdatePriority 刷新 LastUpdated
+    ///     + 空闲超时释放"兜底——阈值太小会把仍被房客活跃对话的身体误释放。
+    /// </summary>
+    private static readonly TimeSpan IdleOverrideThreshold = TimeSpan.FromMinutes(10);
+
+    /// <summary>
     ///     主线程命令执行队列：后台线程收到 TS Agent Server 命令后入队，
     ///     OnUpdateTicked（主线程）出队执行，避免非主线程访问 Game1 状态。
     /// </summary>
@@ -269,6 +277,12 @@ public class EventHandlerInitializer
                     }
                 });
             };
+
+            // B5.4 常驻拆除接线（设计 §3.4 步骤 4）：池表任何一条路径失去槽位
+            // （TryAllocate 挤出 / 换日裁剪 / 空闲淘汰 / promote 挤人）都做完整身体拆除，
+            // 此前只有 PromoteToAgent 的临时捕获做拆除，其余路径"只释放账面不拆身体"是潜伏缺口。
+            // 反订阅在 UnsubscribeEvents 对称注销。
+            _agentService.AllocationManager.OnAgentDeallocated += OnAgentDeallocatedTeardown;
         }
 
         // GMCM 注册已移到 ModEntry.OnGameLaunchedEarly：
@@ -316,6 +330,11 @@ public class EventHandlerInitializer
         if (_agentTickLoop != null)
         {
             _agentTickLoop.OnVanillaReleaseFinalized -= OnVanillaReleaseFinalized;
+        }
+
+        if (_agentService != null)
+        {
+            _agentService.AllocationManager.OnAgentDeallocated -= OnAgentDeallocatedTeardown;
         }
 
         // 防御性反注册：本轮 Router 未注册则 no-op，Task 9 实例化后生效
@@ -1082,10 +1101,8 @@ public class EventHandlerInitializer
         // E3-5: 换日生成当日求购（每 NPC 每天 ≤1 条，价格 1.0~1.1× 公道价，当日有效）
         GenerateDayPurchaseRequests();
 
-        // T16: 跳睡眠补跑 — 检查昨日凝练是否完成（幂等，TS Agent Server 自动跳过已凝练日期）
-        _ = TriggerSkipSleepConsolidationFallbackAsync();
-
-        // Task 10: 通知 TS 新的一天开始（触发导演 morningPlan，10% 概率产出 beat → allocate_agent）
+        // Task 10: 通知 TS 新的一天开始（换日情绪重置由 TS 引擎执行；旧叙事 Director
+        // morningPlan 已于 2026-09-14 砍除，directorContext 继续推送供未来工具脑消费）
         _ = NotifyDayStartedAsync();
 
         _agentTickLoop?.ClearAllReleaseState();
@@ -1229,42 +1246,6 @@ public class EventHandlerInitializer
         _monitor.Log(
             $"Circuit breaker status: {circuitStatus.State}, Failures: {circuitStatus.ConsecutiveFailures}, Avg Response: {circuitStatus.AverageResponseTimeSeconds:F2}s",
             LogLevel.Debug);
-
-        // T16: 触发当日记忆凝练
-        _ = TriggerDayEndingConsolidationAsync();
-    }
-
-    /// <summary>
-    ///     T16: 触发当日记忆凝练。向 TS Agent Server 发送 consolidate_day 消息，
-    ///     对每个 active agent 触发 LLM 凝练。Fire-and-forget，不等待响应。
-    /// </summary>
-    private async Task TriggerDayEndingConsolidationAsync()
-    {
-        if (_agentServerProvider == null || _agentService == null)
-        {
-            return;
-        }
-
-        var dateIso = GetGameDateIso(Game1.year, Game1.currentSeason, Game1.dayOfMonth);
-        foreach (var agent in _agentService.GetAllAgents())
-        {
-            try
-            {
-                var msg = JsonSerializer.Serialize(new
-                {
-                    type = "consolidate_day",
-                    npcName = agent.NpcName,
-                    dateIso,
-                    requestId = Guid.NewGuid().ToString("N")
-                });
-                await _agentServerProvider.SendMessageAsync(msg).ConfigureAwait(false);
-                _monitor.Log($"DayEnding consolidation started for {agent.NpcName}", LogLevel.Debug);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _monitor.Log($"[DayEnding] Consolidation failed for {agent.NpcName}: {ex.Message}", LogLevel.Warn);
-            }
-        }
     }
 
     /// <summary>
@@ -1554,42 +1535,6 @@ public class EventHandlerInitializer
     }
 
     /// <summary>
-    ///     T16: 跳睡眠补跑。在 OnDayStarted 时检查昨日凝练是否完成，
-    ///     向 TS Agent Server 发送昨日日期的 consolidate_day 消息。
-    ///     TS Agent Server 的幂等检查会自动跳过已凝练的日期。
-    /// </summary>
-    private async Task TriggerSkipSleepConsolidationFallbackAsync()
-    {
-        if (_agentServerProvider == null || _agentService == null)
-        {
-            return;
-        }
-
-        var yesterdayIso = GetYesterdayDateIso(Game1.year, Game1.currentSeason, Game1.dayOfMonth);
-        foreach (var agent in _agentService.GetAllAgents())
-        {
-            try
-            {
-                var msg = JsonSerializer.Serialize(new
-                {
-                    type = "consolidate_day",
-                    npcName = agent.NpcName,
-                    dateIso = yesterdayIso,
-                    requestId = Guid.NewGuid().ToString("N")
-                });
-                await _agentServerProvider.SendMessageAsync(msg).ConfigureAwait(false);
-                _monitor.Log($"DayStarted: checking skip-sleep consolidation fallback for {agent.NpcName}",
-                    LogLevel.Debug);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _monitor.Log($"[DayStarted] Skip-sleep fallback failed for {agent.NpcName}: {ex.Message}",
-                    LogLevel.Warn);
-            }
-        }
-    }
-
-    /// <summary>
     ///     根据游戏日期生成 ISO 风格日期字符串，格式 "Y{year}_{season}_{day}"。
     /// </summary>
     /// <param name="year">游戏年份。</param>
@@ -1600,33 +1545,6 @@ public class EventHandlerInitializer
     {
         var safeSeason = season ?? "spring";
         return $"Y{year}_{safeSeason}_{day}";
-    }
-
-    /// <summary>
-    ///     计算昨日 ISO 日期字符串。处理跨季节和跨年的边界情况
-    ///     （每个季节 28 天，春→夏→秋→冬→次年春）。
-    /// </summary>
-    /// <param name="year">当前游戏年份。</param>
-    /// <param name="season">当前季节，可为 null。</param>
-    /// <param name="day">当前日期（1-28）。</param>
-    /// <returns>昨日 ISO 日期字符串。</returns>
-    private static string GetYesterdayDateIso(int year, string? season, int day)
-    {
-        var seasons = new[] { "spring", "summer", "fall", "winter" };
-        var safeSeason = season ?? "spring";
-        if (day > 1)
-        {
-            return GetGameDateIso(year, safeSeason, day - 1);
-        }
-
-        var idx = Array.IndexOf(seasons, safeSeason);
-        if (idx > 0)
-        {
-            return GetGameDateIso(year, seasons[idx - 1], 28);
-        }
-
-        // spring day 1 -> winter day 28 of previous year
-        return GetGameDateIso(year - 1, "winter", 28);
     }
 
     /// <summary>
@@ -2295,9 +2213,85 @@ public class EventHandlerInitializer
     {
         // 情绪衰减由 TS Agent Server 管理，C# 不再本地执行 TickEmotionDecay
 
+        // B5.2 周期驱动（设计 §3.4 步骤 2）：每个时间跳（游戏内 10 分钟）做一次池位级空闲回收。
+        // 原 OnDayStarted 的 ReevaluateAllocations 保留（换日兜底 + 缓存清理语义不变）。
+        RunIdleAllocationReclaim();
+
         // E5-3: 时间触发主动发言。仅在进入新窗口（600/1200/1800）时触发一次，
         // 同窗口不重复触发（_lastProactiveTriggerWindow 防刷屏）。
         TryTriggerProactiveSpeech(e.NewTime);
+    }
+
+    /// <summary>
+    ///     B5 空闲回收编排（设计 §3.4）：先释放空闲 override，再按容量裁剪。
+    ///     顺序不可倒：先释放 override，被释放者才能在随后的 ReevaluateAllocations 里
+    ///     以普通分配身份参与超容量淘汰（manual 垫底规则不再遮蔽它们）。
+    /// </summary>
+    private void RunIdleAllocationReclaim()
+    {
+        if (_agentService == null)
+        {
+            return;
+        }
+
+        var manager = _agentService.AllocationManager;
+        // "是否活跃对话"由本层判定、以委托传入（Manager 不得依赖 Patches 层）：
+        // 主机侧当前活跃对话 NPC 不释放（对话框还开着，override 释放了也会立刻被下一轮对话重建）。
+        var released = manager.ReleaseIdleManualOverrides(
+            DateTime.UtcNow,
+            IdleOverrideThreshold,
+            name => string.Equals(DialogueBoxInputPatch.GetActiveAgentNpc(), name, StringComparison.OrdinalIgnoreCase));
+        if (released > 0)
+        {
+            _monitor.Log($"[Allocation] Idle reclaim: released {released} idle manual override(s)", LogLevel.Debug);
+        }
+
+        manager.ReevaluateAllocations();
+    }
+
+    /// <summary>
+    ///     B5.4 常驻身体拆除（设计 §3.4 步骤 4）：NPC 失去池位时的统一收尾仪式。
+    ///     ForceTransition 必须在 RemoveAgent 之前——RemoveAgent 会把实例挪进休眠注册表，
+    ///     先发带 reason="evicted" 的 state_changed 让 TS 端 updateActualState 记录被逐
+    ///     （RemoveAgent 内部 Reset() 会再发一次空 reason 的 state_changed，TS 端仅在
+    ///     reason 非空时更新 lastTransitionReason，evicted 不会被覆盖）。
+    ///     幂等：agent 已不在（如返回标题清理时 ClearAllAgents 先于 ClearAllAllocations 执行）
+    ///     直接返回，不重复任何副作用——PromoteToAgent 收编后依赖此保证不重复弹提示。
+    /// </summary>
+    private void OnAgentDeallocatedTeardown(object? sender, AgentAllocationEventArgs e)
+    {
+        if (_agentService == null)
+        {
+            return;
+        }
+
+        if (!_agentService.TryGetAgent(e.NpcName, out var agent) || agent == null)
+        {
+            return;
+        }
+
+        _ = agent.StateMachine.ForceTransition(AgentState.IDLE, true, reason: "evicted");
+
+        // 降级休眠不删除：StateMachine.Reset + Handler 清理 + Brain/Inventory 保留复用（AgentService.RemoveAgent）
+        _ = _agentService.RemoveAgent(e.NpcName);
+
+        // 交还原版日程（照抄 PromoteToAgent 对被挤者的收尾仪式）
+        var npc = Game1.getCharacterFromName(e.NpcName);
+        if (npc != null)
+        {
+            npc.controller = null;
+            npc.Halt();
+            npc.followSchedule = true;
+            npc.ignoreScheduleToday = false;
+        }
+
+        // 玩家可见通知只对"被玩家手动挤掉"发：换日裁剪 / 空闲淘汰是静默后台回收，不弹聊天栏。
+        if (string.Equals(e.Reason, "Replaced by manual override", StringComparison.Ordinal))
+        {
+            Game1.chatBox?.addMessage($"{e.NpcName} 告别离开了", Color.White);
+        }
+
+        _monitor.Log($"[Allocation] {e.NpcName} body torn down to dormant brain (reason: {e.Reason})", LogLevel.Debug);
     }
 
     /// <summary>

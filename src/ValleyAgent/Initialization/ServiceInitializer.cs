@@ -107,10 +107,7 @@ public class ServiceInitializer
         };
         _container.RegisterSingleton(debugLogger);
 
-        var knowledgeBase = new RAGKnowledgeBase(_monitor);
-        knowledgeBase.Load(_helper);
-        _container.RegisterSingleton(knowledgeBase);
-
+        // 2026-09-14 死代码清除：RAGKnowledgeBase（flat npcs.json 检索）已删除——容器内无消费者。
         var bioLoader = new ValleyTalkBioLoader(_monitor);
         bioLoader.Initialize(_helper);
         bioLoader.Load();

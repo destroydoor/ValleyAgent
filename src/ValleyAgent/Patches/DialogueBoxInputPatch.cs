@@ -94,6 +94,21 @@ public static class DialogueBoxInputPatch
     /// </summary>
     public static void SetDialogueTransport(IDialogueTransport? transport) => _dialogueTransport = transport;
 
+    /// <summary>
+    ///     房客侧对话通道存在性：房客没有 AgentServerProvider（恒 null），
+    ///     CloseDialoguePostfix 的放行判定要按 transport 判——否则房客播完原版台词后
+    ///     AI 输入框永不弹出。主机形态恒为 false（provider 判定足够）。
+    /// </summary>
+    internal static bool HasDialogueTransport => _dialogueTransport != null;
+
+    /// <summary>
+    ///     身体类工具判定（s_promotionTriggerTools 清单的单一事实源只读入口）：
+    ///     非身体 NPC 的回复动作命中此类工具时需先建身体才能执行。
+    ///     HostRequestHandlers 中继回包的动作分发复用同一清单，不复制列表。
+    /// </summary>
+    internal static bool IsPromotionTriggerTool(string tool)
+        => !string.IsNullOrEmpty(tool) && s_promotionTriggerTools.Contains(tool);
+
     public static void SetActiveAgentNpc(string npcName)
     {
         _activeAgentNpc = npcName;
@@ -350,7 +365,8 @@ public static class DialogueBoxInputPatch
                     npcName,
                     response.Speech ?? "...",
                     response.Actions ?? new List<ToolAction>(),
-                    response.Fallback == true));
+                    response.Fallback == true,
+                    response.FallbackReason));
                 // 深度告警：主线程泵停摆时回复堆积的早期信号（2026-09-11 生产化仪器）
                 QueueTelemetry.WarnIfDeep("dialogue-replies", _pendingReplies.Count, _monitor);
             }
@@ -415,18 +431,15 @@ public static class DialogueBoxInputPatch
             return;
         }
 
-        // 2026-08-16 决策 #3：规则引擎降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
-        // 代词按 NPC 性别区分（他/她/它），与 NPC 第一人称口吻区分开——这是系统提示不是 NPC 发言。
+        // 2026-08-16 决策 #3：降级响应（BUSY 等）→ 灰色系统提示，不弹打字机对话框。
+        // 2026-09-13 R3：灰字文案单一来源在 TS（busy=正在和别人交流，LLM 失败=走神/说不出来等），
+        // C# 只负责灰字样式不维护话术；fallbackReason 仅用于日志留痕与房客广播透传。
         if (reply.Fallback)
         {
-            var pronoun = npc.Gender switch
-            {
-                StardewValley.Gender.Male => "他",
-                StardewValley.Gender.Female => "她",
-                _ => "它"
-            };
-            Game1.chatBox?.addMessage($"{pronoun}正在和别人交流", Color.Gray);
-            _monitor?.Log($"[Chat] {reply.NpcName}: fallback system notice (busy)", LogLevel.Debug);
+            Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
+            _monitor?.Log(
+                $"[Chat] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
+                LogLevel.Debug);
             return;
         }
 
@@ -551,8 +564,9 @@ public static class DialogueBoxInputPatch
     ///     动态分配：把对话中的非 Agent NPC 升级为 Agent。
     ///     满员时 AgentAllocationManager 自动淘汰最低优先级的现有 Agent（记忆保留在服务端记忆文件）。
     ///     E2-2：internal 供聊天栏路由（ChatBarRouter）复用。
+    ///     B4：source 标注 promote 来源（dialogue/director），仅影响日志措辞不误导排查。
     /// </summary>
-    internal static bool PromoteToAgent(string npcName)
+    internal static bool PromoteToAgent(string npcName, string source = "dialogue")
     {
         if (_agentService == null)
         {
@@ -624,31 +638,12 @@ public static class DialogueBoxInputPatch
 
         if (replacedNpc != null)
         {
-            // F5 修复：满员淘汰时先显式 ForceTransition(IDLE, reason="evicted")
-            // 让 StateChangedSender 发出带 reason 的 state_changed，TS 端可据此渲染 prompt。
-            // 必须在 RemoveAgent 之前调用（RemoveAgent 会从 _agents 字典移除该实例）。
-            // 注意：RemoveAgent 内部的 Reset() 会再发一次空 reason 的 state_changed，
-            // TS 端 updateActualState 已调整为仅在 reason 非空时更新 lastTransitionReason，
-            // 因此 evicted reason 不会被覆盖。
-            if (_agentService.TryGetAgent(replacedNpc, out var evictedAgent) && evictedAgent != null)
-            {
-                _ = evictedAgent.StateMachine.ForceTransition(
-                    AgentState.IDLE, true, reason: "evicted");
-            }
-
-            // 销毁被淘汰者的 Agent 实例，交还原版日程（淘汰≠删除记忆，服务端记忆文件保留）
-            _ = _agentService.RemoveAgent(replacedNpc);
-            var oldNpc = Game1.getCharacterFromName(replacedNpc);
-            if (oldNpc != null)
-            {
-                oldNpc.controller = null;
-                oldNpc.Halt();
-                oldNpc.followSchedule = true;
-                oldNpc.ignoreScheduleToday = false;
-            }
-
-            // F5: 玩家可见通知 — 聊天栏提示被淘汰的 NPC 已离开
-            Game1.chatBox?.addMessage($"{replacedNpc} 告别离开了", Color.White);
+            // B5.4 收编（设计 §3.4 步骤 4）：被挤者的完整拆除（ForceTransition(IDLE, reason="evicted")
+            // → RemoveAgent 降级休眠 → controller/Halt/日程还原 → 玩家可见"告别"提示）统一由常驻
+            // OnAgentDeallocated 订阅（EventHandlerInitializer.OnAgentDeallocatedTeardown）执行——
+            // 它与本处捕获的是同一次 ForceAllocate 触发的事件，四条淘汰路径
+            // （TryAllocate 挤出/换日裁剪/空闲淘汰/promote 挤人）由此行为一致，
+            // 且 evicted state_changed 与告别提示恰好各发生一次（订阅方幂等：agent 已不在直接返回）。
             _monitor?.Log($"[Chat] {replacedNpc} deallocated — replaced by {npcName}", LogLevel.Info);
         }
 
@@ -662,7 +657,7 @@ public static class DialogueBoxInputPatch
         _bioLoader?.InjectBio(agent.Brain);
         _wireAgentEvents?.Invoke(agent);
         _monitor?.Log(
-            $"[Chat] {npcName} promoted to Agent via dialogue (conversations={conversations}, hearts={hearts:F1})",
+            $"[Chat] {npcName} promoted to Agent via {source} (conversations={conversations}, hearts={hearts:F1})",
             LogLevel.Info);
         return true;
     }
@@ -725,12 +720,14 @@ public static class DialogueBoxInputPatch
     /// <summary>待主线程渲染的 LLM 回复。</summary>
     private sealed class PendingReply
     {
-        public PendingReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool fallback = false)
+        public PendingReply(string npcName, string speech, IReadOnlyList<ToolAction> actions, bool fallback = false,
+            string? fallbackReason = null)
         {
             NpcName = npcName;
             Speech = speech;
             Actions = actions;
             Fallback = fallback;
+            FallbackReason = fallbackReason;
         }
 
         public string NpcName { get; }
@@ -738,6 +735,8 @@ public static class DialogueBoxInputPatch
         public IReadOnlyList<ToolAction> Actions { get; }
         /// <summary>规则引擎降级响应（BUSY 等）：灰色系统提示渲染，不弹对话框。</summary>
         public bool Fallback { get; }
+        /// <summary>TS 降级原因（busy/llm_error/billing/unavailable），仅日志留痕。</summary>
+        public string? FallbackReason { get; }
     }
 
     /// <summary>

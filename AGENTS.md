@@ -1,6 +1,6 @@
 # ValleyAgent — 项目指南（AI 助手版）
 
-> **Last updated:** 2026-09-10（主机卡死排查+修复批落地版；新增设计哲学第 10 条"猜想与实际分离"）
+> **Last updated:** 2026-09-14（架构漂移审计收割：C# ~5,600 行死子系统 + TS react-guard 删除；**旧叙事 Director 砍除裁决**——morningPlan/beat 线产出无人消费，director.ts/beat-store/runBeat/BEAT 模板/PlayerDirectory 已删，协议 10 条 planned 死 schema 清理 + consolidate_day 降级 planned；C# 工具层与 directorContext 推送保留待未来造脑；审计底稿见 arena 分支 `docs/plan/2026-09-12-architecture-drift-audit.md`）
 > **卡死排查结论**：`docs/plan/2026-09-10-host-freeze-root-cause.md`（"每玩家一导演"=误读；6 轮 soak 无进程级冻结；FOLLOW 跨图缺陷族行为级实证并已修；U1/U2/U3 猜想台账与实机终验流程见附录 B）
 > **当前执行依据**：`docs/plan/2026-08-05-three-tier-architecture-execution-plan.md`
 > **架构修订设计**：`docs/design/2026-08-15-ts-ledger-reflex-architecture.md`（经济账本迁 TS + C# 反射执行，**四步全部完成（2026-08-15）**：adjust 执行器 + TS 账本 + 经济工具同步编排 + TS 情绪引擎 + 断线对账）
@@ -51,9 +51,9 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Director（导演智能体，TS 端）                               │
-│ 视野：全局信息 + 所有 NPC 人设档案 + 所有 NPC 的 L2 状态    │
-│ 职责：编故事、编排事件、创造相遇机会、改 NPC 状态           │
+│ Director（导演智能体，TS 端）——规划中，尚未接线             │
+│ 旧叙事线（morningPlan/beat/runBeat）2026-09-14 已砍除；     │
+│ TS 大脑待造，C# 工具层与 directorContext 推送已就绪         │
 │ 工具：set_npc_position/inventory/money/mood/recent_events/  │
 │       working_on + spawn_beat + spawn_group_beat            │
 │ 不做：不调 NPC LLM、不进 NPC 上下文、不审批                 │
@@ -89,35 +89,41 @@
 
 **关键原则**：NPC Agent 和 Director 之间**永远没有直接消息往来**。Director → C# 状态层 → NPC Agent，单向流动。
 
+> 2026-09-14 起 `AgentAllocationManager` 语义是**并发身体池**：管理"谁当前持有身体（状态机/GoalExecutor/执行动作能力）"，受 [Min,Max] 并发上限约束、按需 ForceAllocate、空闲回收；不再是"这个 NPC 是不是 AI NPC"的身份判定。
+
 ### 3.1 NPC 状态光谱
+
+> **分配语义变更（2026-09-14，issue #9 PR2）**：分配从"身份"改为"身体"——对话**不需要**分配（谁被聊到谁激活，房客与主机一致），只有**身体**占池位：按需 ForceAllocate（对话身体类动作 / 导演 `set_npc_position` / allocate_agent）+ 空闲回收（对话结束释放 override、TimeChanged 周期淘汰、OnAgentDeallocated 常驻拆除）。设计：`docs/design/2026-09-13-agent-body-refactor.md`。
 
 | 状态 | 行为 | LLM 消耗 | 进入条件 |
 |---|---|---|---|
 | **休眠** | 走原版路径，无 AgentBrain | 零 | 默认 |
-| **有限自主** | 可对话/交易/送礼/移动；spark 随机激活 | 中（对话或 spark 命中时） | spark 5% / 玩家对话 / Director beat |
+| **有限自主** | 可对话/交易/送礼/移动；spark 随机激活 | 中（对话或 spark 命中时） | spark 5% / 玩家对话 / Director beat（规划中，见 §3.5） |
 | **执行态** | C# GoalExecutor 后台跑 | 零（纯 C#）；完成时 1 次 LLM 汇报 | set_goal 工具调用 |
 
 ### 3.2 记忆与状态分层
 
 | 层 | 存什么 | 注入方式 |
 |---|---|---|
-| **L1 长期记忆** | 玩家-NPC 重要互动、NPC 间重大事件、玩家说过的有长期影响的话 | RAG 语义检索命中才注入 |
+| **L1 长期记忆** | 玩家-NPC 重要互动、NPC 间重大事件、玩家说过的有长期影响的话 | 显著性排序检索命中才注入（无向量嵌入，审计 M-5） |
 | **L2 状态摘要** | 钱包/背包/位置/心情/近期事件/工作标记/欠款 | **每次对话强制注入** prompt 开头 |
-| **L3 临时剧本** | 当前 beat 场景描述 | beat 有效期内强制注入 |
+| ~~L3 临时剧本~~ | 当前 beat 场景描述 | 随旧叙事 Director 砍除（2026-09-14）；恢复随工具脑再造 |
 
 L2 todayEvents 保留近 3 天，每天 day_started 清理 3 天前的。判定标准：这件事是否需要跨场景、跨日长期检索？是 → L1；否 → 只 L2。
 
 ### 3.3 Wire 协议
 
-单一事实源：`ValleyAI/protocol/messages.json`，check:protocol 追踪。active 的有 `hello` / `ping` / `dialogue`（唯一 LLM 触发）/ `dialogue_response` / `action_result` / `state_changed` / `day_started` / `consolidate_day` / `allocate_agent` / `route_shout_response`（`route_shout` 为 orphan_route 预留）。**四步全部落地（2026-08-15）**：`execute_adjust`（TS→C# 原子批指令，带 instructionId，orphan_route）/ `adjust_result`（C#→TS 回执：每步成败+失败码+新余额，active）/ `reconnect_sync`（C#→TS 重连对账：outbox 补发 + active agent 名单，active）。步骤 2：trade/give_item/give_gift/receive_payment 由 TS 同步编排（账本校验→execute_adjust→回执），不再发 C# 执行；C# 还价单结算链已删除；求购（E3-5）保留 C# 生成，命中时拒绝送礼交接并提示走对话议价。步骤 3：TS 情绪引擎（确定性零 LLM，Director set_npc_mood 覆盖权），C# EmotionAnalyzer/DialogueMemoryAnalyzer 删除，RuleBasedDecisionEngine 瘦身为生存反射。步骤 4：C# 重连发 reconnect_sync（WebSocketClient.OnReconnected），TS 对账 in-flight adjust pending（凭 instructionId 重发，幂等缓存闭环）。旧 Python 时代的 `decision`/`friendship_eval` 等死管道已删除（schema 留档）。
+单一事实源：`server/protocol/messages.json`，check:protocol 追踪。active 的有 `hello` / `ping` / `dialogue`（唯一 LLM 触发）/ `dialogue_response` / `action_result` / `state_changed` / `day_started` / `allocate_agent` / `route_shout_response`（`route_shout` 为 orphan_route 预留）；`consolidate_day` 2026-09-14 降级 planned（记忆日结从未实现，两端代码已删）。**四步全部落地（2026-08-15）**：`execute_adjust`（TS→C# 原子批指令，带 instructionId，orphan_route）/ `adjust_result`（C#→TS 回执：每步成败+失败码+新余额，active）/ `reconnect_sync`（C#→TS 重连对账：outbox 补发 + active agent 名单，active）。步骤 2：trade/give_item/give_gift/receive_payment 由 TS 同步编排（账本校验→execute_adjust→回执），不再发 C# 执行；C# 还价单结算链已删除；求购（E3-5）保留 C# 生成，命中时拒绝送礼交接并提示走对话议价。步骤 3：TS 情绪引擎（确定性零 LLM，Director set_npc_mood 覆盖权），C# EmotionAnalyzer/DialogueMemoryAnalyzer 删除，RuleBasedDecisionEngine 瘦身为生存反射。步骤 4：C# 重连发 reconnect_sync（WebSocketClient.OnReconnected），TS 对账 in-flight adjust pending（凭 instructionId 重发，幂等缓存闭环）。旧 Python 时代的 `decision`/`friendship_eval` 死管道 schema 与 2026-09-14 清理的 10 条 planned 死 schema（beat_plan/beat_start/beat_end/emotion_sync/memory_sync/decision/gift_eval/rag_query/state_sync/day_end）均已从 messages.json 删除。
 
 ### 3.4 NPC Agent 工具集
 
 speak / emote / give_item / give_gift / **trade**（新增，阶段 1）/ **set_goal**（新增，阶段 2）/ set_state / show_dialogue / remember / forget / get_info / accept_job / receive_payment（+evaluate_friendship，no-op 记录型）。worldSnapshot 同时携带玩家侧（location/inventory/playerMoney/PlayerHeldItem）与 NPC 侧（npcLocation/npcMoney/npcInventory/npcMood/npcRecentEvents/npcWorkingOn）数据，NPC 认知以 NPC 侧字段为准。
 
-### 3.5 Director 工具集（阶段 3 落地）
+### 3.5 Director 工具集（阶段 3 落地 = C# 工具层；TS 大脑待造）
 
 set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_recent_events / set_npc_working_on / spawn_beat / spawn_group_beat / inject_memory。Director **没有** speak/emote/give_item/trade/set_goal —— 这些是 NPC Agent 的角色扮演工具。
+
+**2026-09-14 裁决**：旧叙事 Director（director.ts morningPlan→beat→allocate_agent）因产出无人消费（runBeat 从未接入生产、beat 唯一副作用是保活占池）已整体砍除；C# 的 9 个 DirectorTools + `director_command` 通道 + DirectorContextBuilder 每日推送**保留**，作为未来"工具型 Director 造脑"的就绪层（B4 的按需建身体逻辑同样保留）。
 
 ### 3.6 已知坑（详见旧版参考 §2.1.1）
 
@@ -133,6 +139,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 - **联机审计修复（2026-08-23）**：五代理全仓审计后修复——**P0 线程纪律补齐**：房客中继 await 续体（好感度 NetInt 写入 / LastDialoguePlayerId / CommandExecutor 执行 / ModMessage 回包）与房客送礼 fd.Points 写入全部改走 `HostRequestHandlers.ProcessMainThreadActions` 主线程队列（原 P0 修复只覆盖 execute_adjust/director_command/allocate_agent 三类 WS 消息，中继链路漏网）；BUSY `fallback` 标记补进 ModMessage 契约与 `FarmhandDialogueTransport`（房客侧灰字此前不可达，会弹普通对话框）；房客负好感 delta 不再被 `is > 0` 静默丢弃（Clamp 0..2500，正负一致生效）；`IGiftTransport.SendAsync` 增加 `requesterPlayerId`，`HostGiftTransport` 好感基线改按送礼发起玩家解析（原来错用主机 friendshipData）；本地对话经 `DualPathAgentServerProvider.DialogueCompleted` 统一回写 LastDialoguePlayerId（TS echo 的 playerId 此前无人消费）；KeepUntil 豁免从空闲淘汰扩展到 ForceAllocate/TryAllocate 候选过滤与 PromoteToAgent 的 manual override 释放（导演 beat 不再被对话挤占）。TS 侧同步修复：NPC 台词入玩家桶 / forget 双桶 / legacyMigrated 迁移守卫 / pending 终态清理 / temp+rename 原子写盘 / trade 整数校验 / evaluate_friendship ±100 钳制。
 - **房客可用性修复（2026-09-09）**：虚拟环境复现测试（`src/ValleyAgent.UnitTests/Multiplayer/` 14 测试，Windows/Docker 双平台 593 过/1 特征红）定位四缺口后修复——**①房客三队列排水**：`InitializeThinClientMode` UpdateTicked 补 `DialogueBoxInputPatch.ProcessPendingReplies` / `NPCGiftPatch.ProcessMainThreadActions` / `HostRequestHandlers.ProcessMainThreadActions`（此前房客只驱动 renderer，AI 回复不渲染、送礼好感不落账="网络上对了也没法实际使用"）；**②发送主线程化**：两个 Farmhand transport 的 Game1 读取 + SendMessage 整体经 `EnqueueMainThread` 投递（Task.Run 后台线程直发可污染底层消息队列）；**③回包 requestId**：`DialogueRequest/ResponseMessage` 与 `GiftRequest/ResponseMessage` 加可选 `RequestId`，主机 HandleDialogue/GiftRequest 全路径（含兜底/求购拒绝）原样回填，房客 `HandleResponse` 精确配对——带值但 pending 已超时清理 → 迟到回包丢弃（绝不回退 FIFO）；为空（旧主机）→ 退回 npcName 前缀 FIFO（版本内向后兼容）；**④快照主线程采集**：`SubmitInput` 的 `WorldSnapshotBuilder.Build`/`GetNpcState`/playerId 移到 Task.Run 之前。
 - **M3 多玩家化（2026-09-13，issue #4 三项遗留限制全清）**：**①情绪 per-player 双键**——`EmotionEngine` 状态键 `(npcName, playerId)`：无归属事件（state_changed / Director 世界级 mood）进世界桶对所有人可见，可归属事件（action_result 经 `callId → playerId` 暂存表归属）进玩家桶；解析规则是**最近写入胜出**（内部单调 seq），避免一次性玩家情绪永久遮蔽后续世界情绪；换日 `resetAll` 清全部桶。**②房客聊天栏 + 送礼·交易菜单**——`ChatBarRouter.InitializeFarmhand(monitor, transport, remoteRenderer, config)`：在场候选取主机广播的 Agent 名单、请求经 `FarmhandDialogueTransport` 转发主机、回复本地渲染且**不重复执行 actions**（主机已执行并广播）；房客 tick 排水补 `ChatBarRouter.ProcessPendingReplies`；`GiftTradeMenuLogic.ShouldOfferGiftTradeMenu` 去掉 isThinClient 过滤（送礼走 `FarmhandGiftTransport`、交易走 dialogue transport，两条管道房客侧本就接通）。**③玩家画像 + 导演 per-player**——`player_profile` 表改 `player_id` 主键（旧单行迁 `_legacy` + 首个真实玩家惰性认领，M2 记忆拆分同范式）；`PlayerProfileManager` 全部方法加可选 playerId；新增 `PlayerDirectory`（观察式内存名录，从 dialogue 请求登记，上限 8）；`Director.morningPlan({ playerIds })` 按玩家各取画像各调一次 LLM、beat 打 `context.playerId`、跨玩家不重复安排同一 NPC、全局 beat 预算不随玩家数放大（上限由 `maxPlayersPerPlan` 钉住）；`director_runs` 增量加 `player_id` 列留痕。详见 `docs/design/2026-09-13-m3-multiplayer-director-emotion.md`。
+- **PR2 身体重构（2026-09-14，issue #9 B1-B5）**：房客可对**任意村民**进 AI 对话（B1 拆除 patch 三处身份门 + B2 聊天栏候选过滤 + B3 主机中继动作先 promote 再执行、LastDialoguePlayerId/优先级刷新不丢）；导演工具**行为类**（`set_npc_position`）按需建身体、纯数据类直接改休眠 Brain（B4）；空闲身体周期回收——对话结束释放 manual override、TimeChanged（每 10 游戏分钟）空闲回收编排、`ReevaluateAllocations` 显式跳过 KeepUntil、`OnAgentDeallocated` 常驻订阅做完整拆除（ForceTransition(evicted)→RemoveAgent 降级休眠→日程还原）（B5）。设计：`docs/design/2026-09-13-agent-body-refactor.md`。
 - **已知限制**：房客送礼命中求购时物品已在本地消耗（仅主机侧提示）；房客快照反序列化失败时主机兜底重建会用主机钱包/背包拼房客 playerId（TS 决策对象可能错位）；断线期间 director_command/allocate_agent 无 outbox 直接丢弃；玩家名录是内存观察式的（TS 重启后需玩家说过话才重新认识，当天 morningPlan 退化为单玩家编排）；玩家画像行为层/活动日志仍世界级（`activity_report` 协议未接线，C# 未上报 per-player 活动）；导演 game_context 仍是主机玩家状态的世界级快照；房客不支持"喊不在场的 NPC"（远程喊话依赖主机侧 Agent 全员名单）；**房主 3-4 人随机无日志整机卡死未定罪**（2026-09-09 排查：主机中继链路 3 流压测全绿已排除；2026-09-11 起看门狗已随生产 mod 分发，实机冻结自动落 dump，见 `docs/plan/2026-09-10-host-freeze-root-cause.md` 附录 B 终验流程）。
 - **测试**：IT14（playerId 三分支：自身 ID / 不存在 ID → playerNotFound / 缺省回落）；E2E harness `scripts/test/run_farmhand_e2e.ps1`（C1-C5 全绿：C4 房客交易落账 + C5 双玩家对话上下文隔离——agents/Haley_players/ 两个独立 rel 文件）。
 

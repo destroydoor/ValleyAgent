@@ -214,7 +214,8 @@ public class F5_DualAgent : V3TestBase
             $"actions={_actionCount}");
         Assert("No_state_mixing_between_NPCs", _statesNeverMixed,
             "States never mixed during dual action");
-        Assert("Neither_NPC_crashes", !_haleyCrashed && !_abigailCrashed,
+        AssertEx("Neither_NPC_crashes", !_haleyCrashed && !_abigailCrashed,
+            "双 Agent 并发驱动期间任一 NPC 的 Update 链抛 InvalidOperationException/NullReferenceException 等被 catch（_haleyCrashed/_abigailCrashed=true）",
             $"haleyCrashed={_haleyCrashed}, abigailCrashed={_abigailCrashed}");
 
         _monitor.Log(

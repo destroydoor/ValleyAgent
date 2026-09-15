@@ -23,9 +23,10 @@ public class DirectorToolsTests
     private static Dictionary<string, object> ArgsJson(string json) =>
         JsonSerializer.Deserialize<Dictionary<string, object>>(json)!;
 
-    private DirectorTools CreateTools(bool withBeatStore = true, int defaultMinutes = 120) =>
+    private DirectorTools CreateTools(bool withBeatStore = true, int defaultMinutes = 120,
+        Func<string, string, bool>? ensureBody = null) =>
         new(null, withBeatStore ? _beatStore : null, defaultMinutes,
-            name => _agents.TryGetValue(name, out var agent) ? agent : null);
+            name => _agents.TryGetValue(name, out var agent) ? agent : null, ensureBody);
 
     private static AgentInstance CreateAgent(string name) =>
         new(name, new AgentStateMachine(), maxHealth: 100);
@@ -424,5 +425,78 @@ public class DirectorToolsTests
 
         Assert.False(success);
         Assert.Equal(ActionResultReason.AgentMissing, reason);
+    }
+
+    // ───────────────────────── B4：行为类/数据类工具建身体接缝 ─────────────────────────
+
+    /// <summary>记录 (npc, tool) 调用的 ensureBody spy，返回可编程结果（经 Ensure 方法注入委托）。</summary>
+    private sealed class EnsureBodySpy
+    {
+        private readonly bool _result;
+
+        public EnsureBodySpy(bool result) => _result = result;
+
+        public List<(string Npc, string Tool)> Calls { get; } = new();
+
+        public bool Ensure(string npcName, string tool)
+        {
+            Calls.Add((npcName, tool));
+            return _result;
+        }
+    }
+
+    [Fact]
+    public void SetNpcPosition_EnsureBodyInjected_CallsAllocatorWithNpcAndTool()
+    {
+        // 行为类工具：无身体时先过 ensureBody 接缝（默认接 PromoteToAgent），再继续 warp 流程。
+        // 无头环境 ensureBody 返回 true 后流程撞上 Game1 未初始化 → AgentMissing（既有降级语义）；
+        // 本测断言的是"确实调了分配、参数正确"。
+        var spy = new EnsureBodySpy(result: true);
+        var tools = CreateTools(ensureBody: spy.Ensure);
+
+        var (success, reason, _) = tools.SetNpcPosition(
+            ArgsJson("""{"npc":"Shane","location":"Town","tile":[5,4]}"""));
+
+        Assert.Single(spy.Calls);
+        Assert.Equal("Shane", spy.Calls[0].Npc);
+        Assert.Equal("set_npc_position", spy.Calls[0].Tool);
+        Assert.False(success);
+        Assert.Equal(ActionResultReason.AgentMissing, reason);
+    }
+
+    [Fact]
+    public void SetNpcPosition_EnsureBodyFails_ReturnsAgentMissing()
+    {
+        // 分配失败（满员无可替槽）→ 按既有失败语义返回 AgentMissing，不抛异常。
+        var spy = new EnsureBodySpy(result: false);
+        var tools = CreateTools(ensureBody: spy.Ensure);
+
+        var (success, reason, _) = tools.SetNpcPosition(
+            ArgsJson("""{"npc":"Shane","location":"Town","tile":[5,4]}"""));
+
+        Assert.False(success);
+        Assert.Equal(ActionResultReason.AgentMissing, reason);
+        Assert.Single(spy.Calls);
+    }
+
+    [Fact]
+    public void DataClassTools_NeverCallEnsureBody()
+    {
+        // 纯数据类工具（mood/working_on/memory/spawn_beat）直接改休眠 Brain / BeatStore，
+        // "改个心情不该占一个身体名额"（设计 §3.3）——分配 spy 必须零调用。
+        _agents["Shane"] = CreateAgent("Shane");
+        var spy = new EnsureBodySpy(result: true);
+        var tools = CreateTools(ensureBody: spy.Ensure);
+
+        var mood = tools.SetNpcMood(ArgsJson("""{"npc":"Shane","moodTag":"happy"}"""));
+        var workingOn = tools.SetNpcWorkingOn(ArgsJson("""{"npc":"Shane","workingOn":"fishing"}"""));
+        var memory = tools.InjectMemory(ArgsJson("""{"npc":"Shane","text":"talking about miners"}"""));
+        var beat = tools.SpawnBeat(ArgsJson("""{"npc":"Shane","sceneDesc":"at the river"}"""));
+
+        Assert.True(mood.Success);
+        Assert.True(workingOn.Success);
+        Assert.True(memory.Success);
+        Assert.True(beat.Success);
+        Assert.Empty(spy.Calls);
     }
 }

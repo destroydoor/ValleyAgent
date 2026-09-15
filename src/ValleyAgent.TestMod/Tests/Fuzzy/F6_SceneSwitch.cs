@@ -121,12 +121,14 @@ public class F6_SceneSwitch : V3TestBase
     {
         var expectedChanges = _sceneOrder.Length - 1; // e.g., 4 scenes = 3 transitions
 
-        Assert("Scene_change_detected_at_least_3_of_4_transitions",
+        AssertEx("Scene_change_detected_at_least_3_of_4_transitions",
             _detectedChanges >= 3,
+            "连续 warp 后场景指纹（当前地图名）与上一 tick 相同（SafeWarp 未生效或事件把玩家弹回原图），4 段转场少于 3 段被识别",
             $"detectedChanges={_detectedChanges}");
 
-        Assert("All_changes_correctly_identified",
+        AssertEx("All_changes_correctly_identified",
             _detectedChanges >= expectedChanges - 1,
+            "同上：指纹识别漏检超过 1 次（warpPending 读取时序与 warp 实际生效错位）",
             $"detected={_detectedChanges}, expected~={expectedChanges}");
 
         _monitor.Log($"[F6] Final: switches={_switchCount}, detectedChanges={_detectedChanges}",

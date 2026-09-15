@@ -92,6 +92,9 @@ export interface DialogueResponse {
   memorySideEffect?: "recorded";
   // C# 端据此用灰色系统提示渲染（"正在和别人交流"），不弹打字机对话框。
   fallback?: boolean;
+  // 2026-09-13 R2：fallback=true 时的机器可读降级原因（busy/llm_error/billing/unavailable），
+  // 随协议透传 C#→房客，供灰字诊断留痕与 S3 文案改造区分"忙"与"故障"。
+  fallbackReason?: "busy" | "llm_error" | "billing" | "unavailable";
   // 2026-08-16 联机：发起对话的玩家 ID 原样 echo，C# 端据此记录 LastDialoguePlayerId
   // （FOLLOW 等行为的目标玩家解析）。可选，旧客户端不携带。
   playerId?: string;
@@ -152,14 +155,6 @@ export interface StateChangedMessage {
   // 自由字符串原因（如 "travel_failed"/"evicted"/"task_completed"/"llm_decision"/"manual"）。
   // 可选，向后兼容旧 C# 客户端（未携带时为空串）。
   reason?: string;
-}
-
-export interface ConsolidateDayMessage {
-  type: "consolidate_day";
-  npcName: string;
-  dateIso: string;
-  // 可选，向后兼容未携带 requestId 的旧 C# 客户端。
-  requestId?: string;
 }
 
 /** C# DayStarted 时通知 TS 新的一天开始。 */
@@ -335,7 +330,6 @@ export type IncomingMessage =
   | PingRequest
   | ActionResultMessage
   | StateChangedMessage
-  | ConsolidateDayMessage
   | DayStartedMessage
   | RouteShoutMessage
   | DirectorCommandMessage

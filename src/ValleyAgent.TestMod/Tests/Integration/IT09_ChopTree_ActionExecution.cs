@@ -152,12 +152,14 @@ public class IT09_ChopTree_ActionExecution : IntegrationTestBase
             var npc = Game1.getCharacterFromName(NpcName);
             var loc = npc?.currentLocation;
 
-            Assert("location_available", loc != null);
+            AssertEx("location_available", loc != null,
+                "chop_tree 执行链把 NPC 移出地图（死亡清理/传送事故），getCharacterFromName 或 currentLocation 变 null");
 
             if (loc != null)
             {
                 var treeRemoved = !loc.terrainFeatures.ContainsKey(_treeTile);
-                Assert("tree_removed_from_terrain", treeRemoved,
+                AssertEx("tree_removed_from_terrain", treeRemoved,
+                    "GoalExecutor 砍树未生效：_treeTile 仍在 terrainFeatures（ChopTreeGoal.TickCore 未调用或树木血量未扣完）",
                     treeRemoved
                         ? $"tile {_treeTile} no longer in terrainFeatures"
                         : $"tile {_treeTile} still in terrainFeatures (tree not chopped)");

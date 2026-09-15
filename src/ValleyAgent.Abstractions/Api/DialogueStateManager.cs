@@ -23,9 +23,11 @@ namespace ValleyAgent.Api
         public Action<string, string>? CooldownHintCallback { get; set; }
 
         /// <summary>
-        /// Dialogue cooldown in milliseconds. Default 30000 (30 seconds).
+        /// Dialogue cooldown in milliseconds. Default 3000 (3 seconds),
+        /// aligned with ModConfig.DialogueCooldownSeconds default (3 s) to remove
+        /// the 30 s trap during the window before config initialization runs.
         /// </summary>
-        public int DialogueCooldownMs { get; set; } = 30000;
+        public int DialogueCooldownMs { get; set; } = 3000;
 
         /// <summary>
         /// Gift cooldown in milliseconds. Default 30000 (30 seconds).

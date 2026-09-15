@@ -188,14 +188,17 @@ public class F3_RandomDrops : V3TestBase
         }
 
         // maxSlotsSeen must be ≤ MaxSlots (12) at all times
-        Assert("Inventory_count_never_exceeds_12", _maxSlotsSeen <= 12,
+        AssertEx("Inventory_count_never_exceeds_12", _maxSlotsSeen <= 12,
+            "AgentInventory.TryAdd 容量上限失效（第 13 件仍被接受），GetNpcInventory 观察到 >12 格",
             $"maxSlotsSeen={_maxSlotsSeen}");
 
         // After 12+ items, overflow MUST appear on ground
-        Assert("Overflow_items_appeared_on_ground", _overflowItems > 0 || _groundItemCount > 0,
+        AssertEx("Overflow_items_appeared_on_ground", _overflowItems > 0 || _groundItemCount > 0,
+            "背包溢出物品凭空消失：TryAdd 返回 false（_overflowItems>0）但 2 格范围内既无 Debris 也无 objects（F3 事故的丢失语义）",
             $"overflowItems={_overflowItems}, groundItems={_groundItemCount}, slotsFilled={_slotsFilled}");
 
-        Assert("No_NullReferenceException", !_exceptionThrown,
+        AssertEx("No_NullReferenceException", !_exceptionThrown,
+            "FillNpcInventory 内部对空槽/空物品解引用抛 NullReferenceException 被 Update 的 catch 捕获（_exceptionThrown=true）",
             "No NullReferenceException during test");
 
         _monitor.Log(

@@ -135,9 +135,10 @@ public class Func_NpcInventoryFidelity : V3TestBase
             if (inventory != null)
             {
                 var emptyCount = inventory.Count(string.IsNullOrEmpty);
-                Assert(
+                AssertEx(
                     "No_empty_or_null_slot_names",
                     emptyCount == 0,
+                    "GetNpcInventory 序列化时把无法解析/已被引擎清空的槽位序列化成空串或 null（执行镜像与读取视图不一致）",
                     $"{emptyCount}个空/null名称在{count}格中");
             }
 
@@ -186,10 +187,9 @@ public class Func_NpcInventoryFidelity : V3TestBase
         // 断言在 tick 300
         if (tick >= 300)
         {
-            Assert(
-                "Inventory_roundtrip_completed",
-                true,
-                "往返测试完成。无崩溃。");
+            // 原 "Inventory_roundtrip_completed" 心跳断言已删（2026-09-14 死断言清理，K' 降级）：
+            // Assert(true) 心跳型——只标记"往返测试跑到收尾"，无失败语义；
+            // 到达信息由本注释与日志承载，历史键由 checker allowlist 抑制。
 
             return true;
         }

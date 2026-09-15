@@ -134,17 +134,16 @@ public static class NPCDialoguePatch
 
             if (!isAgent)
             {
-                // 非 Agent 村民对话路径：
+                // 非 Agent 村民对话路径（房客与主机同节奏：对话不需要身体，房客侧请求走 dialogue transport）：
                 // - EnableFirstClickVanilla=false → 直接进入 AI 对话（跳过原版台词），支持无限对话
                 // - EnableFirstClickVanilla=true  → 放行原版，关闭后追加 AI 对话（原行为）
                 // EnableInfiniteDialogue（新开关）与 NonAgentAIChatEnabled（旧开关）同时控制，
                 // 任一关闭即不追加 AI 对话——保留旧开关兼容已有存档配置。
-                if (!isThinClient
-                    && (Config?.EnableInfiniteDialogue ?? true)
+                if ((Config?.EnableInfiniteDialogue ?? true)
                     && (Config?.NonAgentAIChatEnabled ?? true)
                     && !(Config?.EnableFirstClickVanilla ?? true))
                 {
-                    OpenAgentDialogue(__instance, false);
+                    OpenAgentDialogue(__instance, isThinClient);
                     __result = true;
                     InterceptCount++;
                     Monitor?.Log($"[Dialogue] Non-agent {__instance.Name}: direct AI dialogue (skip vanilla)",
@@ -152,8 +151,7 @@ public static class NPCDialoguePatch
                     return false;
                 }
 
-                if (!isThinClient
-                    && (Config?.EnableInfiniteDialogue ?? true)
+                if ((Config?.EnableInfiniteDialogue ?? true)
                     && (Config?.NonAgentAIChatEnabled ?? true))
                 {
                     _pendingVanillaDialogueNpc = __instance.Name;
@@ -303,7 +301,9 @@ public static class NPCDialoguePatch
             return;
         }
 
-        if (AgentServerProvider == null)
+        // 房客侧 AgentServerProvider 恒为 null，对话通道存在性由 transport 判定：
+        // 不按 transport 放行的话，房客播完原版台词后 AI 输入框永不弹出。
+        if (AgentServerProvider == null && !DialogueBoxInputPatch.HasDialogueTransport)
         {
             return;
         }
@@ -326,6 +326,20 @@ public static class NPCDialoguePatch
             var api = new ValleyAgentApi(AgentService, AgentService.AllocationManager);
             _ = api.TrySetAgentState(npcName, preState.Value.ToString());
             ClearPreDialogueState(npcName);
+        }
+
+        // PR2 B5.1（设计 §3.4 步骤 1）：对话结束释放该身体的 manual override，让身体从
+        // "玩家手动挤出来的槽位"回到空闲淘汰候选——否则 override 会一直占位到换日。
+        // 判定模式照抄 PromoteToAgent：KeepUntil 未到期不释放（导演 beat 进行中的身体不动）。
+        // 释放 ≠ 拆除：池位裁剪由 ReevaluateAllocations 按容量执行，身体拆除走常驻订阅。
+        if (AgentService != null && AgentService.HasAgent(npcName))
+        {
+            var allocation = AgentService.AllocationManager.GetAllocation(npcName);
+            if (allocation is { IsManuallyOverridden: true }
+                && !(allocation.KeepUntil.HasValue && DateTime.UtcNow < allocation.KeepUntil.Value))
+            {
+                _ = AgentService.AllocationManager.ReleaseManualOverride(npcName);
+            }
         }
 
         Monitor?.Log($"[Dialogue] Agent {npcName}: conversation ended", LogLevel.Debug);

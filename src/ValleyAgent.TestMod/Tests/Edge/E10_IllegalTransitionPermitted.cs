@@ -176,9 +176,10 @@ public class E10_IllegalTransitionPermitted : V3TestBase
         var totalTested = _results.Count;
 
         // 核心断言：所有非法转换都应被阻止
-        Assert(
+        AssertEx(
             "Illegal_transitions_are_blocked_by_state_machine",
             bypassCount == 0,
+            "TrySetAgentState 走 ForceTransition 绕过 AllowedTransitions（E10 记录的历史漏洞）：非法转换对实际到达目标状态，bypassCount>0",
             $"共{totalTested}个非法转换测试，{bypassCount}个被绕过。非法转换：{string.Join(", ", _results.Where(r => r.ActuallySucceeded).Select(r => $"{r.From}→{r.To}"))}");
 
         Assert(
