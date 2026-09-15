@@ -494,6 +494,8 @@ Patches/NPCGiftPatch.cs:65       ProcessMainThreadActions        只捕 InvalidO
 
 阻塞关系：#24 #25 #27 的 C# 部分依赖 #18（C# 门禁未常态化）；#28 附带 4 条猜想（C1/C2/C4/C6）的实机终验清单。
 
+> **另立 #30（本轮顺带发现，优先级最高）**：GitHub Actions 自 2026-09-13 15:48 起**全线起不了 job**（11 个 run 全 `jobs=0`，含 main；PR #20/#29 的 checks 面板为空）。也就是说 `AGENTS.md §5` 声明的门禁（`bun test` / `typecheck` / `check:protocol` / 隐私扫描 / C# 单测）**这两天一次都没跑过**，#18 / #19 / #28 三者共同的前提（CI 能跑）目前不成立。已实测排除账户计费原因（07:26 有一次 `jobs=4` 的绿 run，在 main 失败 14 分钟之后），本地静态检查也排除 YAML 非法/重复键/tab；真因需 Actions 页面顶部的红字确认（#30 附终验三步）。
+
 ---
 
 ## 7. 已验证事实 vs 猜想（遵守 `AGENTS.md §2` 第 10 条）
