@@ -9,6 +9,8 @@
 > - `scripts/exception-hygiene-baseline.json` —— 存量基线（CI 只拦新增，修完一批跑 `--update-baseline` 收紧）
 > - `scripts/test/error-observability-probe.ts` —— 打真实 TS 服务器的可观测性探针（本文档 §8 的全部实测输出来自它）
 > - `scripts/test/agent-wedge-repro.ts` —— Agent 事件流卡死复现（§3.8，已实测复现：`awaitAll-HUNG` + `isIdle(): false`）
+>
+> **遗留项全部转 GitHub issue（#21–#28）**：本批只交付审计底稿 + 门禁 + 探针，**未改任何生产代码**（C# 侧本机无 dotnet，不满足 `AGENTS.md §5` 的验证门槛）。
 
 ---
 
@@ -479,6 +481,18 @@ Patches/NPCGiftPatch.cs:65       ProcessMainThreadActions        只捕 InvalidO
 | **PR3 初始化降级** | §3.4 `ServiceInitializer` 分段 + `DegradedFeatures` 表 + 不 rethrow 改落降级模式 + `RegisterHarmonyPatches` 捕 `Exception`/拆段/失败 `UnpatchSelf` + 玩家可读提示 | 保证"装上了但某子系统坏了"的玩家仍能玩原版 | 单测：某服务构造抛异常 → 容器仍可用、降级表有记录、无异常逃出 `OnSaveLoadedInitialize`；实机：删掉 `npc_prompts.json` 后进存档，游戏可玩且 `ValleyAgent-error.log` 有明确原因 |
 | **PR4 日志提值** | §4.1 139 处 `{ex.Message}` → `{ex}` + §4.2 13 处级别提升 + §4.3 12 处静默降级补留痕 + 数据损坏文件隔离（`.corrupt-<ts>`）+ §4.5 `fallbackReason` 扩档（含 `messages.json` 取值约定） | 让日志"正确 + 有价值" | `CS-LOG-NO-STACK` 与 `CS-SILENT-CATCH`（非白名单部分）归零；`protocol-roundtrip` / 契约测试覆盖新 `fallbackReason` 取值 |
 | **PR5 闭环与健康面板** | §3.9 `AdjustExecutor.Execute` 外层守卫 + 异常必回执 + TS 对账重发上限 + §3.8 `.then` 补 `.catch` + dialogue 服务端 90s 超时 + §4.7 熔断器接主对话路径 + §4.9 `ValleyAgent_diag` | 把"无限重试/永久 BUSY/永不熔断"三个不死不活的稳态清掉 | 单测：注入 C# 抛异常 → TS 收到 `internalError` 回执、重发 ≤3 次后停并打 ERROR；`bun scripts/test/agent-wedge-repro.ts` 退出码 0（`awaitAll-RESOLVED` + `isIdle(): true`）；实机：LLM key 改错 → 熔断器打开且 `ValleyAgent_diag` 能看到原因 |
+
+**批次 ↔ issue 映射**（遗留项已在 GitHub 立项，逐条含证据/方向/验收）：
+
+| 批次 | 对应 issue |
+|---|---|
+| PR1 可观测性止血 | #21（tee 销毁 Error）、#22（error 帧契约）、#26 第 4 项（16 处级别提升）、#27 第 2 项（对账重发上限）、#28（门禁与探针进 CI） |
+| PR2 C# 故障隔离 | #24（tick 分段 / Harmony / WS 循环 / 看门狗 / fire-and-forget） |
+| PR3 初始化降级 | #25（rethrow → 降级模式、半套补丁、`NpcPromptLoader` 秒退） |
+| PR4 日志提值 | #26（139 处 `{ex}` / 47 处 level / 12 处静默 catch / `fallbackReason` 扩档） |
+| PR5 闭环与健康面板 | #23（`awaitAll` 卡死 → NPC 永久 BUSY）、#27（adjust 必回执 / 熔断器接主路径 / `ValleyAgent_diag`） |
+
+阻塞关系：#24 #25 #27 的 C# 部分依赖 #18（C# 门禁未常态化）；#28 附带 4 条猜想（C1/C2/C4/C6）的实机终验清单。
 
 ---
 
