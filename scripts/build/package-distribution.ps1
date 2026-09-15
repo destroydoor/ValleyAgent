@@ -13,7 +13,10 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    # 公开发行开关：config.json 里所有 API key 置空（公开包绝不带任何凭据），
+    # README 相应改为"自行填 key"指引。缺省 false = 内部分发包（预写 key）。
+    [switch]$NoKeys
 )
 
 $ErrorActionPreference = "Stop"
@@ -118,11 +121,55 @@ $distConfig = Get-Content $DevConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 # 注意：ConsoleWindow=true 时 stdout 不落 ValleyAgent-server.log（二选一，见 ServerProcessManager）；
 # 要拿落盘日志需在 config.json 把该项改回 false 重启。
 $distConfig.ServerConsoleWindow = $true
+if ($NoKeys) {
+    # 公开发行：抹掉一切 key 字段。按"属性名含 ApiKey"统一清空，新增 key 字段自动覆盖。
+    $keyProps = $distConfig.PSObject.Properties.Name | Where-Object { $_ -like "*ApiKey*" }
+    foreach ($p in $keyProps) { $distConfig.$p = "" }
+    Write-Log "Stripped $($keyProps.Count) API key fields (public distribution)" "Warn"
+}
 $distConfig | ConvertTo-Json -Depth 10 | Out-File (Join-Path $ModStage "config.json") -Encoding UTF8
-Write-Log "Wrote config.json (keys from dev config, ServerConsoleWindow=true)" "Success"
+$cfgNote = if ($NoKeys) { "keys EMPTY (public)" } else { "keys from dev config" }
+Write-Log "Wrote config.json ($cfgNote, ServerConsoleWindow=true)" "Success"
 
 # ─── Step 5: README ──────────────────────────────────────────────────
-$readme = @"
+if ($NoKeys) {
+    $readme = @"
+ValleyTalk / ValleyAgent —— 星露谷 AI NPC 模组（公开发布版）
+=============================================================
+
+一、安装步骤
+  1. 先安装 SMAPI（https://smapi.io/），装过就跳过。
+  2. 把本包里的 ValleyAgent 整个文件夹放进游戏的 Mods 目录：
+     <星露谷游戏目录>/Mods/ValleyAgent
+  3. 用 StardewModdingAPI.exe 启动游戏（不要用 steam 直接启动）。
+
+二、必须先填自己的 API Key（本包不含任何密钥）
+  用记事本打开 Mods/ValleyAgent/config.json，找到以下字段填入你自己的 key：
+    - "LlmApiKey"                      —— 主力对话模型的 key（Minimax 平台申请）
+    - "DirectorFallbackApiKey" 等 *Fallback2ApiKey —— 备用模型 key（可留空）
+  备用模型默认编排：Minimax 主力 → 商汤 sensenova 备用 → DeepSeek 备用，
+  主力欠费(402/429)时自动逐级切换；只填 LlmApiKey 也能玩（无备用）。
+  （进存档时会自动启动 AI 服务，首次启动有几秒延迟，属正常现象。）
+  进存档后还会弹出一个"AI 服务"黑色终端窗口——那是 AI 服务的实时日志，
+  最小化即可，千万别关（关掉 AI 就停了）；关掉游戏时它会自己退出。
+
+三、出问题了怎么反馈
+  1. 把那个黑色终端窗口的内容截图发回来（这就是 AI 服务的完整日志）。
+  2. 如果需要日志文件：把 Mods/ValleyAgent/config.json 里的
+     "ServerConsoleWindow" 改成 false 再重启游戏，会生成
+     Mods/ValleyAgent/ValleyAgent-server.log，把它发回来即可。
+  3. ValleyAgent-error.log（错误记录）无论如何都会生成，一并发回。
+  日志会自动滚动（单文件最大 5MB），不用担心越写越大。
+
+四、联机（可选）
+  主机和房客都装本包即可。NPC 的经济/好感/行为全部由主机权威同步，
+  房客对话内容各自独立记忆，互不串台。
+
+五、其他
+  - 如果装了 Generic Mod Config Menu，游戏内可直接改设置（一般不用动）。
+"@
+} else {
+    $readme = @"
 ValleyTalk / ValleyAgent —— 星露谷 AI NPC 模组（朋友分发包）
 =============================================================
 
@@ -153,6 +200,7 @@ ValleyTalk / ValleyAgent —— 星露谷 AI NPC 模组（朋友分发包）
 五、其他
   - 如果装了 Generic Mod Config Menu，游戏内可直接改设置（一般不用动）。
 "@
+}
 [System.IO.File]::WriteAllText((Join-Path $StageDir "README.txt"), $readme, (New-Object System.Text.UTF8Encoding($true)))
 Write-Log "Wrote README.txt" "Success"
 
@@ -164,8 +212,9 @@ if ($forbidden) {
     exit 1
 }
 
-# ─── Step 7: zip ─────────────────────────────────────────────────────
-$zipPath = Join-Path $OutRoot "ValleyTalk-dist-$(Get-Date -Format 'yyyyMMdd-HHmm').zip"
+# ─── Step 7: zip（-NoKeys 时带 -public 后缀，绝不与预写 key 的内部分发混淆）───
+$suffix = if ($NoKeys) { "-public" } else { "" }
+$zipPath = Join-Path $OutRoot "ValleyTalk-dist-$(Get-Date -Format 'yyyyMMdd-HHmm')$suffix.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -Path (Join-Path $StageDir "*") -DestinationPath $zipPath -Force
 $zipMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
