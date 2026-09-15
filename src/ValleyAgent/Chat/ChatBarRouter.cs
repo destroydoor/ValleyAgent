@@ -323,50 +323,71 @@ public static class ChatBarRouter
     {
         while (_pendingReplies.TryDequeue(out var reply))
         {
-            var npc = Game1.getCharacterFromName(reply.NpcName);
-            if (npc == null)
+            // 死锁修复（2026-09-12）：逐条兜底。异常逃出 while 会让本 tick 剩余回复
+            // 连同调用方下游的所有主线程泵一起被跳过（泵是串行责任链）。
+            try
             {
-                continue;
+                RenderReply(reply);
             }
-
-            if (reply.IsFailure)
+            catch (Exception ex)
             {
-                // §3.7 规则 3：失败也要灰色字，不要沉默（静默规则只保护正常流程）。
-                Game1.chatBox?.addMessage($"*{reply.NpcName} 没有回应*", Color.Gray);
-                continue;
+                _monitor?.Log($"[ChatBar] Failed to render reply for {reply.NpcName}: {ex}", LogLevel.Error);
             }
+        }
+    }
 
-            if (string.IsNullOrWhiteSpace(reply.Speech))
-            {
-                continue; // LLM 行使沉默权：路由命中 ≠ 必须回
-            }
+    private static void RenderReply(PendingChatReply reply)
+    {
+        var npc = Game1.getCharacterFromName(reply.NpcName);
+        if (npc == null)
+        {
+            return;
+        }
 
-            // 2026-09-13 R5（对话连续性修复）：TS 降级回包（BUSY / LLM 故障）是系统状态提示，不是 NPC 台词
-            // ——不走 ActiveSpeechRouter 的气泡/打字机渲染（否则 NPC 会用自己口吻"说出"占位提示），
-            // 改走聊天栏灰字，文案单一来源 = 回包自带的 TS speech（同 R3）。
-            // 主机与房客聊天栏回包都在本方法汇合渲染（房客经 transport 回包同样进 _pendingReplies），
-            // 一处改动双端生效，无需区分 IsFarmhand。
-            if (reply.Fallback)
-            {
-                Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
-                _monitor?.Log(
-                    $"[ChatBar] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
-                    LogLevel.Debug);
-                continue;
-            }
+        if (reply.IsFailure)
+        {
+            // §3.7 规则 3：失败也要灰色字，不要沉默（静默规则只保护正常流程）。
+            Game1.chatBox?.addMessage($"*{reply.NpcName} 没有回应*", Color.Gray);
+            return;
+        }
 
-            ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
-            _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
+        if (string.IsNullOrWhiteSpace(reply.Speech))
+        {
+            return; // LLM 行使沉默权：路由命中 ≠ 必须回
+        }
 
-            NPCDialoguePatch.IncrementConversationCount(reply.NpcName);
+        // 2026-09-13 R5（对话连续性修复）：TS 降级回包（BUSY / LLM 故障）是系统状态提示，不是 NPC 台词
+        // ——不走 ActiveSpeechRouter 的气泡/打字机渲染（否则 NPC 会用自己口吻"说出"占位提示），
+        // 改走聊天栏灰字，文案单一来源 = 回包自带的 TS speech（同 R3）。
+        // 主机与房客聊天栏回包都在本方法汇合渲染（房客经 transport 回包同样进 _pendingReplies），
+        // 一处改动双端生效，无需区分 IsFarmhand。
+        if (reply.Fallback)
+        {
+            Game1.chatBox?.addMessage(reply.Speech, Color.Gray);
+            _monitor?.Log(
+                $"[ChatBar] {reply.NpcName}: fallback (reason={reply.FallbackReason ?? "unspecified"})",
+                LogLevel.Debug);
+            return;
+        }
 
+        ActiveSpeechRouter.Route(npc, Game1.player, reply.Speech);
+        _monitor?.Log($"[ChatBar] {reply.NpcName} → {Preview(reply.Speech)}", LogLevel.Debug);
+
+        NPCDialoguePatch.IncrementConversationCount(reply.NpcName);
+
+        try
+        {
             // M3：房客不执行 actions —— 实体在主机权威，主机侧 HandleDialogueRequest
             // 已经执行过一次（含广播同步）；房客重复执行会造成双份效果。
             if (!IsFarmhand)
             {
                 DialogueBoxInputPatch.DispatchDialogueActions(npc, reply.Actions);
             }
-
+        }
+        catch (Exception ex)
+        {
+            // 动作分发（含 PromoteToAgent）失败不得回灌渲染泵：台词已经说出去了。
+            _monitor?.Log($"[ChatBar] Action dispatch failed for {reply.NpcName}: {ex}", LogLevel.Error);
         }
     }
 

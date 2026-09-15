@@ -74,6 +74,17 @@ public static class NPCGiftPatch
             {
                 Monitor?.Log($"[Gift] MainThread action failed: {ex.Message}", LogLevel.Warn);
             }
+            catch (Exception ex)
+            {
+                // 死锁修复（2026-09-12）：原来只吞 InvalidOperationException。
+                // 队列动作直写 Game1（friendshipData / getCharacterFromName / drawDialogue），
+                // 切图、NPC 离场、玩家为 null 时会抛 NRE/KeyNotFound——异常一旦逃出 while 循环，
+                // 本 tick 剩余动作连同**下游泵**（ThinClient 里紧随其后的
+                // HostRequestHandlers.ProcessMainThreadActions，即房客唯一的 ModMessage 发送泵）
+                // 全部被跳过：请求发不出去 ⇒ 回包收不到 ⇒ 对话/送礼链路整体停摆。
+                // 每个动作独立兜底，队列必须排干。
+                Monitor?.Log($"[Gift] MainThread action failed: {ex}", LogLevel.Warn);
+            }
         }
     }
 
