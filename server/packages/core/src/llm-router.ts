@@ -18,10 +18,19 @@ export interface RoleProviderConfig {
   maxConcurrency?: number;
 }
 
-/** 一个角色的完整配置：主 + 可选备 */
+/** 一个角色的完整配置：主 + 可选备用链 */
 export interface RoleConfig {
   primary: RoleProviderConfig;
+  /**
+   * 旧式单个备用（等价于 fallbacks 首位）。
+   * 保留是为了版本兼容：旧 exe 只认这个字段，新写入端总是同时写 fallback+fallbacks。
+   */
   fallback?: RoleProviderConfig | null;
+  /**
+   * 备用链（billing 错误时按序回退）。
+   * 与 fallback 同时出现时合并，fallback 排在最前。
+   */
+  fallbacks?: RoleProviderConfig[];
 }
 
 /** runtime JSON 根结构 */
@@ -38,17 +47,28 @@ export interface LlmRouterConfig {
  */
 export class LlmRouter {
   private readonly providers = new Map<string, VercelAIProvider>();
+  private readonly fallbackChains = new Map<LlmRole, VercelAIProvider[]>();
   private readonly config: LlmRouterConfig;
 
   constructor(config: LlmRouterConfig) {
     this.config = config;
-    // 预构造所有 provider 实例（主+备），避免运行时延迟
+    // 预构造所有 provider 实例（主+备链），避免运行时延迟
     for (const [role, roleCfg] of Object.entries(config.roles) as [LlmRole, RoleConfig][]) {
       this.providers.set(`${role}:primary`, this.createProvider(roleCfg.primary));
-      if (roleCfg.fallback) {
-        this.providers.set(`${role}:fallback`, this.createProvider(roleCfg.fallback));
+      const chain = this.fallbackChainOf(roleCfg).map(cfg => this.createProvider(cfg));
+      this.fallbackChains.set(role, chain);
+      for (const [i, provider] of chain.entries()) {
+        this.providers.set(`${role}:fallback${i}`, provider);
       }
     }
+  }
+
+  /** 归并单个 fallback 与 fallbacks 数组为一条按序备用链（fallback 在前） */
+  private fallbackChainOf(roleCfg: RoleConfig): RoleProviderConfig[] {
+    const chain: RoleProviderConfig[] = [];
+    if (roleCfg.fallback) chain.push(roleCfg.fallback);
+    if (roleCfg.fallbacks) chain.push(...roleCfg.fallbacks);
+    return chain;
   }
 
   /** 按 NPC 名解析角色（大小写不敏感） */
@@ -67,9 +87,14 @@ export class LlmRouter {
     return p;
   }
 
-  /** 获取指定角色的备 provider（无备返回 null） */
+  /** 获取指定角色的备 provider（无备返回 null）。多级备用时返回第一级。 */
   getProviderFallback(role: LlmRole): VercelAIProvider | null {
-    return this.providers.get(`${role}:fallback`) ?? null;
+    return this.fallbackChains.get(role)?.[0] ?? null;
+  }
+
+  /** 获取指定角色的完整备用链（按回退顺序；空数组=无备）。 */
+  getProviderFallbacks(role: LlmRole): VercelAIProvider[] {
+    return this.fallbackChains.get(role) ?? [];
   }
 
   /** 带回退的 chatCompletion */
@@ -89,25 +114,32 @@ export class LlmRouter {
 
   /**
    * 核心回退逻辑：
-   * 1. 用主 provider 调用
-   * 2. 捕获 LLMBillingError（402/429）→ 切到 fallback provider 重试一次
-   * 3. fallback 也 billing 错误 → 抛出（已无路可退）
+   * 1. 沿 主 → 备用链 依次调用
+   * 2. 捕获 LLMBillingError（402/429）→ 切到下一级备用
+   * 3. 链尾也 billing 错误 → 抛出最后一个（已无路可退）
    * 4. 其他错误（LLMUnavailableError/网络/超时）→ 直接抛出，不回退
    */
   private async withFallback<T>(
     role: LlmRole,
     fn: (p: VercelAIProvider) => Promise<T>,
   ): Promise<T> {
-    const primary = this.getProvider(role);
-    try {
-      return await fn(primary);
-    } catch (err) {
-      if (!(err instanceof LLMBillingError)) throw err;
-      const fallback = this.getProviderFallback(role);
-      if (!fallback) throw err;
-      console.warn(`[llm-router] ${role} primary billing error, falling back to ${fallback.config.model}`);
-      return await fn(fallback);
+    const chain = [this.getProvider(role), ...this.getProviderFallbacks(role)];
+    let lastBillingError: unknown;
+    for (const [i, provider] of chain.entries()) {
+      try {
+        return await fn(provider);
+      } catch (err) {
+        if (!(err instanceof LLMBillingError)) throw err;
+        lastBillingError = err;
+        const next = chain[i + 1];
+        if (next) {
+          console.warn(
+            `[llm-router] ${role} provider ${provider.config.model} billing error, falling back to ${next.config.model}`,
+          );
+        }
+      }
     }
+    throw lastBillingError;
   }
 
   private createProvider(cfg: RoleProviderConfig): VercelAIProvider {
@@ -184,7 +216,16 @@ function validateRoleConfig(raw: unknown, roleName: string): RoleConfig {
   if (obj.fallback != null) {
     fallback = validateProviderConfig(obj.fallback, `${roleName}.fallback`);
   }
-  return { primary, fallback };
+  let fallbacks: RoleProviderConfig[] | undefined;
+  if (obj.fallbacks != null) {
+    if (!Array.isArray(obj.fallbacks)) {
+      throw new Error(`Invalid router config: ${roleName}.fallbacks must be an array`);
+    }
+    fallbacks = obj.fallbacks.map((fb, i) =>
+      validateProviderConfig(fb, `${roleName}.fallbacks[${i}]`),
+    );
+  }
+  return { primary, fallback, ...(fallbacks ? { fallbacks } : {}) };
 }
 
 function validateProviderConfig(raw: unknown, path: string): RoleProviderConfig {
