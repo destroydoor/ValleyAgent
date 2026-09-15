@@ -1,16 +1,28 @@
 import { test, expect } from "bun:test";
 import { Agent } from "../src/agent";
-import type { AgentContext, AgentMessage } from "../src/types";
+import type { AgentContext, AgentMessage, LlmMessage } from "../src/types";
 import type { AgentLoopConfig } from "../src/agent-loop";
 import { ToolRegistry } from "../src/tool-registry";
 
 function makeLoopConfig(overrides: Partial<AgentLoopConfig> = {}): AgentLoopConfig {
   return {
     tools: new ToolRegistry(),
+    // tool 变体在 LlmMessage 里 toolCallId 为必填（AgentMessage 里可选），
+    // 与 agent-loop.test.ts 同款显式映射，避免窄化丢失 tool 字段（2026-09-15 typecheck:tests 收口）。
     convertToLlm: (ctx) => ({
       messages: [
         { role: "system", content: ctx.systemPrompt },
-        ...ctx.messages.map((m) => ({ role: m.role, content: m.content })),
+        ...ctx.messages.map((m): LlmMessage => {
+          if (m.role === "tool") {
+            return {
+              role: "tool",
+              content: m.content,
+              toolCallId: m.toolCallId ?? "",
+              ...(m.toolName ? { toolName: m.toolName } : {}),
+            };
+          }
+          return { role: m.role, content: m.content };
+        }),
       ],
     }),
     llmCall: async () => ({ content: "response", usage: { totalTokens: 5 } }),

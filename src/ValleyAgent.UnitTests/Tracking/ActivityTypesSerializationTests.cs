@@ -220,8 +220,16 @@ public static class ActivityTypesSerializationTests
     [Fact]
     public static void ActivityReport_Payload_Matches_Ts_Contract()
     {
-        // 构造一段 C# 端实际会发送给 TS 的活动上报 payload。
-        // TS 端 ActivityReportMessage 字段：dailyActivity + farmSnapshot。
+        // ⚠️ 2026-09-15 偏移审查 C3 说明：`activity_report` **协议未接线**——
+        //   ① server/protocol/messages.json 无此类型；② C# 侧无发送端（全仓仅本测试构造该
+        //   envelope）；③ TS 侧的 `ActivityReportMessage` / `ActivityMilestoneMessage` 类型已随
+        //   叙事线清理从导出面删除（见 docs/plan/2026-09-15-doc-code-drift-audit.md §3 C3）。
+        //   本测试因此只保留"**payload 字段名/枚举 casing 契约**"的含义（DailyActivity /
+        //   PlayStyle / GiftRecord 等类型在 TS `narrative-types.ts` 中仍然存在，且是
+        //   `player_profile` 画像层的输入），**不代表该消息链路可运行**。
+        //   接线（C# 上报 per-player 活动）时需同步恢复 TS 侧 envelope 类型与 messages.json 条目。
+        // 构造一段活动上报 payload（模拟未来 C# → TS 上报形态）。
+        // TS 侧字段约定：dailyActivity + farmSnapshot。
         // 这里验证嵌套对象在 JSON 中的字段名与 TS 严格一致。
         var activity = new DailyActivity
         {

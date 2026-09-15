@@ -1,4 +1,7 @@
-// E1-1 接线测试：runDialogue / runBeat 通过 TranscriptStore 落全量留痕。
+// E1-1 接线测试：runDialogue 通过 TranscriptStore 落全量留痕。
+// 2026-09-15 偏移审查 C1：原"覆盖 5 条验收"中的第 4 条（getAgentRuns 往返 / runBeat 携带游戏日期）
+// 随旧叙事 Director 于 2026-09-14 砍除而失去被测对象——`Beat` 类型已从 src/types.ts 删除，
+// 该 import 与 `GameContext`/`PlayerProfile` 同属未使用导入，一并清除；现存 5 个用例均覆盖 runDialogue。
 // Run: bun test packages/stardew/tests/transcript-wiring.test.ts
 // Spec: docs/design/2026-08-01-memory-narrative-extensibility.md §1
 //
@@ -6,7 +9,7 @@
 //   1. 启用 + 临时目录：一次 runDialogue 恰好 1 行 agent_runs，终态 completed；
 //   2. 该 run 至少 1 行 agent_turns；
 //   3. 校验失败 / LLM 故障路径写 status="error"；
-//   4. getAgentRuns(npcName, gameDate?) 往返（runBeat 携带游戏日期）；
+//   4. ~~getAgentRuns(npcName, gameDate?) 往返（runBeat 携带游戏日期）~~ — runBeat 已砍除，本文件不再覆盖；
 //   5. 禁用时零构造：无 SQLite 文件、无行。
 
 import { test, expect } from "bun:test";
@@ -19,7 +22,7 @@ import { mkdtempSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { resolve } from "path";
-import type { SceneState, Beat, GameContext, PlayerProfile } from "../src/types";
+import type { SceneState } from "../src/types";
 
 const DATA_PATH = resolve(import.meta.dir, "../data/npc_prompts.json");
 

@@ -10,7 +10,7 @@
 
 | 层 | 内容 | 判定权 | 落地位置 |
 |---|---|---|---|
-| L1 | 功能模块（状态机/协议字段/账本/回执） | 全自动硬断言 | C# xUnit（580 测）+ ValleyAI bun test（628 测） |
+| L1 | 功能模块（状态机/协议字段/账本/回执） | 全自动硬断言 | C# xUnit + TS `bun test`（**计数以现跑为准**：2026-09-15 实测 TS = 577 通过 / 0 失败；C# 侧最近记录 657 通过，见 2026-09-14 报告） |
 | L2 | 集成流程（数据流发送/处理/上下文管理） | 全自动 | ValleyAI fault-injection/invariants/roundtrip + C# ProtocolWireContractTests + PIPE 组 |
 | L3 | AI 行为（准确/稳定/可预期） | **参考指标 + 人评** | chat-cli.ts（简单场景）+ Complex01（复杂场景）+ 双轨报告 |
 
@@ -104,8 +104,8 @@
 
 ## 4. 验证门槛
 
-- TS：`bun test` + `tsc --noEmit` + `check:protocol` 全绿
-- C#：`dotnet test`（580）全绿 + 编译 0 警告
+- TS：`bun test` + `bun run typecheck`（**已覆盖 `packages/*/tests`，见 2026-09-15 偏移审查 C1**）+ `check:protocol` 全绿
+- C#：`dotnet test` 全绿 + 编译 0 警告（计数不写死，以现跑为准）
 - 容器：Pipeline 26/26 保持 + ComplexScenario（mock LLM）跑通 + `_complex_scenario_report.json` 产出
 - 超时白名单：登记后 V3/Experience 全组超时失败数不回归
 

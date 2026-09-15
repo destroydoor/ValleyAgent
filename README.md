@@ -47,15 +47,20 @@ ValleyAgent = 一个 Stardew Valley SMAPI mod + 一个本地 TS Agent Server。
 | 目录 | 内容 |
 |---|---|
 | `src/ValleyAgent/` | C# SMAPI mod 主体（游戏内状态层、执行器、联机中继） |
+| `src/ValleyAgent.Abstractions/` | C# 共享契约层（协议 DTO / WebSocketClient+断线 Outbox / 导航 / 背包等接口） |
 | `src/ValleyAgent.UnitTests/` | C# 单元测试（含联机虚拟环境测试） |
 | `src/ValleyAgent.TestMod/` `src/ValleyAgent.Autopilot/` | 测试 mod / 自动驾驶 harness（游戏内自动化测试） |
 | `server/` | TS Agent Server（bun workspace：`packages/core` 通用 Agent 框架 + `packages/stardew` 星露谷实现——NPC/Director LLM 编排、经济账本、情绪引擎、记忆） |
 | `server/protocol/messages.json` | C# ↔ TS WebSocket 协议单一事实源 |
-| `docs/` | 设计文档、执行计划、架构决策与排查记录 |
+| `docs/` | 设计文档、执行计划、架构决策与排查记录（[索引](docs/README.md)） |
 | `scripts/` | 构建 / 部署 / 测试脚本 |
 | `docker/` | 游戏内集成测试与联机 E2E 的容器化环境 |
 | `ValleyTalk for SVE/` | Stardew Valley Expanded 兼容 NPC 人设数据 |
 | `tools/` | 自研辅助工具（PlayerInputDriver / XnbExtract / player_eval） |
+
+> 另有 `src/ValleyTalk.ApiTest/`（本地/兼容端点的 LLM provider 测试台）与根级 `src/*.tsx`
+> 前端原型目录——两者**不参与构建、无文档引用**，属历史遗留（详见
+> `docs/plan/2026-09-15-doc-code-drift-audit.md` §3 C5/C6）。
 
 ## 环境要求
 

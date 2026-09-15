@@ -1,0 +1,13 @@
+{
+  // 测试目录的类型检查配置（2026-09-15 偏移审查 C1：根 tsconfig.json 只 include
+  // packages/*/src，packages/core/tsconfig.json 又显式 exclude tests/**，导致
+  // 测试里的悬空 import / 已删类型长期不被发现——bun 转译时丢弃未使用的 import，
+  // 所以 `bun test` 依然全绿。此配置专供 `tsc -p` 使用，把 tests + src 一起检查。）
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

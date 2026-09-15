@@ -27,6 +27,9 @@ namespace ValleyAgent.TestMod.Tests.Integration;
 ///     行为素材来源：SMAPI 日志（ServerConsoleWindow=false 时 TS server stdout 经
 ///     ServerProcessManager.Log → SMAPI Monitor 落盘）。Teardown 提取相关日志段写入
 ///     {logs/test_results/RunTimestamp}/DIR_DirectorBehaviorRecord_behavior.txt 报告文件。
+///
+///     ⚠️ 2026-09-15 状态：**默认跳过**——旧叙事 Director 已于 2026-09-14 砍除，本测试等待的
+///     日志不再产生；设 VALLEY_DIRECTOR_TEST=1 可强制运行（见 Setup 的 DirectorFlowEnabled）。
 /// </summary>
 public class DIR_DirectorBehaviorRecord : IntegrationTestBase
 {
@@ -64,8 +67,27 @@ public class DIR_DirectorBehaviorRecord : IntegrationTestBase
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "StardewValley", "ErrorLogs", "SMAPI-latest.txt");
 
+    /// <summary>
+    ///     旧叙事 Director 链路开关（2026-09-15 文档↔代码偏移审查 C2 处置）。
+    ///     默认 false = 跳过：旧叙事 Director（TS morningPlan→beat→allocate_agent）已于
+    ///     2026-09-14 整体砍除，TS 侧不再产出 "[director] morningPlan end" /
+    ///     "[send] allocate_agent" 日志，本测试每轮必然跑到 MaxWaitTicks（10800 tick = 180s）
+    ///     才收尾并写出空报告——纯耗时零产出。
+    ///     复活路径：设环境变量 VALLEY_DIRECTOR_TEST=1 可强制运行（工具型 Director 造脑接线后，
+    ///     C# 的 9 个 DirectorTools + director_command 通道仍为本测试的就绪层，见 AGENTS §3.5）。
+    /// </summary>
+    private static bool DirectorFlowEnabled =>
+        Environment.GetEnvironmentVariable("VALLEY_DIRECTOR_TEST") == "1";
+
     public override void Setup()
     {
+        if (!DirectorFlowEnabled)
+        {
+            Skip("旧叙事 Director 已于 2026-09-14 砍除：morningPlan/allocate_agent 日志不再产生，"
+                + "本测试当前无观测对象（设 VALLEY_DIRECTOR_TEST=1 可强制运行；见 AGENTS §3.5 / 偏移审查 C2）");
+            return;
+        }
+
         if (!TryCommonSetup())
         {
             return;
