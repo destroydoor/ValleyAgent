@@ -43,6 +43,14 @@ public class AdjustExecutor
     /// <summary>环形淘汰顺序队列（FIFO，与 <see cref="_resultLog" /> 同锁维护）。</summary>
     private readonly Queue<string> _resultOrder = new();
 
+    /// <summary>
+    ///     当前 ExecuteCore 调用是否已进入阶段四（提交期）——自此任何 op 都可能已实际生效。
+    ///     issue #27 守卫 ①：Execute 捕获异常后按此决定是否写幂等缓存（提交期异常不缓存，
+    ///     避免把"可能部分已应用"钉死为"失败已处理"而阻断 TS reconcile 补偿）。
+    ///     本执行器只允许主线程串行调用（见 <see cref="Execute" /> 注释），字段无并发竞争。
+    /// </summary>
+    private bool _commitPhaseEntered;
+
     private readonly object _gate = new();
 
     /// <param name="monitor">日志（可空：单测环境传 stub 或 null）。</param>
@@ -65,6 +73,13 @@ public class AdjustExecutor
     ///     执行原子批指令并返回回执。
     ///     幂等键 instructionId 已缓存时直接返回缓存回执（不重复执行、不重发）；
     ///     未缓存则执行后入环形日志。
+    ///     外层守卫（issue #27 ①）：ExecuteCore 抛出的异常不再逃逸——转为 internalError
+    ///     回执返回（携带异常全文）。此前异常路径既不写幂等缓存也不回执，TS 侧 10s 超时后
+    ///     scheduleReconcile 无上限重发（每 ~40s 一轮直到重启）。回执由调用方
+    ///     （EventHandlerInitializer.HandleExecuteAdjust）经 SendAdjustResultAsync 发出。
+    ///     幂等缓存按异常阶段分流：pre-commit（零副作用）异常 → 缓存安全（重发必然同结果，
+    ///     缓存命中即闭环）；commit 阶段异常 → 可能部分已应用，不缓存（内部已尽力回滚，
+    ///     回滚失败 Error 留痕）——保留 TS reconcile 凭 instructionId 补偿的通路。
     ///     并发约定：幂等检查（锁内）与执行（锁外）之间存在竞态窗口，并发调用同一
     ///     instructionId 会重复执行——因此本方法**只允许在游戏主线程调用**（生产路径由
     ///     EventHandlerInitializer 的主线程指令队列保证；Execute 是 public 是给 TestMod/
@@ -94,8 +109,27 @@ public class AdjustExecutor
             }
         }
 
-        var result = ExecuteCore(message);
-        Cache(message.InstructionId, result);
+        ProtocolV2.AdjustResultMessage result;
+        var cacheable = true;
+        try
+        {
+            result = ExecuteCore(message);
+        }
+        catch (Exception ex)
+        {
+            // 守卫（issue #27 ①）：异常必回执。日志带异常全文（{ex} 含堆栈）——排障不猜。
+            _monitor?.Log(
+                $"[AdjustExecutor] {message.InstructionId}: ExecuteCore threw {Environment.NewLine}{ex}",
+                LogLevel.Error);
+            result = InternalErrorReceipt(message, ex, _commitPhaseEntered);
+            cacheable = !_commitPhaseEntered;
+        }
+
+        if (cacheable)
+        {
+            Cache(message.InstructionId, result);
+        }
+
         return result;
     }
 
@@ -113,6 +147,18 @@ public class AdjustExecutor
         lock (_gate)
         {
             return _resultLog.TryGetValue(instructionId, out var result) ? result : null;
+        }
+    }
+
+    /// <summary>当前幂等缓存条数（ValleyAgent_diag 只读采集用，issue #27 ④）。</summary>
+    public int CachedResultCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _resultLog.Count;
+            }
         }
     }
 
@@ -164,6 +210,7 @@ public class AdjustExecutor
 
     private ProtocolV2.AdjustResultMessage ExecuteCore(ExecuteAdjustMessage message)
     {
+        _commitPhaseEntered = false; // 只允许主线程串行调用（见 Execute 注释），字段无并发竞争
         var npcName = message.NpcName ?? "";
 
         if (message.Ops == null || message.Ops.Count == 0)
@@ -255,23 +302,39 @@ public class AdjustExecutor
         }
 
         // 阶段四：按序提交。任一步失败 → 回滚已提交项（收编 TradeSettlement 纪律），整体失败。
-        for (var i = 0; i < message.Ops.Count; i++)
+        // 自此任何 op 都可能已实际生效——异常路径按 _commitPhaseEntered 决定是否写幂等缓存。
+        _commitPhaseEntered = true;
+        try
         {
-            var op = message.Ops[i];
-            if (TryCommit(op, agent, player, out var commitCode, out var commitDetail, out var resolvedItemId))
+            for (var i = 0; i < message.Ops.Count; i++)
             {
-                steps.Add(new AdjustStepResult
+                var op = message.Ops[i];
+                if (TryCommit(op, agent, player, out var commitCode, out var commitDetail, out var resolvedItemId))
                 {
-                    Index = i, Kind = op.Kind, Target = op.Target, Success = true,
-                    FailureCode = AdjustFailureCode.None, Detail = commitDetail, ItemId = resolvedItemId
-                });
-                continue;
+                    steps.Add(new AdjustStepResult
+                    {
+                        Index = i, Kind = op.Kind, Target = op.Target, Success = true,
+                        FailureCode = AdjustFailureCode.None, Detail = commitDetail, ItemId = resolvedItemId
+                    });
+                    continue;
+                }
+
+                _monitor?.Log($"[AdjustExecutor] {message.InstructionId}: op#{i} commit failed ({commitCode}: {commitDetail}); rolling back {steps.Count} committed step(s)", LogLevel.Warn);
+                RollbackCommitted(message.Ops, steps, agent, player);
+
+                return Fail(message, commitCode, i, Step(op, commitCode, commitDetail, resolvedItemId), steps, player);
             }
-
-            _monitor?.Log($"[AdjustExecutor] {message.InstructionId}: op#{i} commit failed ({commitCode}: {commitDetail}); rolling back {steps.Count} committed step(s)", LogLevel.Warn);
+        }
+        catch (Exception ex)
+        {
+            // 提交期异常同样触发回滚纪律（issue #27 ①）：此前异常直接逃逸出 ExecuteCore，
+            // 已提交步悬空——C# 执行镜像与 TS 账本漂移。回滚失败由 RollbackCommitted Error 留痕，
+            // 异常继续上抛给 Execute 的外层守卫转 internalError 回执。{ex} 全文留痕。
+            _monitor?.Log(
+                $"[AdjustExecutor] {message.InstructionId}: exception in commit phase; rolling back {steps.Count} committed step(s){Environment.NewLine}{ex}",
+                LogLevel.Error);
             RollbackCommitted(message.Ops, steps, agent, player);
-
-            return Fail(message, commitCode, i, Step(op, commitCode, commitDetail, resolvedItemId), steps, player);
+            throw;
         }
 
         // 整体成功：携带双方变更后余额（TS 推进 pending → committed 的依据）。
@@ -413,8 +476,10 @@ public class AdjustExecutor
     ///     失败返回失败码与原因（调用方负责回滚已提交项）。
     ///     resolvedItemId：item 步骤解析出的权威 QualifiedItemId（2026-08-17 键归一，回执携带），
     ///     money 步骤或解析失败为 null。
+    ///     internal virtual：单测注入"提交期抛异常"（issue #27 ① 守卫的 commit 阶段分支）
+    ///     ——覆写首调 base 成功、次调抛出，验证异常回执 + 不写幂等缓存。
     /// </summary>
-    private bool TryCommit(AdjustOp op, AgentInstance? agent, Farmer? player, out AdjustFailureCode code, out string detail, out string? resolvedItemId)
+    internal virtual bool TryCommit(AdjustOp op, AgentInstance? agent, Farmer? player, out AdjustFailureCode code, out string detail, out string? resolvedItemId)
     {
         var reason = op.Reason ?? "execute_adjust";
         var qualifiedId = "";
@@ -761,6 +826,40 @@ public class AdjustExecutor
         {
             return null;
         }
+    }
+
+    /// <summary>
+    ///     ExecuteCore 异常路径的兜底回执（issue #27 守卫 ①）。
+    ///     遵守 AGENTS §2 第 10 条"不猜"：Detail 携带异常全文（ex.ToString()，含类型/消息/堆栈），
+    ///     不做任何归因润色。commit 阶段的异常额外声明"可能部分已应用"——提示消费方
+    ///     （TS handleAdjustResult）该笔账目不能当作干净失败直接回滚了事，须待 reconcile 对账。
+    /// </summary>
+    private static ProtocolV2.AdjustResultMessage InternalErrorReceipt(
+        ExecuteAdjustMessage message, Exception ex, bool commitPhaseEntered)
+    {
+        var phase = commitPhaseEntered
+            ? "commit phase (rollback attempted; possible partial application — do not treat as clean failure)"
+            : "pre-commit phase (zero side effects)";
+        return new ProtocolV2.AdjustResultMessage
+        {
+            RequestId = message.RequestId,
+            InstructionId = message.InstructionId,
+            NpcName = message.NpcName ?? "",
+            Success = false,
+            Steps = new List<AdjustStepResult>(1)
+            {
+                new()
+                {
+                    Index = 0, Kind = "batch", Target = "", Success = false,
+                    FailureCode = AdjustFailureCode.InternalError,
+                    Detail = $"internal error during {phase}: {ex}"
+                }
+            },
+            FailureCode = AdjustFailureCode.InternalError,
+            PlayerMoney = null,
+            NpcMoney = null,
+            PlayerId = message.PlayerId
+        };
     }
 
     private static ProtocolV2.AdjustResultMessage Fail(

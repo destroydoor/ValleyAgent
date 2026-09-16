@@ -409,6 +409,61 @@ public class AdjustExecutorTests
         Assert.NotNull(executor.FindCachedResult("r3"));
     }
 
+    // ── ExecuteCore 异常守卫（issue #27 ①：异常必回执 + 幂等缓存按阶段分流）──
+
+    [Fact]
+    public void Execute_PreCommitException_ReturnsInternalErrorReceiptAndCaches()
+    {
+        using var service = CreateAgentService();
+        service.EnsureBrain("Abigail");
+        var executor = new ThrowingResolveExecutor(service);
+
+        var result = executor.Execute(Msg("ex1", "Abigail", Item("npc", "strawberry", 1)));
+
+        // 异常必回执：internalError + 异常全文（类型 + 消息；{ex} 全文含堆栈）。
+        Assert.False(result.Success);
+        Assert.Equal(AdjustFailureCode.InternalError, result.FailureCode);
+        Assert.Contains("InvalidOperationException", result.Steps[0].Detail);
+        Assert.Contains("resolve exploded: strawberry", result.Steps[0].Detail);
+        Assert.Contains("during pre-commit phase", result.Steps[0].Detail);
+
+        // pre-commit（零副作用）异常 → 幂等缓存写入：同 instructionId 重发被缓存挡掉，
+        // 不重复执行 ExecuteCore（TS reconcile 重发即闭环）。
+        Assert.NotNull(executor.FindCachedResult("ex1"));
+        Assert.Same(result, executor.Execute(Msg("ex1", "Abigail", Item("npc", "strawberry", 1))));
+        Assert.Equal(1, executor.CallCount);
+    }
+
+    [Fact]
+    public void Execute_CommitPhaseException_ReturnsInternalErrorReceiptWithoutCaching()
+    {
+        using var service = CreateAgentService();
+        var agent = service.EnsureBrain("Abigail")!;
+        agent.Inventory.Money = 500;
+        var executor = new ExplodingCommitExecutor(service);
+
+        var result = executor.Execute(Msg("ex2", "Abigail", Money("npc", -60), Money("npc", -40)));
+
+        // 异常必回执：internalError + 异常全文 + "可能部分已应用"声明。
+        Assert.False(result.Success);
+        Assert.Equal(AdjustFailureCode.InternalError, result.FailureCode);
+        Assert.Contains("during commit phase", result.Steps[0].Detail);
+        Assert.Contains("possible partial application", result.Steps[0].Detail);
+        Assert.Contains("InvalidOperationException", result.Steps[0].Detail);
+        Assert.Contains("commit exploded", result.Steps[0].Detail);
+
+        // 提交期异常不写幂等缓存（issue #27 决策）：缓存会把"可能部分已应用"钉死为
+        // "失败已处理"，阻断 TS reconcile 凭 instructionId 的补偿重发。
+        Assert.Null(executor.FindCachedResult("ex2"));
+
+        // 回滚已尽力：首步 -60 已提交后被回滚，异常步未提交 → 余额回到 500。
+        Assert.Equal(500, agent.Inventory.Money);
+
+        // 重发不被缓存挡掉：再次执行重新走 ExecuteCore（TryCommit 第 3、4 次调用，第 4 次再次抛）。
+        executor.Execute(Msg("ex2", "Abigail", Money("npc", -60), Money("npc", -40)));
+        Assert.Equal(4, executor.CallCount);
+    }
+
     // ── 序列化契约（camelCase wire 对齐，types.ts:131-133）─
 
     [Fact]
@@ -476,6 +531,57 @@ public class AdjustExecutorTests
         {
             suggestionsText = "";
             return new FakeObject(itemId, 1); // Stack 由提交阶段按 quantity 覆写
+        }
+    }
+
+    /// <summary>
+    ///     ResolveItem 恒抛异常的执行器（issue #27 ①）：注入 pre-commit 阶段异常
+    ///     （阶段三零副作用预校验中物品解析爆炸），验证守卫回执 + 幂等缓存写入。
+    /// </summary>
+    private sealed class ThrowingResolveExecutor : AdjustExecutor
+    {
+        public ThrowingResolveExecutor(AgentService? service)
+            : base(new StubMonitor(), service, null)
+        {
+        }
+
+        /// <summary>ResolveItem 被调用次数（断言缓存命中后未重新执行）。</summary>
+        public int CallCount { get; private set; }
+
+        internal override Item? ResolveItem(string itemId, out string suggestionsText)
+        {
+            CallCount++;
+            suggestionsText = "";
+            throw new InvalidOperationException($"resolve exploded: {itemId}");
+        }
+    }
+
+    /// <summary>
+    ///     TryCommit 首调走 base（真实提交 npc money）、次调抛异常的执行器（issue #27 ①）：
+    ///     注入 commit 阶段异常，验证守卫回执 + 不写幂等缓存 + 已提交步被回滚。
+    /// </summary>
+    private sealed class ExplodingCommitExecutor : AdjustExecutor
+    {
+        public ExplodingCommitExecutor(AgentService? service)
+            : base(new StubMonitor(), service, null)
+        {
+        }
+
+        /// <summary>TryCommit 被调用次数（断言重发未被缓存挡掉、重新走了 ExecuteCore）。</summary>
+        public int CallCount { get; private set; }
+
+        internal override bool TryCommit(AdjustOp op, AgentInstance? agent, Farmer? player,
+            out AdjustFailureCode code, out string detail, out string? resolvedItemId)
+        {
+            CallCount++;
+            if (CallCount % 2 == 1)
+            {
+                // 奇数次调用走真实提交（每批第 1 步成功），偶数次抛（第 2 步爆炸）——
+                // 每次完整执行都是"首步已提交 + 次步异常"，可重复验证回滚 + 不缓存。
+                return base.TryCommit(op, agent, player, out code, out detail, out resolvedItemId);
+            }
+
+            throw new InvalidOperationException("commit exploded");
         }
     }
 }
