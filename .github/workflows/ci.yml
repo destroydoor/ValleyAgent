@@ -3,7 +3,11 @@
 # 背景：PR #2 曾在零 CI 状态下带着 tsc/编译错误开出 CLEAN，故先补防再犯基建。
 #
 # 覆盖：
-#   ts     — TS 四连（test / typecheck / check:protocol）+ 隐私扫描。
+#   ts     — TS 四连（test / typecheck / check:protocol）+ 隐私扫描 + 两个
+#            可观测性探针（ubuntu 腿；见下方 Probe 步骤注释）。
+#   hygiene — 异常处理/错误可观测性棘轮门禁（scripts/check-exception-hygiene.mjs，
+#            纯 node 零依赖秒级，不需要 bun install）：基线只拦新增违规，
+#            修完一批跑 --update-baseline 收紧（issue #28 / 审计附录 B）。
 #   csharp — C# 单测在 docker/Dockerfile.unittests 容器内跑，解除 PR #3 的
 #            "C# 不进 CI" 决策。原决策的障碍：UnitTests 经 ModBuildConfig
 #            引用游戏 dll（$(GamePath)\smapi-internal），游戏文件有版权
@@ -75,6 +79,37 @@ jobs:
 
       - name: Privacy scan
         run: node scripts/check-privacy.mjs
+
+      # 可观测性探针（issue #21/#23 的回归守卫，2026-09-15 审计 §8/§3.8）：
+      #   error-observability-probe — 打真实 startServer，断言 console.error(msg, err)
+      #     的 Error 详情（message+stack）被 log-tee 落盘（不再是 "{}"）；自清理临时文件。
+      #   agent-wedge-repro — 必抛订阅者注入，断言 Agent run 终态化（awaitAll 不挂起、
+      #     isIdle、errorMessage 非 null）；#23 修复后预期退出码 0。
+      # 两者都自清理临时文件、路径基于 import.meta 与脚本相对解析（cwd 不敏感）。
+      # 只在 ubuntu 腿跑（windows 腿省时；本地复现同命令即可）。
+      - name: "Probe: error observability (log-tee Error serialization)"
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: server
+        run: bun ../scripts/test/error-observability-probe.ts
+
+      - name: "Probe: agent wedge repro (subscriber throw must not wedge run)"
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: server
+        run: bun ../scripts/test/agent-wedge-repro.ts
+
+  # 异常处理 / 错误可观测性棘轮门禁（issue #28）：纯 node 零依赖，秒级。
+  # 基线（scripts/exception-hygiene-baseline.json）记录 规则|文件 存量计数，
+  # 任一计数上升即失败；修完一批跑 `node scripts/check-exception-hygiene.mjs
+  # --update-baseline` 收紧并随 PR 提交。规则表见审计文档附录 B。
+  hygiene:
+    name: Exception hygiene gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exception hygiene scan (ratchet vs baseline)
+        run: node scripts/check-exception-hygiene.mjs
 
   # secrets 上下文在 job 级 if 里不可用，先由本 job 侦察并输出开关。
   csharp-guard:

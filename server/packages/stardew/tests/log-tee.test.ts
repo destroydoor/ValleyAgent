@@ -83,3 +83,114 @@ test("attachConsoleTee is idempotent for the same path (console patched once)", 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── Error 序列化（issue #21 / 审计 §3.6）──────────────────────────────
+// 此前 JSON.stringify(new Error("x")) === "{}"（message/stack 不可枚举），
+// tee 作为 ServerConsoleWindow=true 模式下唯一持久化现场会把错误详情整个销毁。
+
+/** 读 logFile 中含 marker 的那一行（tee 每条日志一行）。 */
+function readLineWith(logFile: string, marker: string): string {
+  const line = readFileSync(logFile, "utf8").split("\n").find((l) => l.includes(marker));
+  if (line === undefined) throw new Error(`marker "${marker}" not found in ${logFile}`);
+  return line;
+}
+
+test("console.error(msg, Error) tee 行含 name/message/stack，不再是 {}", () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-logtee-err-"));
+  try {
+    const logFile = join(dir, "server.log");
+    attachConsoleTee(logFile);
+
+    console.error("tee-error-object:", new Error("boom"));
+
+    const line = readLineWith(logFile, "tee-error-object:");
+    expect(line).toContain("boom");            // message
+    expect(line).toContain("Error");           // name（结构字段值）
+    expect(line).toMatch(/at /);               // stack（bun 运行时有真实栈帧）
+    expect(line).not.toBe('{}');               // 整行不再是空对象
+    expect(line).not.toContain('tee-error-object: {}');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Error 的可枚举自定义属性（如 code）随结构保留", () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-logtee-props-"));
+  try {
+    const logFile = join(dir, "server.log");
+    attachConsoleTee(logFile);
+
+    const err = new Error("enoent");
+    (err as { code?: string }).code = "ENOENT";
+    console.error("tee-error-props:", err);
+
+    const line = readLineWith(logFile, "tee-error-props:");
+    expect(line).toContain("enoent");
+    expect(line).toContain("ENOENT");
+    expect(line).toContain("code");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Error.cause 链递归下钻（多层）", () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-logtee-cause-"));
+  try {
+    const logFile = join(dir, "server.log");
+    attachConsoleTee(logFile);
+
+    const root = new Error("root-cause-msg");
+    const mid = new Error("mid-cause-msg", { cause: root });
+    const top = new Error("top-cause-msg", { cause: mid });
+    console.error("tee-cause-chain:", top);
+
+    const line = readLineWith(logFile, "tee-cause-chain:");
+    expect(line).toContain("top-cause-msg");
+    expect(line).toContain("mid-cause-msg");   // cause 第 1 层
+    expect(line).toContain("root-cause-msg");  // cause 第 2 层（多于一层的递归）
+    expect(line).toContain("cause");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("AggregateError.errors 数组逐项展开", () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-logtee-agg-"));
+  try {
+    const logFile = join(dir, "server.log");
+    attachConsoleTee(logFile);
+
+    const agg = new AggregateError([new Error("inner-a"), new Error("inner-b")], "aggregate-failed");
+    console.error("tee-aggregate:", agg);
+
+    const line = readLineWith(logFile, "tee-aggregate:");
+    expect(line).toContain("aggregate-failed");
+    expect(line).toContain("inner-a");
+    expect(line).toContain("inner-b");
+    expect(line).toContain("AggregateError");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("循环 cause 链被标记而非挂死/爆栈", () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-logtee-circ-"));
+  try {
+    const logFile = join(dir, "server.log");
+    attachConsoleTee(logFile);
+
+    const a = new Error("cyc-a");
+    const b = new Error("cyc-b", { cause: a });
+    (a as { cause?: unknown }).cause = b; // a ↔ b 互为 cause
+    console.error("tee-circular:", a);
+
+    const line = readLineWith(logFile, "tee-circular:");
+    expect(line).toContain("cyc-a");
+    expect(line).toContain("cyc-b");
+    expect(line).toContain("[circular]");
+    // 单行落盘（栈内换行被 JSON 转义，不得把日志文件撕成多行）
+    expect(line).toMatch(LINE_PREFIX_RE);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

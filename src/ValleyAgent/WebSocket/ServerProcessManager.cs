@@ -562,9 +562,10 @@ public class ServerProcessManager : IDisposable
         {
             cts.Cancel();
         }
-        catch (ObjectDisposedException)
+        catch (ObjectDisposedException ex)
         {
-            // 已被上一轮释放：无循环可停。
+            // 已被上一轮释放：无循环可停。留痕防"停不掉却无任何信号"（§3.6 铁律）。
+            _monitor.Log($"[Watchdog] StopWatchdog: CTS already disposed, no loop to stop: {ex}", LogLevel.Trace);
             return;
         }
 
@@ -606,11 +607,12 @@ public class ServerProcessManager : IDisposable
             {
                 break;
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
                 // 纵深防御：修复前 CTS 会被 StopWatchdog 就地 Dispose，循环下一轮 Task.Delay 注册令牌时
                 // 抛 ObjectDisposedException，而循环没有兜底 catch → 看门狗任务直接 fault 并**永久死亡**
                 // （服务器崩溃后再也没人重启）。CTS 生命周期现在挂在退出续体上，理论上到不了这里。
+                _monitor.Log($"[Watchdog] WatchdogLoop 5s tick aborted by disposed CTS: {ex}", LogLevel.Trace);
                 break;
             }
 
@@ -670,8 +672,9 @@ public class ServerProcessManager : IDisposable
                 {
                     break;
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
+                    _monitor.Log($"[Watchdog] restart backoff delay aborted by disposed CTS: {ex}", LogLevel.Trace);
                     break; // 同上：不让 CTS 生命周期问题把看门狗打成永久 fault。
                 }
 
@@ -849,7 +852,7 @@ public class ServerProcessManager : IDisposable
             catch (Exception ex)
             {
                 // 仍有线程在 WaitAsync 上排队等这把信号量时释放它会抛；Dispose 绝不能把游戏搞崩。
-                _monitor.Log($"[ServerProcessManager] _startLock dispose skipped: {ex.Message}", LogLevel.Debug);
+                _monitor.Log($"[ServerProcessManager] _startLock dispose skipped: {ex}", LogLevel.Debug);
             }
         }
 

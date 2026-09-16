@@ -85,17 +85,48 @@ export class Agent {
 
     const proxyStream = new EventStream<AgentEvent>();
 
-    stream.awaitAll().then((allEvents) => {
-      // Replay the full event log (including synchronously-emitted agent_start
-      // and turn_start) to the proxy stream and to subscribers.
-      for (const event of allEvents) {
-        for (const sub of this.subscribers) sub(event);
-        if (!proxyStream.isDone()) proxyStream.emit(event);
-      }
-      if (!proxyStream.isDone()) proxyStream.done();
+    // run 收尾的终态化步骤（成功/失败路径共用）：activeRun 清空 + 状态复位 + follow-up 排水。
+    // issue #23（审计 §3.8）：此前只存在于 then 分支内联，任何异常路径都会跳过 → NPC 永久 BUSY。
+    const finalizeRun = (): void => {
       this.activeRun = null;
       this.state = { ...this.state, isStreaming: false, streamingMessage: null };
       this.drainFollowUps();
+    };
+
+    stream.awaitAll().then((allEvents) => {
+      // Replay the full event log (including synchronously-emitted agent_start
+      // and turn_start) to the proxy stream and to subscribers.
+      // 订阅者隔离（issue #23）：单个订阅者抛异常只记错 + 进状态，不得传播——
+      // 否则回放中断，proxyStream 永不 done()、activeRun 永不清空。
+      for (const event of allEvents) {
+        for (const sub of this.subscribers) {
+          try {
+            sub(event);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(
+              `[agent] ${this.name}: subscriber ${sub.name || "(anonymous)"} threw during replay — isolated:`,
+              err,
+            );
+            this.state = { ...this.state, errorMessage: message };
+          }
+        }
+        if (!proxyStream.isDone()) proxyStream.emit(event);
+      }
+      if (!proxyStream.isDone()) proxyStream.done();
+      finalizeRun();
+    }).catch((err: unknown) => {
+      // 兜底终态化（issue #23）：awaitAll 拒绝或任何未预期路径都必须收敛——
+      // proxyStream 关闭（先补一个 error 事件）、activeRun 清空、错误进 AgentState，
+      // 不再依赖 cli.ts 的全局 unhandledRejection 兜（那会留下永久 BUSY + 一行 {}）。
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[agent] ${this.name}: run failed to finalize — closing stream with error:`, err);
+      if (!proxyStream.isDone()) {
+        proxyStream.emit({ type: "error", timestamp: Date.now(), message, error: err });
+        proxyStream.done();
+      }
+      this.state = { ...this.state, errorMessage: message };
+      finalizeRun();
     });
 
     return proxyStream;

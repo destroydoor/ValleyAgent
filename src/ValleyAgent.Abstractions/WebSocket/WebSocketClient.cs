@@ -324,13 +324,17 @@ namespace ValleyAgent.WebSocket
                 {
                     await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
-                    break; // StopHeartbeat 取消：正常收尾，不该作为 unobserved exception 冒出去
+                    // StopHeartbeat 取消：正常收尾，不该作为 unobserved exception 冒出去（§3.6 铁律：留痕）
+                    LogCallback?.Invoke($"[WS] Heartbeat loop exiting on cancellation: {ex}");
+                    break;
                 }
-                catch (ObjectDisposedException)
+                catch (ObjectDisposedException ex)
                 {
-                    break; // StopHeartbeat 已 Dispose 该 CTS：同上
+                    // StopHeartbeat 已 Dispose 该 CTS：同上
+                    LogCallback?.Invoke($"[WS] Heartbeat loop exiting on disposed CTS: {ex}");
+                    break;
                 }
 
                 if (ct.IsCancellationRequested) break;

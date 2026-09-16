@@ -1,4 +1,5 @@
 import type { StardewAgentRegistry, ToolResultRecord } from "./stardew-agent-registry";
+import type { DialogueResult } from "./stardew-agent";
 import { RuleEngine } from "./rule-engine";
 import { decodeWorldSnapshot } from "./world-snapshot-decoder";
 
@@ -60,12 +61,23 @@ export interface ProtocolAdapterOptions {
    * LLM 超时放弃，不引入新的超时冲突。
    */
   dialogueLockTimeoutMs?: number;
+  /**
+   * runDialogue 服务端兜底超时（issue #23 / 审计 §3.8，默认 90s，0 = 关闭）：
+   * 任何原因的挂起（LLM 无响应、事件流未终态化等）都先于 C# 侧 120s 放弃，
+   * 保证 finally 释放会话锁并回 fallback，NPC 不会永久 BUSY。测试可调小。
+   */
+  dialogueRunTimeoutMs?: number;
 }
 
 /** adjust_result 回执等待超时（设计 §6：回执丢失 → 超时回滚 pending，TS 重发靠 instructionId 幂等兜底）。 */
 const ADJUST_TIMEOUT_MS = 10_000;
 /** 超时对账重发间隔（2026-08-17）：超时后凭原 instructionId 重发，C# 幂等缓存返回原回执。 */
 const ADJUST_RECONCILE_RETRY_MS = 30_000;
+/**
+ * runDialogue 服务端兜底超时（issue #23 / 审计 §3.8）。90s < C# LLMTimeoutSeconds=120：
+ * 服务端先放弃并释放会话锁、回 fallback——不把"锁必被释放"寄托在客户端超时上。
+ */
+const DIALOGUE_RUN_TIMEOUT_MS = 90_000;
 
 interface PendingAdjustWaiter {
   promise: Promise<AdjustResultMessage>;
@@ -617,7 +629,29 @@ export class ProtocolAdapter {
         },
       };
 
-      const result = await agent.runDialogue(req.playerInput, scene, toolResults, economy, playerId, playerName);
+      // issue #23 服务端兜底：runDialogue 任何原因挂起（LLM 无响应/事件流未终态化）
+      // 都要在 90s（可配）内放弃——走下面的 catch 回 fallback，finally 释放会话锁，
+      // 不依赖 C# 侧 120s 超时。超时路径 console.error 留痕（含 npcName 与 requestId）。
+      const runTimeoutMs = this.options?.dialogueRunTimeoutMs ?? DIALOGUE_RUN_TIMEOUT_MS;
+      let runTimer: ReturnType<typeof setTimeout> | undefined;
+      const runTimeout = new Promise<never>((_, reject) => {
+        if (runTimeoutMs <= 0) return;
+        runTimer = setTimeout(() => {
+          console.error(
+            `[${timestamp()}] [dialogue] ${req.npcName} runDialogue timed out after ${runTimeoutMs}ms — releasing lock, requestId=${req.requestId}`,
+          );
+          reject(new Error(`dialogue run timed out after ${runTimeoutMs}ms (npc=${req.npcName}, requestId=${req.requestId})`));
+        }, runTimeoutMs);
+      });
+      let result: DialogueResult;
+      try {
+        result = await Promise.race([
+          agent.runDialogue(req.playerInput, scene, toolResults, economy, playerId, playerName),
+          runTimeout,
+        ]);
+      } finally {
+        if (runTimer !== undefined) clearTimeout(runTimer);
+      }
 
       // M2a：对话好感 delta 记入 TS 权威账本（玩家桶；同时 dialogue_response 回传 C#
       // 加游戏内点——两套各自用途：vanilla 管游戏事件，TS 管人设/阶段）。
