@@ -1947,27 +1947,36 @@ public class EventHandlerInitializer
     }
 
     /// <summary>
-    ///     主线程泵的统一兜底执行器（死锁修复 2026-09-12）。
+    ///     主线程泵/事件段的统一兜底入口（死锁修复 2026-09-12 → issue #24 全面分段化）。
     ///     OnUpdateTicked 里的排水段是一条**串行责任链**：后台线程只入队，回包渲染 /
     ///     ModMessage 发送 / 好感落账 / execute_adjust 执行全靠每 tick 排干。
     ///     链上任一环抛异常，下游所有环当 tick 全部失效——其中
     ///     DialogueBoxInputPatch.ProcessPendingReplies 是 <c>_isWaitingForResponse</c>
     ///     的唯一清除点，被跳过就意味着输入框永久停在"等待回复"、Enter 与键盘输入全被吞。
-    ///     所以每个泵独立兜底：单泵失败只丢当 tick 的一个动作，链不能断。
+    ///     所以每个段独立兜底：单段失败只丢当 tick 的一个动作，链不能断。
+    ///     节流（首报全栈 + 窗口内降 Trace）与 ModErrorLog 落盘在 <see cref="EventGuard.SafeRun"/>。
     /// </summary>
-    private void Pump(string name, Action pump)
+    private void SafeRun(string segmentName, Action action) => EventGuard.SafeRun(_monitor, segmentName, action);
+
+    private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
+        // issue #24 最后一道兜底：正常路径所有子系统都在 OnUpdateTickedCore 的 SafeRun 段内，
+        // 走到这里说明"分段编排本身"抛了（段边界划漏）——同样节流 + 落盘，不让 SMAPI 每 tick 重演。
         try
         {
-            pump();
+            OnUpdateTickedCore();
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Pump] '{name}' failed this tick (downstream pumps unaffected): {ex}", LogLevel.Error);
+            if (QueueTelemetry.ShouldWarn("safeseg:on-update-ticked"))
+            {
+                _monitor.Log($"[SafeRun] OnUpdateTicked outer guard (segment boundary missed): {ex}", LogLevel.Error);
+                ModErrorLog.LogError("SafeRun", "OnUpdateTicked outer guard (segment boundary missed)", ex);
+            }
         }
     }
 
-    private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
+    private void OnUpdateTickedCore()
     {
         // 只量"排水段"（TranscriptSink.Drain → ProcessPendingWsCommands）：这段全部是主线程队列消费，
         // >100ms 说明某个泵 handler 在挂起；后面的 agent tick 逻辑不在此计时范围（它有自己的观测面）
@@ -1977,26 +1986,26 @@ public class EventHandlerInitializer
         // 死锁修复（2026-09-12）：以下每个泵各自兜底。这些泵是串行责任链——
         // 任一环抛异常，当 tick 下游全部泵（含 DialogueBoxInputPatch 的回复渲染，
         // 即 _isWaitingForResponse 的唯一清除点）都被跳过，输入框会卡在"等待回复"。
-        Pump("transcript-sink", () => _transcriptSink?.Drain());
+        SafeRun("transcript-sink", () => _transcriptSink?.Drain());
 
         // E2-3: 排空到期的长文分句聊天消息（主线程访问 Game1.chatBox）
-        Pump("speech-display", SpeechDisplayRouter.Tick);
+        SafeRun("speech-display", SpeechDisplayRouter.Tick);
 
         // ThinClient 模式下 _agentService 为 null，但 farmhand 仍需要处理
         // 礼物响应、对话回复与 state_sync 命令的主线程队列，否则 UI 无法渲染。
-        Pump("gift-actions", NPCGiftPatch.ProcessMainThreadActions);
-        Pump("dialogue-api-actions", ValleyAgentApi.ProcessMainThreadActions);
+        SafeRun("gift-actions", NPCGiftPatch.ProcessMainThreadActions);
+        SafeRun("dialogue-api-actions", ValleyAgentApi.ProcessMainThreadActions);
         // 2026-08-23 审计 P0：房客中继链路（HostRequestHandlers）的 await 续体改状态也走主线程队列
-        Pump("host-request-mainthread", Multiplayer.HostRequestHandlers.ProcessMainThreadActions);
-        Pump("dialogue-replies", DialogueBoxInputPatch.ProcessPendingReplies);
+        SafeRun("host-request-mainthread", Multiplayer.HostRequestHandlers.ProcessMainThreadActions);
+        SafeRun("dialogue-replies", DialogueBoxInputPatch.ProcessPendingReplies);
         // 陈旧等待自愈：回包与超时兜底双双丢失时强制解锁输入框（防永久"等待回复"）
-        Pump("dialogue-stale-wait", DialogueBoxInputPatch.ResetStaleWait);
+        SafeRun("dialogue-stale-wait", DialogueBoxInputPatch.ResetStaleWait);
         // E2-2: 聊天栏路由的 LLM 回复主线程渲染（ActiveSpeechRouter，不打开对话框）
-        Pump("chat-replies", ChatBarRouter.ProcessPendingReplies);
+        SafeRun("chat-replies", ChatBarRouter.ProcessPendingReplies);
         // E5-2: 远程喊话延迟回应主线程渲染（NPC 听到喊话 3~8s 后回应）
-        Pump("shout-replies", ChatBarRouter.ProcessShoutReplies);
-        Pump("mainthread-commands", ProcessPendingMainThreadCommands);
-        Pump("ws-commands", ProcessPendingWsCommands);
+        SafeRun("shout-replies", ChatBarRouter.ProcessShoutReplies);
+        SafeRun("mainthread-commands", ProcessPendingMainThreadCommands);
+        SafeRun("ws-commands", ProcessPendingWsCommands);
 
         // 排水段耗时告警（节流 5s）：主线程泵停滞的细粒度信号，补看门狗 5s 阈值以下的盲区
         var drainMs = drainStopwatch.Elapsed.TotalMilliseconds;
@@ -2012,114 +2021,151 @@ public class EventHandlerInitializer
         }
 
         // T17/T18: 处理 pre_speak 主动说话（主线程执行，避免跨线程访问 Game1）
-        ProcessPendingPreSpeakActions();
+        SafeRun("pre-speak", ProcessPendingPreSpeakActions);
 
         _tickCounter++;
 
         // 阶段 3 (3.6): 每 10 tick 采样玩家活动（采样是廉价的只读分类，不阻塞主线程）
-        if (_tickCounter % PlayerActionTracker.SampleIntervalTicks == 0 && Game1.currentLocation != null)
+        SafeRun("activity-sample", () =>
         {
-            _playerActionTracker?.Sample();
-        }
+            if (_tickCounter % PlayerActionTracker.SampleIntervalTicks == 0 && Game1.currentLocation != null)
+            {
+                _playerActionTracker?.Sample();
+            }
+        });
 
         // ── 加速模式：推进游戏时间 ──
         // 游戏本身以 1x 推进 timeOfDay，我们额外追加 (multiplier-1)x
         // 正常速率：10 游戏分钟 / 420 ticks（7秒 @60fps）
-        _currentSpeedMultiplier = DebugFlags.GameSpeedMultiplier;
-        if (_currentSpeedMultiplier > 1 && !Game1.paused && Game1.timeOfDay < 2600)
+        SafeRun("game-speed", () =>
         {
-            _extraTimeAccumulator += (_currentSpeedMultiplier - 1) * (10.0f / 420.0f);
-            if (_extraTimeAccumulator >= 10.0f)
+            _currentSpeedMultiplier = DebugFlags.GameSpeedMultiplier;
+            if (_currentSpeedMultiplier > 1 && !Game1.paused && Game1.timeOfDay < 2600)
             {
-                var advance = (int)(_extraTimeAccumulator / 10.0f) * 10;
-                Game1.timeOfDay += advance;
-                _extraTimeAccumulator -= advance;
+                _extraTimeAccumulator += (_currentSpeedMultiplier - 1) * (10.0f / 420.0f);
+                if (_extraTimeAccumulator >= 10.0f)
+                {
+                    var advance = (int)(_extraTimeAccumulator / 10.0f) * 10;
+                    Game1.timeOfDay += advance;
+                    _extraTimeAccumulator -= advance;
+                }
             }
-        }
+        });
 
-        // ── 加速模式：缩放决策间隔 ──
-        var effectiveDecisionInterval = _currentSpeedMultiplier > 1
-            ? Math.Max(60, _decisionIntervalTicks / _currentSpeedMultiplier)
-            : _decisionIntervalTicks;
+        // ── 加速模式：缩放决策间隔 + 对话跟踪 + 决策批触发 ──
+        SafeRun("decision-batch", () =>
+        {
+            var effectiveDecisionInterval = _currentSpeedMultiplier > 1
+                ? Math.Max(60, _decisionIntervalTicks / _currentSpeedMultiplier)
+                : _decisionIntervalTicks;
 
-        if (Game1.activeClickableMenu is DialogueBox)
-        {
-            var speaker = Game1.currentSpeaker;
-            _lastDialogueNpcName = speaker?.Name;
-        }
-        else if (_lastDialogueNpcName != null)
-        {
-            _lastDialogueNpcName = null;
-        }
-
-        if (!DebugFlags.SuppressDecisions && _tickCounter % effectiveDecisionInterval == 0)
-        {
-            var decisionAgents = _agentService.GetAllAgents()
-                .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
-                .ToList();
-            if (decisionAgents.Count > 0)
+            if (Game1.activeClickableMenu is DialogueBox)
             {
-                _ = Task.Run(async () => await MakeDecisionsAsync(decisionAgents).ConfigureAwait(false));
+                var speaker = Game1.currentSpeaker;
+                _lastDialogueNpcName = speaker?.Name;
             }
-        }
+            else if (_lastDialogueNpcName != null)
+            {
+                _lastDialogueNpcName = null;
+            }
+
+            if (!DebugFlags.SuppressDecisions && _tickCounter % effectiveDecisionInterval == 0)
+            {
+                var decisionAgents = _agentService.GetAllAgents()
+                    .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
+                    .ToList();
+                if (decisionAgents.Count > 0)
+                {
+                    _ = Task.Run(async () => await MakeDecisionsAsync(decisionAgents).ConfigureAwait(false));
+                }
+            }
+        });
 
         // spark 检查：每 60 tick（约 1 秒）检查玩家附近 NPC 是否低概率激活
         // 设计文档 §4.2.3：5% 概率（BelowMin 翻倍到 10%，>=Normal 停止）
-        if (_tickCounter % 60 == 0)
+        SafeRun("spark", () =>
         {
-            TrySparkNearbyNpcs();
-        }
+            if (_tickCounter % 60 == 0)
+            {
+                TrySparkNearbyNpcs();
+            }
+        });
 
         // 互动空闲淘汰检查：每 120 tick（约 2 秒）检查一次
         // 设计文档 §4.3.2：超过 IdleThresholdSeconds 未互动且无 keep 豁免 → 淘汰
-        if (_tickCounter % 120 == 0)
+        SafeRun("idle-eviction", () =>
         {
-            CheckInteractionIdleEviction();
-        }
+            if (_tickCounter % 120 == 0)
+            {
+                CheckInteractionIdleEviction();
+            }
+        });
 
         var agents = _agentService.GetAllAgents();
 
         // 在游戏 NPC.Update() 之后强制禁用日程，防止 schedule 将 agent NPC 拉走。
         // IDLE 未释放的 agent 由 IdleWanderHandler 管（flag 保持 false 单一所有权）；
         // 释放后的 agent 由 AgentTickLoop released 分支接管（FinalizeVanillaRelease 恢复 flag）。
-        foreach (var agent in agents)
+        SafeRun("schedule-suppression", () =>
         {
-            var npc = Game1.getCharacterFromName(agent.NpcName);
-            if (npc == null) continue;
-
-            if (agent.StateMachine.CurrentStateFlag != AgentState.IDLE)
+            foreach (var agent in agents)
             {
-                npc.followSchedule = false;
-                npc.ignoreScheduleToday = true;
-            }
-        }
+                var npc = Game1.getCharacterFromName(agent.NpcName);
+                if (npc == null) continue;
 
-        foreach (var agent in agents)
+                if (agent.StateMachine.CurrentStateFlag != AgentState.IDLE)
+                {
+                    npc.followSchedule = false;
+                    npc.ignoreScheduleToday = true;
+                }
+            }
+        });
+
+        // agent tick：每个 agent 独立隔离（issue #24）——一个 agent 的 tick/控制器应用抛异常
+        // 不影响同 tick 其余 agent；段名带 npcName 归因。
+        SafeRun("agent-tick", () =>
         {
-            var result = _agentTickLoop?.ProcessAgent(agent, _lastDialogueNpcName);
-
-            switch (result)
+            foreach (var agent in agents)
             {
-                case AgentTickLoop.ProcessResult.Skip:
-                case AgentTickLoop.ProcessResult.Dead:
-                case null:
-                    continue;
-                case AgentTickLoop.ProcessResult.Normal:
-                    var currentState = agent.StateMachine.CurrentStateFlag;
-                    ApplyControllerToNpc(agent, currentState);
-                    break;
+                var target = agent;
+                SafeRun($"agent-tick:{target.NpcName}", () =>
+                {
+                    var result = _agentTickLoop?.ProcessAgent(target, _lastDialogueNpcName);
+
+                    switch (result)
+                    {
+                        case AgentTickLoop.ProcessResult.Skip:
+                        case AgentTickLoop.ProcessResult.Dead:
+                        case null:
+                            return;
+                        case AgentTickLoop.ProcessResult.Normal:
+                            var currentState = target.StateMachine.CurrentStateFlag;
+                            ApplyControllerToNpc(target, currentState);
+                            break;
+                    }
+                });
             }
-        }
+        });
 
         // state_sync 管道已删除：TS 端无路由，每秒 1 个 60s 阻塞 Task 导致稳态 ~60 并发。
 
         // 加速模式下更频繁地处理状态机更新
         var stateMachineInterval = _currentSpeedMultiplier > 1 ? Math.Max(2, 10 / _currentSpeedMultiplier) : 10;
-        if (_tickCounter % stateMachineInterval != 0)
+        if (_tickCounter % stateMachineInterval == 0)
         {
-            return;
+            SafeRun("pending-decisions", ProcessPendingDecisions);
         }
 
+        // 决策触发器（对话结束/任务完成/送礼事件）+ 怪物仇恨 + 紧急健康 + 联机广播（每 tick，各自分段）
+        SafeRun("decision-triggers", () => ProcessPendingDecisionTriggers(agents));
+    }
+
+    /// <summary>
+    ///     消费待处理决策队列（原 OnUpdateTicked 内联 lock 块，issue #24 抽方法便于分段守卫；
+    ///     逻辑逐行保留，行为不变）。
+    /// </summary>
+    private void ProcessPendingDecisions()
+    {
         lock (_pendingDecisionsLock)
         {
             // 收集 "state too young" 的延迟决策，while 循环结束后统一重新入队。
@@ -2258,116 +2304,135 @@ public class EventHandlerInitializer
                 _pendingDecisions.Enqueue(item);
             }
         }
+    }
 
-        if (!DebugFlags.SuppressDecisions && _pendingDialogueEndDecisions != null &&
-            _pendingDialogueEndDecisions.Count > 0)
+    /// <summary>
+    ///     每 tick 的决策触发器与收尾编排（原 OnUpdateTicked 尾段，issue #24 抽方法并各自分段；
+    ///     逻辑逐行保留，行为不变）。
+    /// </summary>
+    private void ProcessPendingDecisionTriggers(IReadOnlyList<AgentInstance> agents)
+    {
+        SafeRun("dialogue-end-decisions", () =>
         {
-            var dialogueEndAgents = _pendingDialogueEndDecisions
-                .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
-                .ToList();
-            _pendingDialogueEndDecisions = null;
-            if (dialogueEndAgents.Count > 0)
+            if (!DebugFlags.SuppressDecisions && _pendingDialogueEndDecisions != null &&
+                _pendingDialogueEndDecisions.Count > 0)
             {
-                _monitor.Log($"[DecisionTrigger] Processing {dialogueEndAgents.Count} dialogue-end decisions...");
-                _ = Task.Run(async () => await MakeDecisionsAsync(dialogueEndAgents).ConfigureAwait(false));
-            }
-        }
-
-        if (!DebugFlags.SuppressDecisions && _pendingTaskCompleteDecisions != null &&
-            _pendingTaskCompleteDecisions.Count > 0)
-        {
-            var taskCompleteAgents = _pendingTaskCompleteDecisions
-                .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
-                .ToList();
-            _pendingTaskCompleteDecisions = null;
-            if (taskCompleteAgents.Count > 0)
-            {
-                _monitor.Log($"[DecisionTrigger] Processing {taskCompleteAgents.Count} task-complete decisions...");
-                _ = Task.Run(async () => await MakeDecisionsAsync(taskCompleteAgents).ConfigureAwait(false));
-            }
-        }
-
-        if (!DebugFlags.SuppressDecisions && _pendingGiftEventDecisions != null && _pendingGiftEventDecisions.Count > 0)
-        {
-            var giftEventAgents = _pendingGiftEventDecisions
-                .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
-                .ToList();
-            _pendingGiftEventDecisions = null;
-            if (giftEventAgents.Count > 0)
-            {
-                _monitor.Log($"[DecisionTrigger] Processing {giftEventAgents.Count} gift-event decisions...");
-                _ = Task.Run(async () => await MakeDecisionsAsync(giftEventAgents).ConfigureAwait(false));
-            }
-        }
-
-        _monsterAggroManager?.ProcessMonsterAttacks(agents, _tickCounter);
-
-        foreach (var agent in agents)
-        {
-            var npc = Game1.getCharacterFromName(agent.NpcName);
-            if (npc == null)
-            {
-                continue;
-            }
-
-            if (agent.Health.IsDead)
-            {
-                HandleDeadNpc(npc);
-                continue;
-            }
-
-            var emergencyState = CheckEmergencyState(npc, agent.StateMachine.CurrentStateFlag, agent.Health, _config!,
-                agent.NpcName);
-            if (emergencyState.HasValue && emergencyState.Value != agent.StateMachine.CurrentStateFlag)
-            {
-                agent.StateMachine.SetEmergencyEscape(true);
-                agent.StateMachine.ForceTransition(emergencyState.Value);
-                agent.StateMachine.SetEmergencyEscape(false);
-                _monitor.Log($"{agent.NpcName} emergency switch to {emergencyState.Value}");
-            }
-
-            if (Game1.player?.currentLocation == npc.currentLocation
-                && agent.StateMachine.CurrentStateFlag != AgentState.FIGHT)
-            {
-                var playerLocation = Game1.player!.currentLocation;
-                Monster? nearestToPlayer = null;
-                var nearestDist = float.MaxValue;
-                foreach (var c in playerLocation.characters)
+                var dialogueEndAgents = _pendingDialogueEndDecisions
+                    .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
+                    .ToList();
+                _pendingDialogueEndDecisions = null;
+                if (dialogueEndAgents.Count > 0)
                 {
-                    if (c is Monster monster && !monster.IsInvisible && !monster.Name.Contains("Slime Ball"))
+                    _monitor.Log($"[DecisionTrigger] Processing {dialogueEndAgents.Count} dialogue-end decisions...");
+                    _ = Task.Run(async () => await MakeDecisionsAsync(dialogueEndAgents).ConfigureAwait(false));
+                }
+            }
+        });
+
+        SafeRun("task-complete-decisions", () =>
+        {
+            if (!DebugFlags.SuppressDecisions && _pendingTaskCompleteDecisions != null &&
+                _pendingTaskCompleteDecisions.Count > 0)
+            {
+                var taskCompleteAgents = _pendingTaskCompleteDecisions
+                    .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
+                    .ToList();
+                _pendingTaskCompleteDecisions = null;
+                if (taskCompleteAgents.Count > 0)
+                {
+                    _monitor.Log($"[DecisionTrigger] Processing {taskCompleteAgents.Count} task-complete decisions...");
+                    _ = Task.Run(async () => await MakeDecisionsAsync(taskCompleteAgents).ConfigureAwait(false));
+                }
+            }
+        });
+
+        SafeRun("gift-event-decisions", () =>
+        {
+            if (!DebugFlags.SuppressDecisions && _pendingGiftEventDecisions != null && _pendingGiftEventDecisions.Count > 0)
+            {
+                var giftEventAgents = _pendingGiftEventDecisions
+                    .Where(a => _agentNavigator?.IsTravelling(a.NpcName) != true)
+                    .ToList();
+                _pendingGiftEventDecisions = null;
+                if (giftEventAgents.Count > 0)
+                {
+                    _monitor.Log($"[DecisionTrigger] Processing {giftEventAgents.Count} gift-event decisions...");
+                    _ = Task.Run(async () => await MakeDecisionsAsync(giftEventAgents).ConfigureAwait(false));
+                }
+            }
+        });
+
+        SafeRun("monster-aggro", () => _monsterAggroManager?.ProcessMonsterAttacks(agents, _tickCounter));
+
+        SafeRun("emergency-health", () =>
+        {
+            foreach (var agent in agents)
+            {
+                var npc = Game1.getCharacterFromName(agent.NpcName);
+                if (npc == null)
+                {
+                    continue;
+                }
+
+                if (agent.Health.IsDead)
+                {
+                    HandleDeadNpc(npc);
+                    continue;
+                }
+
+                var emergencyState = CheckEmergencyState(npc, agent.StateMachine.CurrentStateFlag, agent.Health, _config!,
+                    agent.NpcName);
+                if (emergencyState.HasValue && emergencyState.Value != agent.StateMachine.CurrentStateFlag)
+                {
+                    agent.StateMachine.SetEmergencyEscape(true);
+                    agent.StateMachine.ForceTransition(emergencyState.Value);
+                    agent.StateMachine.SetEmergencyEscape(false);
+                    _monitor.Log($"{agent.NpcName} emergency switch to {emergencyState.Value}");
+                }
+
+                if (Game1.player?.currentLocation == npc.currentLocation
+                    && agent.StateMachine.CurrentStateFlag != AgentState.FIGHT)
+                {
+                    var playerLocation = Game1.player!.currentLocation;
+                    Monster? nearestToPlayer = null;
+                    var nearestDist = float.MaxValue;
+                    foreach (var c in playerLocation.characters)
                     {
-                        var dist = Vector2.Distance(Game1.player!.Tile, monster.Tile);
-                        if (dist < nearestDist)
+                        if (c is Monster monster && !monster.IsInvisible && !monster.Name.Contains("Slime Ball"))
                         {
-                            nearestDist = dist;
-                            nearestToPlayer = monster;
+                            var dist = Vector2.Distance(Game1.player!.Tile, monster.Tile);
+                            if (dist < nearestDist)
+                            {
+                                nearestDist = dist;
+                                nearestToPlayer = monster;
+                            }
+                        }
+                    }
+
+                    if (nearestToPlayer != null && nearestDist <= _config!.PlayerInDangerDistance)
+                    {
+                        // Issue 10: 冷却+去重，防止每 tick 刷屏
+                        var lastTick = _lastPlayerInDangerEmotionTick.TryGetValue(agent.NpcName, out var lt) ? lt : 0;
+                        if (Game1.ticks - lastTick >= _config!.EmotionCooldownTicks &&
+                            agent.Brain.Emotion != NpcEmotion.Worried)
+                        {
+                            agent.Brain.SyncEmotion(NpcEmotion.Worried, 0.7f, "PlayerInDanger");
+                            _lastPlayerInDangerEmotionTick[agent.NpcName] = Game1.ticks;
                         }
                     }
                 }
+            }
 
-                if (nearestToPlayer != null && nearestDist <= _config!.PlayerInDangerDistance)
+            foreach (var agent in agents)
+            {
+                if (agent.Health.IsDead)
                 {
-                    // Issue 10: 冷却+去重，防止每 tick 刷屏
-                    var lastTick = _lastPlayerInDangerEmotionTick.TryGetValue(agent.NpcName, out var lt) ? lt : 0;
-                    if (Game1.ticks - lastTick >= _config!.EmotionCooldownTicks &&
-                        agent.Brain.Emotion != NpcEmotion.Worried)
-                    {
-                        agent.Brain.SyncEmotion(NpcEmotion.Worried, 0.7f, "PlayerInDanger");
-                        _lastPlayerInDangerEmotionTick[agent.NpcName] = Game1.ticks;
-                    }
                 }
             }
-        }
-
-        foreach (var agent in agents)
-        {
-            if (agent.Health.IsDead)
-            {
-            }
-        }
+        });
 
         // 联机：60 tick 节流快照广播（broadcaster 内部自带 ShouldRunAgentLogic && IsMultiplayer 守卫）
-        _multiplayerBroadcaster?.Update(_tickCounter);
+        SafeRun("multiplayer-broadcast", () => _multiplayerBroadcaster?.Update(_tickCounter));
     }
 
     private void OnTimeChanged(object? sender, TimeChangedEventArgs e)
