@@ -1,6 +1,1 @@
-{
-  "TS-FAIL-AT-LOG-LEVEL|server/packages/core/src/llm-provider.ts": 2,
-  "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/console-log-subscriber.ts": 1,
-  "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/protocol-adapter.ts": 11,
-  "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/stardew-agent-registry.ts": 2
-}
+{}

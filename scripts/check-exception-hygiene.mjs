@@ -429,6 +429,13 @@ if (failAll) {
   process.exit(0);
 }
 
+// issue #26 收口：存量全部修完后 counts 为空、基线也是空 {}——零违规是合法终态，
+// 不应触发"基线为空"守卫（该守卫的语义是"有违规但没建基线"，不是"没有违规"）。
+if (total === 0) {
+  console.log(`\n✅ 零违规（存量已全部收敛；另 CS-SILENT-CATCH 显式豁免 ${waivedCount} 处，登记见 SILENT_CATCH_WAIVED）。`);
+  process.exit(0);
+}
+
 if (Object.keys(baseline).length === 0) {
   console.error("\n❌ 基线为空：先跑 `node scripts/check-exception-hygiene.mjs --update-baseline` 建立存量基线，再让 CI 只拦新增。");
   process.exit(1);
