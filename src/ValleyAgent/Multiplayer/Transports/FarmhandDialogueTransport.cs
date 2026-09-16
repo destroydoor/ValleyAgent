@@ -120,7 +120,8 @@ public class FarmhandDialogueTransport : IDialogueTransport
             else
             {
                 _monitor.Log(
-                    $"[FarmhandDialogueTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending (timed out or already served), dropping late response");
+                    $"[FarmhandDialogueTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending (timed out or already served), dropping late response",
+                    LogLevel.Warn);
             }
 
             return;
@@ -131,7 +132,7 @@ public class FarmhandDialogueTransport : IDialogueTransport
             _pending.Keys.FirstOrDefault(k => k.StartsWith(msg.NpcName + "_", StringComparison.OrdinalIgnoreCase));
         if (matchingKey == null)
         {
-            _monitor.Log($"[FarmhandDialogueTransport] No pending request for {msg.NpcName}, dropping response");
+            _monitor.Log($"[FarmhandDialogueTransport] No pending request for {msg.NpcName}, dropping response", LogLevel.Warn);
             return;
         }
 

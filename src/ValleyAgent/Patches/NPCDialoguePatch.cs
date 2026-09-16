@@ -198,7 +198,8 @@ public static class NPCDialoguePatch
         {
             _preDialogueStates[npc.Name] = dialogAgent.StateMachine.CurrentStateFlag;
             Monitor?.Log(
-                $"[Dialogue] Saved pre-dialogue state for {npc.Name}: {dialogAgent.StateMachine.CurrentStateFlag}");
+                $"[Dialogue] Saved pre-dialogue state for {npc.Name}: {dialogAgent.StateMachine.CurrentStateFlag}",
+                LogLevel.Debug);
         }
 
         // 直接打开原生 DialogueBox，无问候语。

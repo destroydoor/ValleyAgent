@@ -125,7 +125,8 @@ public class AgentTickLoop
         if (agent.StateMachine.CurrentStateFlag != AgentState.IDLE)
         {
             _monitor.Log(
-                $"{npcName}: IDLE decision ignored — agent is in active state ({agent.StateMachine.CurrentStateFlag})");
+                $"{npcName}: IDLE decision ignored — agent is in active state ({agent.StateMachine.CurrentStateFlag})",
+                LogLevel.Debug);
             return;
         }
 
@@ -159,7 +160,7 @@ public class AgentTickLoop
         _ = _vanillaFinalized.Remove(npcName);
         _ = _exitPathTargets.Remove(npcName);
         _ = _exitPathStartTick.Remove(npcName);
-        _monitor.Log($"{npcName}: active decision ({targetState}) — re-engaged from vanilla");
+        _monitor.Log($"{npcName}: active decision ({targetState}) — re-engaged from vanilla", LogLevel.Debug);
     }
 
     /// <summary>
@@ -452,7 +453,7 @@ public class AgentTickLoop
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"{npc.Name}: checkSchedule for target lookup failed: {ex}");
+            _monitor.Log($"{npc.Name}: checkSchedule for target lookup failed: {ex}", LogLevel.Warn);
         }
 
         // checkSchedule 成功后 controller 的终点就是日程位置

@@ -87,7 +87,8 @@ public class MultiplayerEventRouter
         }
 
         _monitor.Log(
-            $"[MultiplayerEventRouter] Received {e.Type} from player {e.FromPlayerID} (broadcaster={_broadcaster != null}, renderer={_renderer != null})");
+            $"[MultiplayerEventRouter] Received {e.Type} from player {e.FromPlayerID} (broadcaster={_broadcaster != null}, renderer={_renderer != null})",
+            LogLevel.Trace);
 
         try
         {
@@ -105,7 +106,7 @@ public class MultiplayerEventRouter
                         _requestHandlers?.HandleInteractionRequest(e.ReadAs<InteractionRequestMessage>());
                         break;
                     default:
-                        _monitor.Log($"[MultiplayerEventRouter] Unknown message type: {e.Type}");
+                        _monitor.Log($"[MultiplayerEventRouter] Unknown message type: {e.Type}", LogLevel.Warn);
                         break;
                 }
             }
@@ -138,7 +139,7 @@ public class MultiplayerEventRouter
                         _renderer.HandleNpcAction(e.ReadAs<NpcActionMessage>());
                         break;
                     default:
-                        _monitor.Log($"[MultiplayerEventRouter] Unknown message type: {e.Type}");
+                        _monitor.Log($"[MultiplayerEventRouter] Unknown message type: {e.Type}", LogLevel.Warn);
                         break;
                 }
             }
@@ -177,5 +178,5 @@ public class MultiplayerEventRouter
     ///     后续如需清理远程 Farmhand 缓存可在此扩展。
     /// </summary>
     private void OnPeerDisconnected(object? sender, PeerDisconnectedEventArgs e) =>
-        _monitor.Log($"[MultiplayerEventRouter] Peer disconnected: {e.Peer.PlayerID}");
+        _monitor.Log($"[MultiplayerEventRouter] Peer disconnected: {e.Peer.PlayerID}", LogLevel.Debug);
 }

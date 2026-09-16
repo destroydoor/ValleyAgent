@@ -208,7 +208,7 @@ public class AgentSyncBroadcaster
         {
             if (!_agentService.TryGetAgent(npcName, out var agent) || agent == null)
             {
-                _monitor.Log($"[Multiplayer] BroadcastImmediateState: agent '{npcName}' not found");
+                _monitor.Log($"[Multiplayer] BroadcastImmediateState: agent '{npcName}' not found", LogLevel.Warn);
                 return;
             }
 

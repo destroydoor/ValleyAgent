@@ -381,5 +381,5 @@ public class HostRequestHandlers
 
     /// <summary>处理 Farmhand 发来的交互请求（右键点击 NPC）。占位实现，后续 Task 填充。</summary>
     public void HandleInteractionRequest(InteractionRequestMessage msg) =>
-        _monitor.Log($"[HostRequestHandlers] HandleInteractionRequest placeholder for {msg.NpcName}");
+        _monitor.Log($"[HostRequestHandlers] HandleInteractionRequest placeholder for {msg.NpcName}", LogLevel.Trace);
 }

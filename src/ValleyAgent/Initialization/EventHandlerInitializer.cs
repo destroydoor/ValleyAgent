@@ -730,7 +730,7 @@ public class EventHandlerInitializer
 
             if (removed > 0)
             {
-                _monitor.Log($"Cleared {removed} pending decision(s) for {npcName}");
+                _monitor.Log($"Cleared {removed} pending decision(s) for {npcName}", LogLevel.Debug);
             }
 
             // 把保留的决策放回原队列
@@ -1177,7 +1177,7 @@ public class EventHandlerInitializer
 #pragma warning disable CA1031
             catch (Exception sEx)
             {
-                _monitor.Log($"Structured save data load skipped: {sEx}");
+                _monitor.Log($"Structured save data load skipped: {sEx}", LogLevel.Warn);
             }
 #pragma warning restore CA1031
 
@@ -1422,7 +1422,7 @@ public class EventHandlerInitializer
             LogLevel.Debug);
         foreach (var agent in agents)
         {
-            _monitor.Log($"  - {agent.NpcName}: {agent.StateMachine.CurrentStateFlag}");
+            _monitor.Log($"  - {agent.NpcName}: {agent.StateMachine.CurrentStateFlag}", LogLevel.Trace);
         }
 
         foreach (var agent in agents)
@@ -1872,7 +1872,7 @@ public class EventHandlerInitializer
         {
             npc.followSchedule = true;
             npc.ignoreScheduleToday = false;
-            _monitor.Log($"{e.NpcName}: vanilla release finalized — schedule flags confirmed");
+            _monitor.Log($"{e.NpcName}: vanilla release finalized — schedule flags confirmed", LogLevel.Debug);
         }
     }
 
@@ -2371,7 +2371,7 @@ public class EventHandlerInitializer
                 var decisionAge = (DateTime.UtcNow - queuedAt).TotalSeconds;
                 if (decisionAge > MaxDecisionAgeSeconds)
                 {
-                    _monitor.Log($"Decision discarded for {agent?.NpcName ?? "?"}: expired ({decisionAge:F1}s old)");
+                    _monitor.Log($"Decision discarded for {agent?.NpcName ?? "?"}: expired ({decisionAge:F1}s old)", LogLevel.Debug);
                     continue;
                 }
 
@@ -2389,7 +2389,8 @@ public class EventHandlerInitializer
                     if (!deferredAgents.Contains(safeAgent.NpcName))
                     {
                         _monitor.Log(
-                            $"Decision deferred for {safeAgent.NpcName}: state too young ({safeAgent.StateMachine.StateDuration.TotalSeconds:F1}s < {minDuration}s)");
+                            $"Decision deferred for {safeAgent.NpcName}: state too young ({safeAgent.StateMachine.StateDuration.TotalSeconds:F1}s < {minDuration}s)",
+                            LogLevel.Debug);
                         deferredAgents.Add(safeAgent.NpcName);
                         deferred.Add((safeAgent, targetState, reason, thought, queuedAt));
                     }
@@ -2403,7 +2404,8 @@ public class EventHandlerInitializer
                     && _dialogueFollowedAgents.Contains(safeAgent.NpcName))
                 {
                     _monitor.Log(
-                        $"Decision skipped for {safeAgent.NpcName}: dialogue-triggered FOLLOW guarded against {targetState}");
+                        $"Decision skipped for {safeAgent.NpcName}: dialogue-triggered FOLLOW guarded against {targetState}",
+                        LogLevel.Debug);
                     continue;
                 }
 
@@ -2430,7 +2432,8 @@ public class EventHandlerInitializer
                         {
                             targetState = AgentState.FOLLOW;
                             _monitor.Log(
-                                $"Guard fallback for {safeAgent.NpcName}: TALK→FOLLOW (friendship={friendship})");
+                                $"Guard fallback for {safeAgent.NpcName}: TALK→FOLLOW (friendship={friendship})",
+                                LogLevel.Debug);
                         }
                         else
                         {
@@ -2482,7 +2485,7 @@ public class EventHandlerInitializer
                     npc?.showTextAboveHead(thought, duration: 3000);
                 }
 
-                _monitor.Log($"Decision applied for {safeAgent.NpcName}: {targetState} | {reason}");
+                _monitor.Log($"Decision applied for {safeAgent.NpcName}: {targetState} | {reason}", LogLevel.Debug);
             }
 
             // 将延迟的决策重新入队，下一 tick 再处理
@@ -2510,7 +2513,7 @@ public class EventHandlerInitializer
                 _pendingDialogueEndDecisions = null;
                 if (dialogueEndAgents.Count > 0)
                 {
-                    _monitor.Log($"[DecisionTrigger] Processing {dialogueEndAgents.Count} dialogue-end decisions...");
+                    _monitor.Log($"[DecisionTrigger] Processing {dialogueEndAgents.Count} dialogue-end decisions...", LogLevel.Debug);
                     SafeFire(Task.Run(async () => await MakeDecisionsAsync(dialogueEndAgents).ConfigureAwait(false)),
                         "decision-batch:dialogue-end");
                 }
@@ -2528,7 +2531,7 @@ public class EventHandlerInitializer
                 _pendingTaskCompleteDecisions = null;
                 if (taskCompleteAgents.Count > 0)
                 {
-                    _monitor.Log($"[DecisionTrigger] Processing {taskCompleteAgents.Count} task-complete decisions...");
+                    _monitor.Log($"[DecisionTrigger] Processing {taskCompleteAgents.Count} task-complete decisions...", LogLevel.Debug);
                     SafeFire(Task.Run(async () => await MakeDecisionsAsync(taskCompleteAgents).ConfigureAwait(false)),
                         "decision-batch:task-complete");
                 }
@@ -2545,7 +2548,7 @@ public class EventHandlerInitializer
                 _pendingGiftEventDecisions = null;
                 if (giftEventAgents.Count > 0)
                 {
-                    _monitor.Log($"[DecisionTrigger] Processing {giftEventAgents.Count} gift-event decisions...");
+                    _monitor.Log($"[DecisionTrigger] Processing {giftEventAgents.Count} gift-event decisions...", LogLevel.Debug);
                     SafeFire(Task.Run(async () => await MakeDecisionsAsync(giftEventAgents).ConfigureAwait(false)),
                         "decision-batch:gift-event");
                 }
@@ -2577,7 +2580,7 @@ public class EventHandlerInitializer
                     agent.StateMachine.SetEmergencyEscape(true);
                     agent.StateMachine.ForceTransition(emergencyState.Value);
                     agent.StateMachine.SetEmergencyEscape(false);
-                    _monitor.Log($"{agent.NpcName} emergency switch to {emergencyState.Value}");
+                    _monitor.Log($"{agent.NpcName} emergency switch to {emergencyState.Value}", LogLevel.Warn);
                 }
 
                 if (Game1.player?.currentLocation == npc.currentLocation
@@ -2854,7 +2857,8 @@ public class EventHandlerInitializer
                     {
                         agent.StateMachine.ForceTransition(preDialogueState.Value);
                         _monitor.Log(
-                            $"Restored {_lastDialogueNpcName} to pre-dialogue state: {preDialogueState.Value}");
+                            $"Restored {_lastDialogueNpcName} to pre-dialogue state: {preDialogueState.Value}",
+                            LogLevel.Debug);
                     }
 
                     NPCDialoguePatch.ClearPreDialogueState(_lastDialogueNpcName);
@@ -2863,7 +2867,8 @@ public class EventHandlerInitializer
                     ClearPendingDecisions(_lastDialogueNpcName);
 
                     _monitor.Log(
-                        $"[DecisionTrigger] Dialogue ended with {_lastDialogueNpcName}, triggering LLM re-evaluation...");
+                        $"[DecisionTrigger] Dialogue ended with {_lastDialogueNpcName}, triggering LLM re-evaluation...",
+                        LogLevel.Debug);
                     _pendingDialogueEndDecisions ??= new List<AgentInstance>();
                     _pendingDialogueEndDecisions.Add(agent);
                 }
@@ -2987,7 +2992,8 @@ public class EventHandlerInitializer
                     // 状态机拒绝转换（如最小持续时间未满足），强制转换以避免 NPC 卡在无人地图
                     agent.StateMachine.ForceTransition(AgentState.IDLE);
                     _monitor.Log(
-                        $"[Warp] {agent.NpcName}: {currentState} → IDLE (forced, player left {e.OldLocation?.Name} → {e.NewLocation?.Name})");
+                        $"[Warp] {agent.NpcName}: {currentState} → IDLE (forced, player left {e.OldLocation?.Name} → {e.NewLocation?.Name})",
+                        LogLevel.Debug);
                 }
             }
         }
@@ -3356,7 +3362,8 @@ public class EventHandlerInitializer
                 }
 
                 _monitor.Log(
-                    $"[Emotion] {agent.NpcName}: TaskCompleted ({args.PreviousState}) → {agent.Brain.Emotion}");
+                    $"[Emotion] {agent.NpcName}: TaskCompleted ({args.PreviousState}) → {agent.Brain.Emotion}",
+                    LogLevel.Debug);
 
                 // 协作行为完成时增加好感度
                 var friendshipDelta = args.PreviousState switch
@@ -3395,13 +3402,15 @@ public class EventHandlerInitializer
                             $"TaskCompleted:{args.PreviousState}");
                         fd.Points = Math.Clamp(fsResult.NewPoints, 0, 2500);
                         _monitor.Log(
-                            $"[Friendship] {agent.NpcName}: +{friendshipDelta} ({args.PreviousState} completed) → {fd.Points}");
+                            $"[Friendship] {agent.NpcName}: +{friendshipDelta} ({args.PreviousState} completed) → {fd.Points}",
+                            LogLevel.Debug);
                     }
                     else
                     {
                         fd.Points = Math.Min(fd.Points + friendshipDelta, 2500);
                         _monitor.Log(
-                            $"[Friendship] {agent.NpcName}: +{friendshipDelta} ({args.PreviousState} completed) → {fd.Points}");
+                            $"[Friendship] {agent.NpcName}: +{friendshipDelta} ({args.PreviousState} completed) → {fd.Points}",
+                            LogLevel.Debug);
                     }
                 }
             }
@@ -3410,7 +3419,7 @@ public class EventHandlerInitializer
             {
                 agent.Brain.SyncEmotion(NpcEmotion.Tired, 0.5f, "FoughtMonsters");
                 agent.Brain.AddMemory("I was just fighting monsters. It was exhausting.", 3.0, MemoryEntryType.Combat);
-                _monitor.Log($"[Emotion] {agent.NpcName}: FoughtMonsters → {agent.Brain.Emotion}");
+                _monitor.Log($"[Emotion] {agent.NpcName}: FoughtMonsters → {agent.Brain.Emotion}", LogLevel.Debug);
 
                 // Issue 6: Fight exit cooldown — prevent immediate re-entry into FIGHT
                 // Monsters may still be "nearby" in scan results but handler already found none reachable
@@ -3423,7 +3432,8 @@ public class EventHandlerInitializer
                     && _tickCounter - lastTick < _config!.TaskCompleteDecisionCooldownTicks)
                 {
                     _monitor.Log(
-                        $"[DecisionTrigger] Skipped task-complete for {agent.NpcName} — cooldown active ({_tickCounter - lastTick}/{_config.TaskCompleteDecisionCooldownTicks} ticks)");
+                        $"[DecisionTrigger] Skipped task-complete for {agent.NpcName} — cooldown active ({_tickCounter - lastTick}/{_config.TaskCompleteDecisionCooldownTicks} ticks)",
+                        LogLevel.Debug);
                     return;
                 }
 
@@ -3437,7 +3447,8 @@ public class EventHandlerInitializer
                 agent.LastDecisionState = args.PreviousState.ToString();
                 agent.LastDecisionReason = $"Just completed {args.PreviousState.ToString().ToLower()}";
                 _monitor.Log(
-                    $"[DecisionTrigger] Task complete for {agent.NpcName} ({args.PreviousState}→IDLE), queued for re-evaluation");
+                    $"[DecisionTrigger] Task complete for {agent.NpcName} ({args.PreviousState}→IDLE), queued for re-evaluation",
+                    LogLevel.Debug);
             }
         };
 
@@ -3822,7 +3833,8 @@ public class EventHandlerInitializer
         else
         {
             _monitor.Log(
-                $"Same-state rule decision for {agent.NpcName}: staying in {result.TargetState} | {result.Reason}");
+                $"Same-state rule decision for {agent.NpcName}: staying in {result.TargetState} | {result.Reason}",
+                LogLevel.Debug);
         }
 
         // ApplyRuleDecision 仅在 MakeDecisionsAsync 内（_agentService 已 null 检查）调用，

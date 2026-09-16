@@ -48,7 +48,7 @@ public static class StateFeasibility
                 // 排除已知非农场户外位置（即使有 HoeDirt 也不行）
                 if (IsKnownNonFarmOutdoors(locName))
                 {
-                    monitor?.Log($"StateFeasibility: {npc.Name} cannot FARM at '{locName}'");
+                    monitor?.Log($"StateFeasibility: {npc.Name} cannot FARM at '{locName}'", LogLevel.Debug);
                     return false;
                 }
 
@@ -58,7 +58,7 @@ public static class StateFeasibility
                     return true;
                 }
 
-                monitor?.Log($"StateFeasibility: {npc.Name} cannot FARM at '{locName}'");
+                monitor?.Log($"StateFeasibility: {npc.Name} cannot FARM at '{locName}'", LogLevel.Debug);
                 return false;
 
             case AgentState.MINE:
@@ -78,7 +78,7 @@ public static class StateFeasibility
                     return true;
                 }
 
-                monitor?.Log($"StateFeasibility: {npc.Name} cannot MINE at '{locName}'");
+                monitor?.Log($"StateFeasibility: {npc.Name} cannot MINE at '{locName}'", LogLevel.Debug);
                 return false;
 
             case AgentState.FORAGE:
@@ -97,7 +97,7 @@ public static class StateFeasibility
                     return true;
                 }
 
-                monitor?.Log($"StateFeasibility: {npc.Name} cannot FORAGE at '{locName}'");
+                monitor?.Log($"StateFeasibility: {npc.Name} cannot FORAGE at '{locName}'", LogLevel.Debug);
                 return false;
 
             case AgentState.FIGHT:
@@ -106,7 +106,7 @@ public static class StateFeasibility
                     return true;
                 }
 
-                monitor?.Log($"StateFeasibility: {npc.Name} cannot FIGHT at '{locName}' — no monsters");
+                monitor?.Log($"StateFeasibility: {npc.Name} cannot FIGHT at '{locName}' — no monsters", LogLevel.Debug);
                 return false;
 
             case AgentState.TALK:
@@ -115,7 +115,7 @@ public static class StateFeasibility
                     return true;
                 }
 
-                monitor?.Log($"StateFeasibility: {npc.Name} cannot TALK at '{locName}' — player elsewhere");
+                monitor?.Log($"StateFeasibility: {npc.Name} cannot TALK at '{locName}' — player elsewhere", LogLevel.Debug);
                 return false;
 
             // 这些状态始终有效

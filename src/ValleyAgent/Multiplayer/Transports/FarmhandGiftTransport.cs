@@ -109,7 +109,8 @@ public class FarmhandGiftTransport : IGiftTransport
             else
             {
                 _monitor.Log(
-                    $"[FarmhandGiftTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending, dropping late response");
+                    $"[FarmhandGiftTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending, dropping late response",
+                    LogLevel.Warn);
             }
 
             return;
@@ -119,7 +120,7 @@ public class FarmhandGiftTransport : IGiftTransport
             _pending.Keys.FirstOrDefault(k => k.StartsWith(msg.NpcName + "_", StringComparison.OrdinalIgnoreCase));
         if (matchingKey == null)
         {
-            _monitor.Log($"[FarmhandGiftTransport] No pending request for {msg.NpcName}, dropping response");
+            _monitor.Log($"[FarmhandGiftTransport] No pending request for {msg.NpcName}, dropping response", LogLevel.Warn);
             return;
         }
 

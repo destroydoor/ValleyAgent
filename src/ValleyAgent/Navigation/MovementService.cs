@@ -774,7 +774,7 @@ public class MovementService : IMovementService
         _ => _lastShortRangeCreation
     };
 
-    private void LogDebug(string npcName, string message) => _monitor?.Log($"[MovementService] {npcName}: {message}");
+    private void LogDebug(string npcName, string message) => _monitor?.Log($"[MovementService] {npcName}: {message}", LogLevel.Debug);
 
     /// <summary>
     ///     递增连续NoPathFound计数。达到阈值时自动触发熔断：清除失败缓存并重置计数。

@@ -262,7 +262,7 @@ public static class ChatBarRouter
             // 沉默权预过滤（零 token）：纯标点/符号/表情不算对话。
             if (ChatRouteResolver.IsTrivialNonDialogue(text))
             {
-                _monitor?.Log($"[ChatBar] Dropped trivial message: {text}");
+                _monitor?.Log($"[ChatBar] Dropped trivial message: {text}", LogLevel.Warn);
                 return;
             }
 
