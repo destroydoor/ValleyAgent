@@ -6,6 +6,7 @@ using StardewValley;
 using ValleyAgent.Brain;
 using ValleyAgent.Config;
 using ValleyAgent.Goals;
+using ValleyAgent.Infrastructure;
 using ValleyAgent.Navigation;
 using ValleyAgent.Services;
 using ValleyAgent.StateMachine;
@@ -163,8 +164,30 @@ public class AgentTickLoop
 
     /// <summary>
     ///     Process a single agent for one tick.
+    ///     issue #24：per-agent 泵隔离——单个 agent 的 tick 异常只跳过该 agent 本 tick
+    ///     （返回 Skip：不应用控制器、不推进状态链，下一 tick 重试），不传染同批其余 agent。
     /// </summary>
     public ProcessResult ProcessAgent(AgentInstance agent, string? lastDialogueNpcName)
+    {
+        try
+        {
+            return ProcessAgentCore(agent, lastDialogueNpcName);
+        }
+        catch (Exception ex)
+        {
+            // 节流：确定性故障每 tick 重演时收敛为 5s 一条；全栈落盘归因到 npcName
+            if (QueueTelemetry.ShouldWarn($"safeseg:process-agent:{agent.NpcName}"))
+            {
+                _monitor.Log($"[SafeRun] ProcessAgent failed for {agent.NpcName} — skip this tick: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("SafeRun", $"ProcessAgent failed for {agent.NpcName}", ex);
+            }
+
+            return ProcessResult.Skip;
+        }
+    }
+
+    private ProcessResult ProcessAgentCore(AgentInstance agent, string? lastDialogueNpcName)
     {
         var npc = Game1.getCharacterFromName(agent.NpcName);
         if (npc == null)

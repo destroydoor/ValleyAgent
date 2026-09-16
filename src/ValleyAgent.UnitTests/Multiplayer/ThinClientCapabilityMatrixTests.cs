@@ -64,14 +64,15 @@ public class ThinClientCapabilityMatrixTests
     public void Host_UpdateTicked_DrainsAllMainThreadQueues()
     {
         var src = ReadSource("src", "ValleyAgent", "Initialization", "EventHandlerInitializer.cs");
-        // 2026-09-13 死锁专项：泵改为逐泵隔离形态（Pump 助手，每泵独立 try/catch）——
+        // 2026-09-13 死锁专项：泵改为逐泵隔离形态（每泵独立兜底）——
         // 单个泵抛异常不得跳过下游泵（下游含房客唯一的 ModMessage 发送泵）。
-        // 断言锁定 Pump 包裹形态：退回裸调用/共用一个 try 的旧写法会在这里红。
-        Assert.Contains("Pump(\"gift-actions\", NPCGiftPatch.ProcessMainThreadActions)", src);
-        Assert.Contains("Pump(\"dialogue-replies\", DialogueBoxInputPatch.ProcessPendingReplies)", src);
-        Assert.Contains("Pump(\"host-request-mainthread\", Multiplayer.HostRequestHandlers.ProcessMainThreadActions)", src);
+        // issue #24（2026-09-16）：Pump 助手升级为 SafeRun（EventGuard 分段守卫，补节流+落盘），
+        // 逐泵隔离契约不变。断言锁定 SafeRun 包裹形态：退回裸调用/共用一个 try 的旧写法会在这里红。
+        Assert.Contains("SafeRun(\"gift-actions\", NPCGiftPatch.ProcessMainThreadActions)", src);
+        Assert.Contains("SafeRun(\"dialogue-replies\", DialogueBoxInputPatch.ProcessPendingReplies)", src);
+        Assert.Contains("SafeRun(\"host-request-mainthread\", Multiplayer.HostRequestHandlers.ProcessMainThreadActions)", src);
         // 陈旧等待自愈泵：回包与超时兜底双双丢失时强制解锁输入框，必须每 tick 被驱动
-        Assert.Contains("Pump(\"dialogue-stale-wait\", DialogueBoxInputPatch.ResetStaleWait)", src);
+        Assert.Contains("SafeRun(\"dialogue-stale-wait\", DialogueBoxInputPatch.ResetStaleWait)", src);
     }
 
     /// <summary>

@@ -88,7 +88,9 @@ public class AgentBodyPoolWiringTests
     public void TimeChanged_DrivesIdleReclaimEveryTick()
     {
         var src = ReadSource("src", "ValleyAgent", "Initialization", "EventHandlerInitializer.cs");
-        var timeChanged = Normalize(ExtractMethodBody(src, "OnTimeChanged(object? sender, TimeChangedEventArgs e)"));
+        // issue #24（2026-09-16）：OnTimeChanged 拆 wrapper（try/catch 守卫）+ OnTimeChangedCore，
+        // 空闲回收编排移入 Core——断言跟随抽取，锁定"时间跳驱动回收"的契约不变。
+        var timeChanged = Normalize(ExtractMethodBody(src, "private void OnTimeChangedCore(TimeChangedEventArgs e)"));
 
         // 每个时间跳（游戏内 10 分钟）调一次空闲回收编排；换日处的 ReevaluateAllocations 保留不动。
         Assert.Contains("RunIdleAllocationReclaim();", timeChanged);

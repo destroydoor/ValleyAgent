@@ -127,14 +127,29 @@ public sealed class MainThreadWatchdog
 
     private void WatchLoop()
     {
+        // issue #24：.NET 后台线程未处理异常 = 整个游戏进程终止——看门狗线程绝不能让异常逃出。
+        // 单轮检查失败只跳过该轮（250ms 后重试）；确定性故障经 QueueTelemetry 节流，
+        // 防 error.log 被每 250ms 一条的重复异常撑爆（5MB 轮转也会被刷穿）。
         while (true)
         {
-            Thread.Sleep(PollIntervalMs);
+            try
+            {
+                Thread.Sleep(PollIntervalMs);
 
-            CheckMainThreadStall();
+                CheckMainThreadStall();
 
-            // 同一线程顺带轮询后台操作停滞：候选 2/3 是后台死循环，主线程可能仍在正常 tick
-            PollStuckOperations();
+                // 同一线程顺带轮询后台操作停滞：候选 2/3 是后台死循环，主线程可能仍在正常 tick
+                PollStuckOperations();
+            }
+            catch (Exception ex)
+            {
+                if (QueueTelemetry.ShouldWarn("safeseg:watchdog-loop"))
+                {
+                    // 留痕优先 ModErrorLog（SMAPI 日志缓冲在异常现场可能不落盘），Monitor 随后
+                    ModErrorLog.LogError("Watchdog", "WatchLoop iteration failed — continuing", ex);
+                    _monitor.Log($"[Watchdog] WatchLoop iteration failed — continuing: {ex}", LogLevel.Error);
+                }
+            }
         }
     }
 

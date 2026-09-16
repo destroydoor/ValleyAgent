@@ -8,7 +8,11 @@ namespace ValleyAgent.UnitTests;
 ///     QueueTelemetry 节流（ShouldWarn）、StuckOperationTracker 停滞上报（TakeNewlyStalled）。
 ///     三者均为可注入时钟的纯逻辑；静态状态必须 try/finally 还原（ResetForTests），
 ///     且全部集中在本类（xUnit 同类串行，避免静态状态跨类竞态）。
+///     issue #24（2026-09-16）：EventGuardTests 也触达同一批静态单例（SafeRun 节流 /
+///     SafeFireAndForget 的 StuckOp），两类入同一 Collection 串行——DescribeRunning==="none"
+///     是进程级断言，并行下会被在途 op 打破（实测 flaky）。
 /// </summary>
+[Collection("StaticTelemetryState")]
 public class InfrastructureTelemetryTests
 {
     [Fact]

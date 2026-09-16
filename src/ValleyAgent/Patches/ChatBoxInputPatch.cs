@@ -4,6 +4,7 @@ using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
 using ValleyAgent.Chat;
+using ValleyAgent.Infrastructure;
 
 namespace ValleyAgent.Patches;
 
@@ -23,16 +24,13 @@ public static class ChatBoxInputPatch
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(ChatBox.receiveChatMessage))]
-    public static void ReceiveChatMessagePrefix(
-        long sourceFarmer,
-        int chatKind,
-        LocalizedContentManager.LanguageCode language,
-        string message)
+    public static void ReceiveChatMessagePrefix(long sourceFarmer, int chatKind, LocalizedContentManager.LanguageCode language, string message)
     {
-        _ = language; // 语言仅影响原版显示，路由不关心
-
+        // issue #24：try 必须是首条语句——本前缀注入原版聊天提交调用栈，SMAPI 事件兜底覆盖不到。
         try
         {
+            _ = language; // 语言仅影响原版显示，路由不关心
+
             // 只路由本地玩家自己提交的普通聊天：远程消息（sourceFarmer != 本地）
             // 与私聊/系统信息（chatKind != 0）都不属于"玩家对在场 NPC 说话"。
             if (Game1.player == null
@@ -47,7 +45,14 @@ public static class ChatBoxInputPatch
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[ChatBox] Chat routing failed: {ex.Message}", LogLevel.Error);
+            // 回落语义（Prefix 返回 void）：路由失败即本条消息不做 AI 路由，
+            // 原版聊天显示/广播不受影响（原版逻辑在原方法里，Prefix 异常不再外抛）。
+            if (QueueTelemetry.ShouldWarn("harmony:ChatBoxInputPatch.ReceiveChatMessagePrefix"))
+            {
+                _monitor?.Log($"[ChatBox] Chat routing failed — skip AI routing, vanilla chat unaffected: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "ChatBoxInputPatch.ReceiveChatMessagePrefix failed", ex);
+            }
         }
     }
 }
