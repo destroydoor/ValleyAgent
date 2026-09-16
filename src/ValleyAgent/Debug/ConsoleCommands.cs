@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ValleyAgent.Agents;
 using ValleyAgent.Config;
+using ValleyAgent.Infrastructure;
 using ValleyAgent.Resilience;
 
 namespace ValleyAgent.Debug;
@@ -277,29 +278,41 @@ public class ConsoleCommands
 
     private CommandResult HandleStatus(string[] args)
     {
+        var sb = new StringBuilder();
+
         if (_agentManager == null)
         {
-            return CommandResult.Fail("AgentAllocationManager not available.");
+            _ = sb.AppendLine("AgentAllocationManager not available.");
+        }
+        else
+        {
+            var agents = _agentManager.GetAllAllocatedAgents();
+            if (agents.Count == 0)
+            {
+                _ = sb.AppendLine("No Agents currently allocated.");
+            }
+            else
+            {
+                _ = sb.AppendLine(
+                    $"=== Allocated Agents ({agents.Count} | range [{_agentManager.MinAgents}, {_agentManager.MaxAgents}]) ===");
+
+                foreach (var agent in agents)
+                {
+                    _ = sb.AppendLine($"  [{agent.NpcName}]");
+                    _ = sb.AppendLine($"    State: {agent.CurrentState}");
+                    _ = sb.AppendLine($"    Manual: {agent.IsManuallyOverridden}");
+                    _ = sb.AppendLine($"    Priority: {agent.PriorityScore:F2}");
+                    _ = sb.AppendLine($"    Friendship: {agent.FriendshipLevel:F0}");
+                    _ = sb.AppendLine($"    Last Updated: {agent.LastUpdated:HH:mm:ss UTC}");
+                }
+            }
         }
 
-        var agents = _agentManager.GetAllAllocatedAgents();
-        if (agents.Count == 0)
+        // issue #25：降级项在 status 一屏可见（初始化分段失败 / Harmony 补丁回退 / 整体降级）。
+        _ = sb.AppendLine($"=== Degraded features: {(DegradedFeatures.Any ? "" : "none")} ===");
+        if (DegradedFeatures.Any)
         {
-            return CommandResult.Ok("No Agents currently allocated.");
-        }
-
-        var sb = new StringBuilder();
-        _ = sb.AppendLine(
-            $"=== Allocated Agents ({agents.Count} | range [{_agentManager.MinAgents}, {_agentManager.MaxAgents}]) ===");
-
-        foreach (var agent in agents)
-        {
-            _ = sb.AppendLine($"  [{agent.NpcName}]");
-            _ = sb.AppendLine($"    State: {agent.CurrentState}");
-            _ = sb.AppendLine($"    Manual: {agent.IsManuallyOverridden}");
-            _ = sb.AppendLine($"    Priority: {agent.PriorityScore:F2}");
-            _ = sb.AppendLine($"    Friendship: {agent.FriendshipLevel:F0}");
-            _ = sb.AppendLine($"    Last Updated: {agent.LastUpdated:HH:mm:ss UTC}");
+            _ = sb.AppendLine(DegradedFeatures.Describe());
         }
 
         return CommandResult.Ok(sb.ToString().TrimEnd());

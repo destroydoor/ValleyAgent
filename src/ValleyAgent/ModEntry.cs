@@ -307,8 +307,40 @@ public class ModEntry : Mod
         }
         catch (Exception ex)
         {
-            Monitor.Log($"Failed to initialize ValleyAgent: {ex.Message}", LogLevel.Error);
-            throw;
+            // issue #25（异常处理审计 PR3）：初始化失败不再 rethrow——异常逃进 SMAPI 存档加载
+            // 流程会中断进档，此前只打 ex.Message 丢栈、且无任何降级标记（半初始化容器 +
+            // 玩家侧"AI 全无"无解释）。现在落降级模式：原版体验保留 + 全栈留痕 + 玩家可读提示
+            // + DegradedFeatures 登记（ValleyAgent_status / ValleyAgent_diag 可查）。
+            // 降级为终态（_initialized 置 true 不重试）：在半初始化容器上重跑完整初始化
+            // 会二次叠加部分事件订阅/静态注入，比降级更危险；重进存档或重启游戏可重试。
+            _initialized = true;
+            DegradedFeatures.Report(
+                "mod-initialize",
+                $"初始化失败，本会话降级为原版体验: {ex.GetType().Name}: {ex.Message}",
+                ex);
+            Monitor.Log(
+                $"Failed to initialize ValleyAgent — entering degraded mode (vanilla experience preserved): {ex}",
+                LogLevel.Error);
+            ModErrorLog.LogError("Init", "OnSaveLoadedInitialize failed — degraded mode", ex);
+            NotifyDegradedMode();
+        }
+    }
+
+    /// <summary>
+    ///     降级模式的玩家可读提示：聊天栏一行灰字（不弹窗、不打断进档流程）。
+    ///     提示自身失败只 Trace 留痕——通知是锦上添花，不能反过来把进档流程再炸一次。
+    /// </summary>
+    private void NotifyDegradedMode()
+    {
+        try
+        {
+            Game1.chatBox?.addMessage(
+                "ValleyAgent 部分功能未能启动，已回退原版体验（详见 ValleyAgent-error.log，ValleyAgent_status 可查降级项）",
+                Microsoft.Xna.Framework.Color.Gray);
+        }
+        catch (Exception ex)
+        {
+            Monitor.Log($"[Init] degraded-mode notify failed: {ex}", LogLevel.Trace);
         }
     }
 
