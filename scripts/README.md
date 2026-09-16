@@ -121,11 +121,33 @@ since filenames encode timestamps and test type.
 ```
 === Test Report ===
 [Phase 1] Cleanup         [PASS]
-[Phase 2] Greeting         [PASS]
+[Phase 2] Greeting        [PASS]
 ...
 === End of Report ===
 Passed: 23/32
 ```
+
+## Dead Assertion Check (post-run local tool)
+
+`scripts/check-dead-assertions.mjs` (alias `bun run check:test-dead` in `server/`)
+scans `logs/test_results/**/*_assertions.json` and reports assertions that have
+never failed (candidate dead assertions).
+
+**Prerequisite**: `logs/test_results/` is written by the in-game test runner
+(TestMod) and is gitignored — it does not exist on a clean clone, so the tool
+fails with "结果目录不存在" until you run a game test round first
+(`scripts\test\run-tests.ps1` or `scripts\test\test-game.ps1`); each round
+writes assertion JSONs under `logs/test_results/<timestamp>/`.
+
+```bash
+node scripts/check-dead-assertions.mjs    # from repo root
+# or: cd server && bun run check:test-dead
+```
+
+Exit codes: 0 = no candidates; 1 = high-risk candidates found; 2 = results
+directory missing / no assertion JSONs (a self-explanatory error is printed).
+This is a post-run local check, not CI-able (the input directory never enters
+git). See `scripts/TEST_README.md` for the full test workflow.
 
 ## Environment Variables
 
