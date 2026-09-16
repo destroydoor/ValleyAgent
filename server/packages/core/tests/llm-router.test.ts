@@ -139,9 +139,9 @@ describe("LlmRouter 备用链（fallbacks）", () => {
     const router = new LlmRouter(makeChainedConfig());
     const chain = router.getProviderFallbacks("npc");
     expect(chain).toHaveLength(3);
-    expect(chain[0].config.model).toBe("sensenova-6.8-flash-lite");
-    expect(chain[1].config.model).toBe("deepseek-flash");
-    expect(chain[2].config.model).toBe("MiniMax-M2.7-highspeed");
+    expect(chain[0]!.config.model).toBe("sensenova-6.8-flash-lite");
+    expect(chain[1]!.config.model).toBe("deepseek-flash");
+    expect(chain[2]!.config.model).toBe("MiniMax-M2.7-highspeed");
     // getProviderFallback 语义不变：返回第一级备用
     expect(router.getProviderFallback("npc")!.config.model).toBe("sensenova-6.8-flash-lite");
   });
@@ -155,9 +155,9 @@ describe("LlmRouter 备用链（fallbacks）", () => {
     });
     router.getProvider("npc")._setCallOverride(spy("primary", false) as any);
     const chain = router.getProviderFallbacks("npc");
-    chain[0]._setCallOverride(spy("fb1", false) as any);
-    chain[1]._setCallOverride(spy("fb2", true) as any);
-    chain[2]._setCallOverride(spy("fb3", true) as any);
+    chain[0]!._setCallOverride(spy("fb1", false) as any);
+    chain[1]!._setCallOverride(spy("fb2", true) as any);
+    chain[2]!._setCallOverride(spy("fb3", true) as any);
 
     const result = await router.chatCompletion("npc", []);
     expect(result.content).toBe("fb2");
@@ -179,10 +179,10 @@ describe("LlmRouter 备用链（fallbacks）", () => {
       mock(() => Promise.reject(new LLMBillingError("402"))) as any,
     );
     const chain = router.getProviderFallbacks("npc");
-    chain[0]._setCallOverride(mock(() => Promise.reject(new LLMUnavailableError("500"))) as any);
+    chain[0]!._setCallOverride(mock(() => Promise.reject(new LLMUnavailableError("500"))) as any);
     const lastSpy = mock(() => Promise.resolve({ content: "fb3", usage: {} }));
-    chain[1]._setCallOverride(lastSpy as any);
-    chain[2]._setCallOverride(lastSpy as any);
+    chain[1]!._setCallOverride(lastSpy as any);
+    chain[2]!._setCallOverride(lastSpy as any);
 
     await expect(router.chatCompletion("npc", [])).rejects.toThrow(LLMUnavailableError);
     expect(lastSpy).toHaveBeenCalledTimes(0);
