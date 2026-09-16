@@ -289,7 +289,7 @@ public static class ChatBarRouter
                 GroupResponseMax = _config.ChatGroupResponseMax,
                 Talkativeness = GetTalkativeness
             };
-            var route = ChatRouteResolver.Resolve(text, sessionNpc, present, options);
+            var route = ChatRouteResolver.Resolve(text, sessionNpc, present, options, monitor: _monitor);
             if (route == null)
             {
                 return;

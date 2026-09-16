@@ -69,8 +69,10 @@ public class HostGiftTransport : IGiftTransport
             {
                 giftTaste = npc.getGiftTasteForThisItem(item);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
+                // 好感口味查询失败（NPC 数据未就绪等）→ 默认中性 4，送礼流程继续
+                _monitor?.Log($"[HostGiftTransport] gift taste lookup failed for '{itemId}' — defaulting to neutral(4): {ex}", LogLevel.Debug);
                 giftTaste = 4;
             }
 

@@ -38,11 +38,14 @@ public class SaveDataManager
 
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly object _lock = new();
+    private readonly Action<string, Exception>? _onCorruptSave;
 
     /// <summary>
     ///     Creates a new SaveDataManager with default JSON options.
+    ///     <paramref name="onCorruptSave"/>：可选的损坏存档留痕钩子（宿主注入，本类保持
+    ///     game-agnostic 不直接依赖 SMAPI）。存档 JSON 损坏回退默认数据时以 (message, ex) 调用。
     /// </summary>
-    public SaveDataManager()
+    public SaveDataManager(Action<string, Exception>? onCorruptSave = null)
     {
         _jsonOptions = new JsonSerializerOptions
         {
@@ -53,6 +56,7 @@ public class SaveDataManager
             ReadCommentHandling = JsonCommentHandling.Skip
         };
         _jsonOptions.Converters.Add(new JsonStringEnumConverter());
+        _onCorruptSave = onCorruptSave;
     }
 
     /// <summary>
@@ -98,9 +102,14 @@ public class SaveDataManager
             {
                 data = JsonSerializer.Deserialize<SaveData>(json, _jsonOptions);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
-                // Invalid JSON - return defaults rather than failing
+                // issue #26 批③：存档 JSON 损坏 → 回退默认数据（进度等效重置）。返回值无法区分
+                // "无存档"与"存档损坏"，必须留痕；SMAPI 托管存储无法对坏数据改名隔离，
+                // 故带原文预览交宿主日志，让"进度归零"可归因。
+                _onCorruptSave?.Invoke(
+                    $"save JSON invalid — falling back to default save data (session progress reset). preview: {TruncateForLog(json)}",
+                    ex);
                 return CreateDefaultSaveData();
             }
 
@@ -122,6 +131,8 @@ public class SaveDataManager
             return data;
         }
     }
+
+    private static string TruncateForLog(string s) => s.Length <= 300 ? s : s[..300] + "…";
 
     /// <summary>
     ///     Migrates a V1 save data object to V2 format.

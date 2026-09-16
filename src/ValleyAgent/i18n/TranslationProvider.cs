@@ -31,6 +31,7 @@ public class TranslationProvider : ITranslationProvider
 
     private readonly ConcurrentDictionary<string, string> _defaultTranslations;
     private ConcurrentDictionary<string, string> _currentTranslations;
+    private readonly Action<string, Exception>? _onCorruptResource;
 
     /// <summary>
     ///     Creates a new
@@ -38,9 +39,10 @@ public class TranslationProvider : ITranslationProvider
     ///         Falls back to the default language if the requested language resource is not found.
     /// </summary>
     /// <param name="language">Language code, e.g. "default" or "zh".</param>
-    public TranslationProvider(string language = DefaultLanguage)
+    public TranslationProvider(string language = DefaultLanguage, Action<string, Exception>? onCorruptResource = null)
     {
-        _defaultTranslations = LoadTranslations(DefaultLanguage);
+        _onCorruptResource = onCorruptResource;
+        _defaultTranslations = LoadTranslations(DefaultLanguage, onCorruptResource);
         CurrentLanguage = DefaultLanguage;
         _currentTranslations = _defaultTranslations;
 
@@ -127,7 +129,7 @@ public class TranslationProvider : ITranslationProvider
             return true;
         }
 
-        var loaded = LoadTranslations(normalized);
+        var loaded = LoadTranslations(normalized, _onCorruptResource);
         if (loaded == null || loaded.IsEmpty)
         {
             // Resource not found or empty 鈥?stay on current language
@@ -147,7 +149,9 @@ public class TranslationProvider : ITranslationProvider
     ///     Loads a translation dictionary from an embedded JSON resource.
     ///     Returns an empty dictionary if the resource is not found or parsing fails.
     /// </summary>
-    private static ConcurrentDictionary<string, string> LoadTranslations(string language)
+    private static ConcurrentDictionary<string, string> LoadTranslations(
+        string language,
+        Action<string, Exception>? onCorruptResource)
     {
         var result = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -174,9 +178,11 @@ public class TranslationProvider : ITranslationProvider
                 }
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // Swallow parse errors and return empty dictionary
+            // issue #26 批③：内嵌翻译资源损坏属构建/打包缺陷——全部文案将回退为 key 本身。
+            // 资源烧在程序集里无法改名隔离，Error 留痕定位坏掉的语言资源。
+            onCorruptResource?.Invoke($"translation resource '{ResourcePrefix}.{language}.json' is corrupt — all strings fall back to keys", ex);
         }
 
         return result;

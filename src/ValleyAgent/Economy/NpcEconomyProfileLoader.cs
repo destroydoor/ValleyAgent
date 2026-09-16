@@ -4,12 +4,14 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StardewModdingAPI;
+using ValleyAgent.Infrastructure;
 
 namespace ValleyAgent.Economy;
 
 /// <summary>
 ///     NPC 经济档案装载器（E3-1）。镜像 MemoryRuleLoader 的容错契约：
-///     - 从 mod 目录读 JSON（默认 Data/npc_economy.json），IOException/JsonException → 空表不抛；
+///     - 从 mod 目录读 JSON（默认 Data/npc_economy.json），IOException/JsonException → 空表不抛
+///       （JSON 损坏时坏文件隔离改名 .corrupt-&lt;ts&gt; + Error 留痕，issue #26 批③）；
 ///     - 按 NPC 名缓存（StringComparer.OrdinalIgnoreCase），未知 NPC 返回 null；
 ///     - 装载时钳制数值（Savvy/Talkativeness ∈ [0,1]，InitialMoney/DailyWage ≥ 0），
 ///     BudgetTier 枚举解析失败回退 Normal。
@@ -24,6 +26,13 @@ public sealed class NpcEconomyProfileLoader
 
     private readonly Dictionary<string, NpcEconomyProfile> _profiles =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IMonitor? _monitor;
+
+    public NpcEconomyProfileLoader(IMonitor? monitor = null)
+    {
+        _monitor = monitor;
+    }
 
     static NpcEconomyProfileLoader()
     {
@@ -55,7 +64,7 @@ public sealed class NpcEconomyProfileLoader
     }
 
     /// <summary>
-    ///     从指定路径装载档案（单元测试直接喂临时文件）。失败静默清空。
+    ///     从指定路径装载档案（单元测试直接喂临时文件）。失败降级空表并留痕；JSON 损坏时隔离改名。
     /// </summary>
     public void LoadFromFile(string jsonPath)
     {
@@ -93,13 +102,18 @@ public sealed class NpcEconomyProfileLoader
                     entry.PurchaseItems ?? new List<string>());
             }
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            _profiles.Clear();
+            // 读失败（文件锁/权限）≠ 已损坏：不隔离，Error 留痕 + 本次降级空表
+            _monitor?.Log($"[NpcEconomyProfileLoader] economy profile unreadable — using empty table: {jsonPath}: {ex}", LogLevel.Error);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            _profiles.Clear();
+            // 解析失败 = 文件已损坏：隔离改名（可取回原始字节），不再静默清空整张经济表
+            var quarantined = CorruptFileQuarantine.TryQuarantine(jsonPath);
+            _monitor?.Log(
+                $"[NpcEconomyProfileLoader] economy profile JSON corrupt — quarantined: '{jsonPath}' → '{quarantined ?? "(rename failed, file left in place)"}'; using empty table: {ex}",
+                LogLevel.Error);
         }
     }
 

@@ -222,8 +222,10 @@ public static class NPCGiftPatch
                 {
                     giftTasteOnly = __instance.getGiftTasteForThisItem(item);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex)
                 {
+                    // 好感口味查询失败 → 默认中性 4，只消耗物品不变好感度的流程继续
+                    Monitor?.Log($"[Gift] gift taste lookup failed — defaulting to neutral(4): {ex}", LogLevel.Debug);
                     giftTasteOnly = 4;
                 }
 

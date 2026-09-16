@@ -197,7 +197,8 @@ public class ServiceInitializer
             return;
         }
 
-        var translation = new TranslationProvider();
+        var translation = new TranslationProvider(onCorruptResource: (message, exception) =>
+            _monitor.Log($"[TranslationProvider] {message}: {exception}", LogLevel.Error));
         _container.RegisterSingleton<ITranslationProvider>(translation);
         _container.RegisterSingleton(translation);
         _translation = translation;
@@ -362,7 +363,7 @@ public class ServiceInitializer
         var agentService = _agentService!;
 
         // E3-1: NPC 经济档案装载器——CreateAgent 时按 NPC 查初始资金回填钱包
-        var economyProfileLoader = new NpcEconomyProfileLoader();
+        var economyProfileLoader = new NpcEconomyProfileLoader(_monitor);
         if (config.Economy.Enabled)
         {
             economyProfileLoader.Load(_helper, config.Economy.DataFile);
@@ -388,7 +389,7 @@ public class ServiceInitializer
         agentService.EconomyProfiles = economyProfileLoader;
 
         // 阶段 3 (3.2.1): NPC 人设配置装载器——DirectorContextBuilder 拼装人设摘要、DirectorTools 约束人设
-        var npcConfigLoader = new NpcConfigLoader();
+        var npcConfigLoader = new NpcConfigLoader(_monitor);
         npcConfigLoader.LoadFromDirectory(_helper, "npc-configs");
         if (npcConfigLoader.Count > 0)
         {
@@ -525,7 +526,8 @@ public class ServiceInitializer
         var monsterAggroManager = new MonsterAggroManager(_monitor);
         _container.RegisterSingleton(monsterAggroManager);
 
-        var saveDataManager = new SaveDataManager();
+        var saveDataManager = new SaveDataManager((message, exception) =>
+            _monitor.Log($"[SaveDataManager] {message}: {exception}", LogLevel.Error));
         _container.RegisterSingleton(saveDataManager);
 
         // E5-1: NPC 作息表查询服务（数据层）。晨间喊话 E5-2 稍后从此服务取作息，此处只注册不接线。
