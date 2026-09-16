@@ -73,6 +73,11 @@ namespace ValleyAgent.WebSocket
                 ?? throw new InvalidOperationException("Failed to deserialize DialogueResponse.");
         }
 
+        /// <summary>
+        ///     error 帧检测（issue #22）。兼容三代 TS 服务器：新协议发 message+code（+可选
+        ///     requestId），老 TS 只发 message，更老版本只填 error 字段。code/requestId 一并
+        ///     拼进异常消息，保证崩溃可归因，而不是退化成"Unknown error"或 120s 盲等。
+        /// </summary>
         private static void CheckErrorResponse(string response)
         {
             using var doc = System.Text.Json.JsonDocument.Parse(response);
@@ -80,8 +85,41 @@ namespace ValleyAgent.WebSocket
             var type = root.TryGetProperty("type", out var t) ? t.GetString() : "";
             if (type == "error")
             {
-                var error = root.TryGetProperty("error", out var e) ? e.GetString() : "Unknown error";
-                throw new InvalidOperationException($"Server error: {error}");
+                string detail = "Unknown error";
+                if (root.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == JsonValueKind.String)
+                {
+                    detail = msgProp.GetString() ?? "Unknown error";
+                }
+                else if (root.TryGetProperty("error", out var errProp) && errProp.ValueKind == JsonValueKind.String)
+                {
+                    // 老 TS 服务器用 error 字段承载详情
+                    detail = errProp.GetString() ?? "Unknown error";
+                }
+
+                string? code = null;
+                if (root.TryGetProperty("code", out var codeProp) && codeProp.ValueKind == JsonValueKind.String)
+                {
+                    code = codeProp.GetString();
+                }
+
+                string? requestId = null;
+                if (root.TryGetProperty("requestId", out var reqProp) && reqProp.ValueKind == JsonValueKind.String)
+                {
+                    requestId = reqProp.GetString();
+                }
+
+                var attribution = $"Server error: {detail}";
+                if (!string.IsNullOrEmpty(code))
+                {
+                    attribution += $" [code={code}]";
+                }
+
+                if (!string.IsNullOrEmpty(requestId))
+                {
+                    attribution += $" [requestId={requestId}]";
+                }
+
+                throw new InvalidOperationException(attribution);
             }
         }
 
