@@ -66,7 +66,6 @@
   "CS-SILENT-CATCH|src/ValleyAgent/Chat/ShoutReplyScheduler.cs": 1,
   "CS-SILENT-CATCH|src/ValleyAgent/Commands/DirectorTools.cs": 2,
   "CS-SILENT-CATCH|src/ValleyAgent/Config/NpcConfigLoader.cs": 2,
-  "CS-SILENT-CATCH|src/ValleyAgent/Debug/ConsoleCommands.cs": 2,
   "CS-SILENT-CATCH|src/ValleyAgent/Economy/AdjustExecutor.cs": 1,
   "CS-SILENT-CATCH|src/ValleyAgent/Economy/NpcEconomyProfileLoader.cs": 2,
   "CS-SILENT-CATCH|src/ValleyAgent/Multiplayer/Transports/HostGiftTransport.cs": 1,

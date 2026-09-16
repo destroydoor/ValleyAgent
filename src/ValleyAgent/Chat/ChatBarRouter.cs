@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
@@ -58,6 +59,9 @@ public static class ChatBarRouter
     private static readonly object _inflightLock = new();
 
     private static readonly ConcurrentQueue<PendingChatReply> _pendingReplies = new();
+
+    /// <summary>待渲染聊天回复队列深度（ValleyAgent_diag 只读采集用，issue #27 ④）。</summary>
+    internal static int PendingReplyCount => _pendingReplies.Count;
 
     /// <summary>
     ///     E5-3 主动发言额度（由 EventHandlerInitializer 在 Initialize 时注入）。
@@ -498,6 +502,20 @@ public static class ChatBarRouter
         {
             var worldSnapshot = WorldSnapshotBuilder.Build(npcName, DialogueBoxInputPatch.GetNpcState(npcName));
 
+            // issue #27 ②：熔断器接线（本地 LLM 路径）。OPEN → TryAcquireExecution 拒绝，
+            // 直接入队明确兜底文案（灰字系统提示），不走完整超时链——此前该路径从未接
+            // 熔断器，LLM key 失效/上游 5xx 时每条聊天都要重新付满超时成本。
+            // 房客 transport 路径不接：LLM 在主机侧，主机的对话链路已记录熔断。
+            var circuitBreaker = _agentService?.CircuitBreaker;
+            var localLlmPath = !IsFarmhand;
+            if (localLlmPath && circuitBreaker != null && !circuitBreaker.TryAcquireExecution())
+            {
+                _monitor?.Log($"[ChatBar] {npcName}: circuit breaker OPEN — fast fallback without LLM round-trip", LogLevel.Warn);
+                EnqueueFallbackReply(npcName, $"（{npcName} 现在无法回应：AI 服务保护中，稍后再试。）", "unavailable");
+                return;
+            }
+
+            var sw = Stopwatch.StartNew();
             // M3：主机走本地 provider，房客走 transport 转发主机（DialogueBoxInputPatch 同款双路径）。
             // 此前房客形态仍解引用 _agentServerProvider（房客恒为 null）→ 每次聊天必 NRE，
             // 玩家侧表现为 "*NPC 没有回应*" 灰字（2026-09-13 实机联机测试定位）。
@@ -517,6 +535,15 @@ public static class ChatBarRouter
                     Game1.player.UniqueMultiplayerID.ToString());
                 response = await _agentServerProvider!.GenerateDialogueAsync(request).ConfigureAwait(false);
             }
+
+            // issue #27 ②：成功 → RecordSuccess + RecordResponseTime（响应耗时只在本地 LLM
+            // 路径记录——房客 transport 的耗时是主机转发链路，喂给熔断器会误判慢响应）。
+            if (localLlmPath)
+            {
+                circuitBreaker?.RecordSuccess();
+                circuitBreaker?.RecordResponseTime(sw.Elapsed);
+            }
+
             _pendingReplies.Enqueue(new PendingChatReply(
                 npcName,
                 response.Speech ?? string.Empty,
@@ -529,12 +556,14 @@ public static class ChatBarRouter
         }
         catch (TimeoutException)
         {
+            RecordLocalCircuitFailure(npcName, "chat_timeout");
             // 异步聊天不阻塞玩家：超时记为失败（主线程渲染灰色系统消息）
             _pendingReplies.Enqueue(new PendingChatReply(npcName, string.Empty, new List<ToolAction>(), true));
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }
         catch (Exception ex)
         {
+            RecordLocalCircuitFailure(npcName, "chat_error");
             _monitor?.Log($"[ChatBar] Dialogue request failed for {npcName}: {ex.Message}", LogLevel.Error);
             _pendingReplies.Enqueue(new PendingChatReply(npcName, string.Empty, new List<ToolAction>(), true));
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
@@ -543,6 +572,32 @@ public static class ChatBarRouter
         {
             ReleaseInflight(npcName);
         }
+    }
+
+    /// <summary>issue #27 ②：本地 LLM 路径失败 → 熔断器记失败（房客 transport 路径不记，LLM 健康由主机侧记录）。</summary>
+    private static void RecordLocalCircuitFailure(string npcName, string failureType)
+    {
+        if (IsFarmhand)
+        {
+            return;
+        }
+
+        try
+        {
+            _agentService?.CircuitBreaker?.RecordFailure(failureType);
+        }
+        catch (Exception ex)
+        {
+            _monitor?.Log($"[ChatBar] circuit breaker RecordFailure failed for {npcName}: {ex}", LogLevel.Debug);
+        }
+    }
+
+    /// <summary>issue #27 ②：熔断快速兜底回复入队（灰字系统提示，RenderReply 按 Fallback 渲染）。</summary>
+    private static void EnqueueFallbackReply(string npcName, string speech, string fallbackReason)
+    {
+        _pendingReplies.Enqueue(new PendingChatReply(
+            npcName, speech, new List<ToolAction>(), isFailure: false, fallback: true, fallbackReason));
+        QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
     }
 
     private static string Preview(string text)

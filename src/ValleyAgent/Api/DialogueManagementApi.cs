@@ -137,6 +137,9 @@ public class DialogueManagementApi
                     }
 
                     acquired = true;
+                    // issue #27 ②：RecordResponseTime 需要真实 LLM 耗时——从发出请求起计时
+                    // （慢响应均值超阈值会自动打开熔断器，此前该路径只记成败不记耗时）。
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     var result = await agentServerProvider.GenerateDialogueAsync(request).ConfigureAwait(false);
                     var responseText = result.Speech ?? "";
                     var responseAction = result.Actions.Count > 0 ? result.Actions[0].Tool : null;
@@ -145,8 +148,10 @@ public class DialogueManagementApi
                         $"[Dialogue] {npcName}: response received — text=\"{responsePreview}\" action={responseAction}",
                         LogLevel.Info);
 
-                    // 对话成功，记录熔断器成功
+                    // 对话成功，记录熔断器成功 + 响应耗时（issue #27 ② 补齐：TryAcquire/RecordSuccess/
+                    // RecordFailure 已有，唯缺耗时采样——慢响应熔断在本地对话路径此前不可达）。
                     circuitBreaker?.RecordSuccess();
+                    circuitBreaker?.RecordResponseTime(sw.Elapsed);
 
                     // 先捕获快照（Game1 状态可能在 await 后变化）
                     var playerInputSnapshot = playerInput ?? string.Empty;
