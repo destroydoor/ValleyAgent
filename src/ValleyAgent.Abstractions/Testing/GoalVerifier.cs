@@ -18,7 +18,8 @@ namespace ValleyAgent.Testing
 
     /// <summary>
     /// 纯验证逻辑，不依赖任何游戏类型。
-    /// 从 GoalCompletionAuditor 中提取，供游戏内测试和 xUnit 单元测试共享。
+    /// 供游戏内测试和 xUnit 单元测试共享。
+    /// 出自已删除的 GoalCompletionAuditor（该审计器零外部引用，2026-09-16 随 issue #15 删除）。
     /// </summary>
     public static class GoalVerifier
     {

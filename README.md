@@ -58,10 +58,6 @@ ValleyAgent = 一个 Stardew Valley SMAPI mod + 一个本地 TS Agent Server。
 | `ValleyTalk for SVE/` | Stardew Valley Expanded 兼容 NPC 人设数据 |
 | `tools/` | 自研辅助工具（PlayerInputDriver / XnbExtract / player_eval） |
 
-> 另有 `src/ValleyTalk.ApiTest/`（本地/兼容端点的 LLM provider 测试台）与根级 `src/*.tsx`
-> 前端原型目录——两者**不参与构建、无文档引用**，属历史遗留（详见
-> `docs/plan/2026-09-15-doc-code-drift-audit.md` §3 C5/C6）。
-
 ## 环境要求
 
 - Stardew Valley 1.6（Steam/GOG）+ [SMAPI](https://smapi.io/) 4.x
