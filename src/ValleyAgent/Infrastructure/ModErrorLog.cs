@@ -38,6 +38,30 @@ public static class ModErrorLog
         }
     }
 
+    /// <summary>TS 服务器日志文件路径（ValleyAgent_diag 读尾部用；未初始化为 null）。issue #27 ④。</summary>
+    public static string? ServerLogPath
+    {
+        get
+        {
+            lock (s_lock)
+            {
+                return _serverLogPath;
+            }
+        }
+    }
+
+    /// <summary>错误日志文件路径（ValleyAgent_diag 提取最近失败原因用；未初始化为 null）。issue #27 ④。</summary>
+    public static string? ErrorLogPath
+    {
+        get
+        {
+            lock (s_lock)
+            {
+                return _errorLogPath;
+            }
+        }
+    }
+
     /// <summary>写入一条关键错误（时间戳 + 来源 + 消息 + 异常堆栈）。</summary>
     /// <param name="source">错误来源标识（如 "Unhandled"/"ServerProcess"/"WebSocket"）。</param>
     /// <param name="message">错误描述。</param>

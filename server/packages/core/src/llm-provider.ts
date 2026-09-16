@@ -64,6 +64,31 @@ function extractHttpStatusCode(err: unknown): number | undefined {
 }
 
 /**
+ * responseBody 摘要提取（issue #27：401/403 快速失败时随 ERROR 留痕）。
+ * ai-sdk APICallError 挂 `responseBody`（原始响应文本）；被外层 wrap 时挂在 cause 上。
+ * 摘要截断到 300 字符——够看清 "invalid api key" / "quota exceeded" 类原因，不刷屏。
+ */
+function extractResponseBodySummary(err: unknown): string {
+  const pick = (e: Record<string, unknown>): string | undefined => {
+    if (typeof e.responseBody === "string" && e.responseBody.length > 0) return e.responseBody;
+    if (typeof e.responseText === "string" && e.responseText.length > 0) return e.responseText;
+    return undefined;
+  };
+  let body: string | undefined;
+  if (typeof err === "object" && err !== null) {
+    body = pick(err as Record<string, unknown>);
+    if (body === undefined) {
+      const cause = (err as Record<string, unknown>).cause;
+      if (typeof cause === "object" && cause !== null) {
+        body = pick(cause as Record<string, unknown>);
+      }
+    }
+  }
+  const text = body ?? describeError(err);
+  return text.length <= 300 ? text : `${text.slice(0, 300)}...(truncated, len=${text.length})`;
+}
+
+/**
  * 描述信息提取：分类后的错误信息携带原始 message，便于排障。
  */
 function describeError(err: unknown): string {
@@ -225,9 +250,21 @@ export class VercelAIProvider implements ILLMProvider {
         return result;
       } catch (err) {
         // E5: HTTP 错误分类，使 rule-engine 三档人设兜底全部可达。
+        // 401/403 → LLMBillingError（issue #27：鉴权失败重试毫无意义——key 失效/无权限
+        //           不会因退避重试变好，每次重试都是完整超时链。快速失败并记
+        //           statusCode + responseBody 摘要，ERROR 级留痕）。
         // 402/429 → LLMBillingError（立即抛出，不重试，billing 失败重试无意义）
         // 5xx    → 走下方 max-retries 兜底，最终包装为 LLMUnavailableError
         const statusCode = extractHttpStatusCode(err);
+        if (statusCode === 401 || statusCode === 403) {
+          console.error(
+            `[${logTimestamp()}] [llm] auth rejected HTTP ${statusCode} → no retry `
+            + `(responseBody: ${extractResponseBodySummary(err)})`,
+          );
+          throw new LLMBillingError(
+            `LLM auth rejected (HTTP ${statusCode}): ${describeError(err)}`
+          );
+        }
         if (statusCode === 402 || statusCode === 429) {
           console.log(`[${logTimestamp()}] [llm] billing/rate-limited HTTP ${statusCode} → 不重试`);
           throw new LLMBillingError(

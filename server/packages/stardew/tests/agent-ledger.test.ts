@@ -309,3 +309,45 @@ test("item quantity dropping to zero removes the ledger entry", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── dead_letter（issue #27：对账重发超限的终态）──────
+
+test("deadLetter marks pending dead_letter and keeps the entry for inspection (memory and disk)", async () => {
+  const dir = makeTempDir();
+  try {
+    const ledger = new AgentLedger(dir);
+    await ledger.load("Abigail");
+    ledger.seedFromSnapshot("Abigail", makeScene({ npcMoney: 100, npcInventory: [] }));
+    ledger.beginPending("Abigail", "dl-1", "req", [moneyOp("npc", -60)]);
+
+    const done = ledger.deadLetter("Abigail", "dl-1", "reconcile exhausted after 3 attempts (receipt never arrived)");
+    expect(done?.status).toBe("dead_letter");
+    expect(done?.deadLetterReason).toContain("3 attempts");
+
+    // 终态但**不删除**（与 committed/rolled_back 相反）：条目留在 pending 表内
+    // （内存 + 落盘）供人工/诊断查验 instructionId、ops、deadLetterReason。
+    expect(ledger.getPending("Abigail", "dl-1")?.status).toBe("dead_letter");
+    expect(ledger.listDeadLetters().map((e) => e.pending.instructionId)).toEqual(["dl-1"]);
+
+    await ledger.save("Abigail");
+    const onDisk = JSON.parse(readFileSync(join(dir, "Abigail_ledger.json"), "utf-8")) as {
+      pending: Record<string, { status: string; deadLetterReason?: string }>;
+    };
+    expect(onDisk.pending["dl-1"]!.status).toBe("dead_letter");
+    expect(onDisk.pending["dl-1"]!.deadLetterReason).toContain("3 attempts");
+
+    const reloaded = new AgentLedger(dir);
+    await reloaded.load("Abigail");
+    expect(reloaded.listDeadLetters()).toHaveLength(1);
+
+    // dead_letter 不参与对账重发（listPending 只返回 pending）——重发循环就此终止。
+    expect(ledger.listPending()).toHaveLength(0);
+    // 余额不被 dead_letter 触碰（真实执行与否不可判定，不能当作干净失败回滚）。
+    expect(ledger.getMoney("Abigail")).toBe(100);
+    // commit/rollback 对非 pending 条目幂等 no-op（迟到回执不会复活该条目）。
+    expect(ledger.commit("Abigail", "dl-1", resultOf("dl-1", "Abigail", true, 40))).toBeUndefined();
+    expect(ledger.rollback("Abigail", "dl-1", "late receipt")).toBeUndefined();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

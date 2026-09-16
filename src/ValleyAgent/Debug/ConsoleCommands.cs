@@ -121,6 +121,14 @@ public class ConsoleCommands
     public Func<Task<CommandResult>>? TestLlmCallback { get; set; }
 
     /// <summary>
+    ///     Callback to build the one-screen diagnostics report (issue #27 ④).
+    ///     具体数据采集由宿主（EventHandlerInitializer）注入——WS 状态/TS 进程/日志尾部/
+    ///     熔断器/队列深度分散在宿主侧服务里，保持本类 game-agnostic。
+    ///     实现方约定：单项取不到标 "&lt;unavailable&gt;"，报告器自身不抛异常。
+    /// </summary>
+    public Func<string>? DiagReportCallback { get; set; }
+
+    /// <summary>
     ///     Maps command names to their handler functions.
     /// </summary>
     public IReadOnlyDictionary<string, Func<string[], CommandResult>> CommandMap
@@ -147,15 +155,14 @@ public class ConsoleCommands
             {
                 return handler(args);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                _debugLogger?.LogError(ex, $"Console command '{commandName}'");
-                return CommandResult.Fail($"Command '{commandName}' failed: {ex.Message}");
-            }
-            catch (ArgumentException ex)
-            {
-                _debugLogger?.LogError(ex, $"Console command '{commandName}'");
-                return CommandResult.Fail($"Command '{commandName}' failed: {ex.Message}");
+                // issue #27 ④：兜底捕获——此前只捕 InvalidOperationException/ArgumentException，
+                // NRE/JsonException/TaskCanceledException 等直接逃逸到 SMAPI 命令执行器
+                // （用户侧零反馈）。{ex} 全文留痕 + 一行错误反馈。
+                _debugLogger?.Log($"Console command '{commandName}' failed: {ex}", LogLevel.Error);
+                return CommandResult.Fail(
+                    $"Command '{commandName}' failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -252,6 +259,12 @@ public class ConsoleCommands
         // ValleyAgent_test_llm
         _commands["ValleyAgent_test_llm"] = HandleTestLlm;
         _helpText["ValleyAgent_test_llm"] = "ValleyAgent_test_llm - Test LLM connection with a simple prompt";
+
+        // ValleyAgent_diag（issue #27 ④）
+        _commands["ValleyAgent_diag"] = HandleDiag;
+        _helpText["ValleyAgent_diag"] =
+            "ValleyAgent_diag - One-screen diagnostics: WS status / TS process / server.log tail / "
+            + "circuit breaker / queue depths / pending adjusts / last failure";
 
         // ValleyAgent_reload_config
         _commands["ValleyAgent_reload_config"] = HandleReloadConfig;
@@ -467,6 +480,14 @@ public class ConsoleCommands
     private CommandResult HandleReloadConfig(string[] args) => ReloadConfigCallback == null
         ? CommandResult.Fail("Config reload handler not configured.")
         : ReloadConfigCallback();
+
+    private CommandResult HandleDiag(string[] args)
+    {
+        _ = args;
+        return DiagReportCallback == null
+            ? CommandResult.Fail("Diag report handler not configured.")
+            : CommandResult.Ok(DiagReportCallback());
+    }
 
     private CommandResult HandleHelp(string[] args) =>
         args.Length > 0 ? CommandResult.Ok(GetHelpText(args[0])) : CommandResult.Ok(GetHelpText());

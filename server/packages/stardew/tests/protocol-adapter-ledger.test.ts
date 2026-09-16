@@ -773,3 +773,73 @@ test("playerId contract: reconnect_sync resend preserves original playerId", asy
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── issue #27 ①：对账重发上限（≤3 次）+ dead_letter 终态 ──
+
+test("reconcile gives up after 3 attempts: ledger entry -> dead_letter and no further resend", async () => {
+  const { adapter, ledger, dir, sent } = makeHarness({ timeoutMs: 50, reconcileRetryMs: 60 });
+  try {
+    await ledger.load("Abigail");
+    ledger.seedFromSnapshot("Abigail", {
+      season: "summer", day: 1, timeStr: "09:00", weather: "sunny", location: "Town",
+      nearbyObjects: "", farmerName: "农夫", friendship: 0, npcState: "IDLE",
+      inventory: [], npcTile: { x: 0, y: 0 }, playerMoney: 0, npcLocation: "Town",
+      npcMoney: 500, npcInventory: [], playerHeldItem: null, currentGoal: null,
+      npcMood: null, npcRecentEvents: null, npcWorkingOn: null, npcOwedMoney: null,
+    });
+    const msg = makeAdjust("Abigail", "ins-dead", [moneyOp("npc", -100)]);
+    expect(ledger.beginPending("Abigail", "ins-dead", msg.requestId, msg.ops).ok).toBe(true);
+
+    // 无回执：首次下发 + 3 次对账重发 = 4 次投递，之后超限 dead_letter。
+    await adapter.sendAdjust(msg);
+    await waitFor(
+      () => ledger.getPending("Abigail", "ins-dead")?.status === "dead_letter",
+      3000, 20,
+    );
+    expect(sent.length).toBe(4);
+
+    // 超限：账本条目落 dead_letter 终态（issue #27 验收：不再 pending、不再重发）
+    expect(ledger.getPending("Abigail", "ins-dead")?.status).toBe("dead_letter");
+    expect(ledger.getPending("Abigail", "ins-dead")?.deadLetterReason).toContain("3 attempts");
+    expect(ledger.listDeadLetters().map((e) => e.pending.instructionId)).toEqual(["ins-dead"]);
+    expect(ledger.listPending()).toHaveLength(0); // 不再参与 reconnect_sync 对账重发
+    expect(ledger.getMoney("Abigail")).toBe(500); // 真实执行与否不可判定：余额未被触碰
+
+    // dead_letter 后静置一段时间：确认重发循环真正停止（issue #27 的核心断言）
+    await new Promise((r) => setTimeout(r, 250));
+    expect(sent.length).toBe(4);
+  } finally {
+    await adapter?.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("late receipt cancels the scheduled reconcile (no pointless resend)", async () => {
+  const { adapter, ledger, dir, sent } = makeHarness({ timeoutMs: 50, reconcileRetryMs: 200 });
+  try {
+    const msg = makeAdjust("Abigail", "ins-late", [moneyOp("npc", -100)]);
+    await ledger.load("Abigail");
+    ledger.seedFromSnapshot("Abigail", {
+      season: "summer", day: 1, timeStr: "09:00", weather: "sunny", location: "Town",
+      nearbyObjects: "", farmerName: "农夫", friendship: 0, npcState: "IDLE",
+      inventory: [], npcTile: { x: 0, y: 0 }, playerMoney: 0, npcLocation: "Town",
+      npcMoney: 500, npcInventory: [], playerHeldItem: null, currentGoal: null,
+      npcMood: null, npcRecentEvents: null, npcWorkingOn: null, npcOwedMoney: null,
+    });
+    expect(ledger.beginPending("Abigail", "ins-late", msg.requestId, msg.ops).ok).toBe(true);
+
+    await adapter.sendAdjust(msg); // 超时失败，挂上 200ms 后的对账重发
+    expect(sent.length).toBe(1);
+
+    // 重发触发前迟到回执到达 → commit 闭环 + 取消定时器（issue #27：不空转重发）
+    await new Promise((r) => setTimeout(r, 100));
+    await adapter.routeMessage(makeResult("ins-late", "Abigail", true, 400));
+    expect(ledger.getMoney("Abigail")).toBe(400); // 500 - 100
+
+    await new Promise((r) => setTimeout(r, 300)); // 越过 200ms 重发点
+    expect(sent.length).toBe(1); // 未发生重发
+  } finally {
+    await adapter?.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

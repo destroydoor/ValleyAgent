@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Reflection;
@@ -422,6 +423,160 @@ public class EventHandlerInitializer
             EnqueueDecision);
 
         commandHandlers.RegisterCallbacks(consoleCommands);
+
+        // issue #27 ④：诊断命令回调（数据采集在宿主侧完成，ConsoleCommands 保持 game-agnostic）。
+        consoleCommands.DiagReportCallback = BuildDiagReport;
+    }
+
+    /// <summary>
+    ///     ValleyAgent_diag 一屏诊断报告（issue #27 ④）。回答"现在到底哪里坏了"：
+    ///     WS 连接 / TS 进程 / server.log 尾部 / 熔断器 / 主线程队列深度 / pending adjust /
+    ///     最近一次失败原因。数据分散在约 6 个类里，全部经现有公开接口（或本类私有字段）
+    ///     只读采集，不改其内部结构；任何单项取不到标 &lt;unavailable&gt;，绝不抛异常——
+    ///     诊断器自身故障不能让排障通道一起瘫。
+    /// </summary>
+    private string BuildDiagReport()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("=== ValleyAgent_diag ===");
+
+        // 1. WS 连接状态（IsConnectedAsync 实为锁内同步检查 + Task.FromResult，同步取值安全）。
+        //    预期内的"未初始化"走 null 判分支（非异常）；try 只兜真实故障并 Debug 留痕。
+        var ws = "<unavailable> (no provider)";
+        if (_agentServerProvider != null)
+        {
+            try
+            {
+                ws = _agentServerProvider.IsConnectedAsync().GetAwaiter().GetResult().ToString();
+            }
+            catch (Exception ex)
+            {
+                _monitor.Log($"[Diag] WS status probe failed: {ex}", LogLevel.Debug);
+                ws = $"<unavailable> ({ex.GetType().Name})";
+            }
+        }
+
+        sb.AppendLine($"WS connected: {ws}");
+
+        // 2. TS 进程存活（未注册 manager = Inert/早期——预期分支，不算故障）
+        var ts = "<unavailable> (no ServerProcessManager)";
+        if (_serverProcessManager != null)
+        {
+            try
+            {
+                ts = $"alive={_serverProcessManager.IsProcessAlive}";
+            }
+            catch (Exception ex)
+            {
+                _monitor.Log($"[Diag] TS process probe failed: {ex}", LogLevel.Debug);
+                ts = $"<unavailable> ({ex.GetType().Name})";
+            }
+        }
+
+        sb.AppendLine($"TS server process: {ts}");
+
+        // 3. server.log 尾部 ~30 行（TS 侧 LLM 调用/决策留痕）
+        sb.AppendLine("--- ValleyAgent-server.log (tail 30) ---");
+        sb.AppendLine(ReadLogTail(ModErrorLog.ServerLogPath, 30));
+        sb.AppendLine("--- end tail ---");
+
+        // 4. 熔断器状态（开闭 / 失败计数 / 均值响应）
+        var cb = "<unavailable> (no AgentService)";
+        if (_agentService?.CircuitBreaker != null)
+        {
+            try
+            {
+                var st = _agentService.CircuitBreaker.GetStatus();
+                cb = $"state={st.State} consecutiveFailures={st.ConsecutiveFailures} "
+                    + $"avgResponse={st.AverageResponseTimeSeconds:F2}s samples={st.ResponseTimeSampleCount} "
+                    + $"canExecute={st.CanExecute} lastChange={st.LastStateChangeAt:HH:mm:ss}";
+            }
+            catch (Exception ex)
+            {
+                _monitor.Log($"[Diag] circuit breaker status failed: {ex}", LogLevel.Debug);
+                cb = $"<unavailable> ({ex.GetType().Name})";
+            }
+        }
+
+        sb.AppendLine($"Circuit breaker: {cb}");
+
+        // 5. 主线程队列深度（泵停滞的早期信号；ChatBarRouter 未初始化时 Inert 模式恒 0 语义也成立）
+        var queuedAdjusts = 0;
+        foreach (var item in _pendingWsCommands)
+        {
+            if (item.Type == "execute_adjust")
+            {
+                queuedAdjusts++;
+            }
+        }
+
+        sb.AppendLine(
+            $"Main-thread queues: wsCommands={_pendingWsCommands.Count} "
+            + $"dialogActions={_pendingMainThreadCommands.Count} decisions={_pendingDecisions.Count} "
+            + $"preSpeak={_pendingPreSpeakActions.Count} chatReplies={ChatBarRouter.PendingReplyCount}");
+
+        // 6. pending adjust 数量（C# 侧视角：WS 队列中尚未执行的 execute_adjust + 已执行回执缓存数；
+        //    TS 账本 pending 的权威数字在 TS 侧，C# 看不到）
+        sb.AppendLine(
+            $"Pending adjusts: queuedInMainThread={queuedAdjusts} "
+            + $"executedReceiptsCached={_adjustExecutor?.CachedResultCount.ToString() ?? "<unavailable>"} "
+            + "(TS ledger pending: see TS side)");
+
+        // 7. 最近一次失败原因（ValleyAgent-error.log 最后一条）
+        sb.AppendLine($"Last failure: {ExtractLastFailure(ModErrorLog.ErrorLogPath)}");
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>读日志文件尾部 N 行；文件缺失（预期）返回占位，读取故障 Debug 留痕——诊断不抛。</summary>
+    private string ReadLogTail(string? path, int maxLines)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return "<unavailable> (log file not found — server may run with ConsoleWindow and no tee)";
+        }
+
+        try
+        {
+            var lines = File.ReadAllLines(path);
+            var start = Math.Max(0, lines.Length - maxLines);
+            var tail = lines[start..];
+            return tail.Length == 0 ? "<empty>" : string.Join(Environment.NewLine, tail);
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"[Diag] failed to read log tail ({path}): {ex}", LogLevel.Debug);
+            return $"<unavailable> ({ex.GetType().Name}: {ex.Message})";
+        }
+    }
+
+    /// <summary>从错误日志提取最近一条失败（[时间] [来源] 摘要）；无记录（预期）返回占位，读取故障 Debug 留痕。</summary>
+    private string ExtractLastFailure(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return "<unavailable> (no errors recorded)";
+        }
+
+        try
+        {
+            var lines = File.ReadAllLines(path);
+            for (var i = lines.Length - 1; i >= 0; i--)
+            {
+                var line = lines[i].TrimEnd();
+                if (line.Length > 0 && line.StartsWith('['))
+                {
+                    return line.Length > 200 ? line[..200] + "..." : line;
+                }
+            }
+
+            return "<unavailable> (error log has no failure entries)";
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"[Diag] failed to extract last failure ({path}): {ex}", LogLevel.Debug);
+            return $"<unavailable> ({ex.GetType().Name}: {ex.Message})";
+        }
     }
 
     /// <summary>
