@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using StardewModdingAPI;
 
 namespace ValleyAgent.Infrastructure;
@@ -61,5 +63,77 @@ public static class EventGuard
                 $"[SafeRun] segment '{segmentName}' failed again (throttled): {ex.GetType().Name}: {ex.Message}",
                 LogLevel.Trace);
         }
+    }
+
+    /// <summary>
+    ///     fire-and-forget 统一封口（issue #24 ⑤）：裸 <c>_ = Task.Run(...)</c> 的异常只有
+    ///     TaskScheduler.UnobservedTaskException 兜底，而它由 GC 触发（时机不定、可能不触发）。
+    ///     本方法立即挂观察续体：任务失败即时 Error + ModErrorLog 落盘（不再等 GC）；
+    ///     同时接既有 StuckOperationTracker（Begin/End），停滞/泄漏的后台任务可被看门狗点名
+    ///     （&gt;60s 落 stuck-*.dmp）。opId 带自增序号：同名任务可并发，固定 id 会互相覆盖
+    ///     （先结束的把仍在跑的记录 End 掉——与 MakeDecisionsAsync 序号化同一理由）。
+    /// </summary>
+    /// <param name="task">要观察的后台任务。</param>
+    /// <param name="name">任务名（日志归因；建议含实体/批次语义如 "decision-batch:dialogue-end"）。</param>
+    /// <param name="monitor">可选 SMAPI monitor（仅影响 SMAPI 通道，落盘不受影响）。</param>
+    public static void SafeFireAndForget(Task? task, string name, IMonitor? monitor = null)
+    {
+        if (task == null)
+        {
+            return;
+        }
+
+        var opId = $"faf:{name}#{Interlocked.Increment(ref _fireAndForgetSequence)}";
+        StuckOperationTracker.Begin(opId, "fire-and-forget");
+
+        task.ContinueWith(
+            static (t, state) =>
+            {
+                var ctx = (FireAndForgetContext)state!;
+                StuckOperationTracker.End(ctx.OpId);
+
+                if (t.IsCanceled)
+                {
+                    ctx.Monitor?.Log($"[FireAndForget] '{ctx.Name}' canceled", LogLevel.Debug);
+                    return;
+                }
+
+                if (!t.IsFaulted)
+                {
+                    return;
+                }
+
+                // GetBaseException 拿根因（AggregateException 解包）；两处皆 null 属极端竞态，跳过
+                var ex = t.Exception?.GetBaseException() ?? t.Exception;
+                if (ex == null)
+                {
+                    return;
+                }
+
+                ctx.Monitor?.Log($"[FireAndForget] '{ctx.Name}' failed: {ex}", LogLevel.Error);
+                ModErrorLog.LogError("FireAndForget", $"'{ctx.Name}' failed", ex);
+            },
+            new FireAndForgetContext(opId, name, monitor),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private static long _fireAndForgetSequence;
+
+    private sealed class FireAndForgetContext
+    {
+        public FireAndForgetContext(string opId, string name, IMonitor? monitor)
+        {
+            OpId = opId;
+            Name = name;
+            Monitor = monitor;
+        }
+
+        public string OpId { get; }
+
+        public string Name { get; }
+
+        public IMonitor? Monitor { get; }
     }
 }

@@ -265,7 +265,7 @@ public class EventHandlerInitializer
         {
             _agentService.OnDecisionTriggerRequested += agent =>
             {
-                _ = Task.Run(async () =>
+                SafeFire(Task.Run(async () =>
                 {
                     try
                     {
@@ -276,7 +276,7 @@ public class EventHandlerInitializer
                         _monitor.Log($"[DecisionTrigger] Force decision failed for {agent.NpcName}: {ex.Message}",
                             LogLevel.Error);
                     }
-                });
+                }), $"decision-batch:forced:{agent.NpcName}");
             };
 
             // B5.4 常驻拆除接线（设计 §3.4 步骤 4）：池表任何一条路径失去槽位
@@ -1105,7 +1105,7 @@ public class EventHandlerInitializer
             wsClient.OnReconnected -= OnReconnected;
             wsClient.OnReconnected += OnReconnected;
 
-            _ = Task.Run(async () =>
+            SafeFire(Task.Run(async () =>
             {
                 try
                 {
@@ -1115,7 +1115,7 @@ public class EventHandlerInitializer
                 {
                     _monitor.Log($"Agent Server connection failed: {ex.Message}", LogLevel.Warn);
                 }
-            });
+            }), "agent-server-connect");
         }
     }
 
@@ -1290,7 +1290,7 @@ public class EventHandlerInitializer
 
         // Task 10: 通知 TS 新的一天开始（换日情绪重置由 TS 引擎执行；旧叙事 Director
         // morningPlan 已于 2026-09-14 砍除，directorContext 继续推送供未来工具脑消费）
-        _ = NotifyDayStartedAsync();
+        SafeFire(NotifyDayStartedAsync(), "day-started-notify");
 
         _agentTickLoop?.ClearAllReleaseState();
 
@@ -2038,6 +2038,9 @@ public class EventHandlerInitializer
     private void ReportSegmentFailure(string segmentName, Exception ex) =>
         EventGuard.ReportFailure(_monitor, segmentName, ex);
 
+    /// <summary>EventGuard.SafeFireAndForget 实例简写（省 _monitor 传参；issue #24 ⑤）。</summary>
+    private void SafeFire(Task task, string name) => EventGuard.SafeFireAndForget(task, name, _monitor);
+
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
         // issue #24 最后一道兜底：正常路径所有子系统都在 OnUpdateTickedCore 的 SafeRun 段内，
@@ -2153,7 +2156,8 @@ public class EventHandlerInitializer
                     .ToList();
                 if (decisionAgents.Count > 0)
                 {
-                    _ = Task.Run(async () => await MakeDecisionsAsync(decisionAgents).ConfigureAwait(false));
+                    SafeFire(Task.Run(async () => await MakeDecisionsAsync(decisionAgents).ConfigureAwait(false)),
+                        "decision-batch:periodic");
                 }
             }
         });
@@ -2401,7 +2405,8 @@ public class EventHandlerInitializer
                 if (dialogueEndAgents.Count > 0)
                 {
                     _monitor.Log($"[DecisionTrigger] Processing {dialogueEndAgents.Count} dialogue-end decisions...");
-                    _ = Task.Run(async () => await MakeDecisionsAsync(dialogueEndAgents).ConfigureAwait(false));
+                    SafeFire(Task.Run(async () => await MakeDecisionsAsync(dialogueEndAgents).ConfigureAwait(false)),
+                        "decision-batch:dialogue-end");
                 }
             }
         });
@@ -2418,7 +2423,8 @@ public class EventHandlerInitializer
                 if (taskCompleteAgents.Count > 0)
                 {
                     _monitor.Log($"[DecisionTrigger] Processing {taskCompleteAgents.Count} task-complete decisions...");
-                    _ = Task.Run(async () => await MakeDecisionsAsync(taskCompleteAgents).ConfigureAwait(false));
+                    SafeFire(Task.Run(async () => await MakeDecisionsAsync(taskCompleteAgents).ConfigureAwait(false)),
+                        "decision-batch:task-complete");
                 }
             }
         });
@@ -2434,7 +2440,8 @@ public class EventHandlerInitializer
                 if (giftEventAgents.Count > 0)
                 {
                     _monitor.Log($"[DecisionTrigger] Processing {giftEventAgents.Count} gift-event decisions...");
-                    _ = Task.Run(async () => await MakeDecisionsAsync(giftEventAgents).ConfigureAwait(false));
+                    SafeFire(Task.Run(async () => await MakeDecisionsAsync(giftEventAgents).ConfigureAwait(false)),
+                        "decision-batch:gift-event");
                 }
             }
         });
