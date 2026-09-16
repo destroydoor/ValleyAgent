@@ -22,7 +22,12 @@ const SKIP_DIRS = new Set([
 ]);
 
 // 本文件自身含有示例模式，扫描时跳过。
-const SKIP_FILES = new Set(["scripts/check-privacy.mjs"]);
+// 审计底稿系 2026-09-16 自未合并分支 arena/01a09648-valleyagent 原样恢复（issue #12），
+// 承诺正文一字不改以保历史证据可核验；其中取证命令里的开发者本机路径属当时记录，故整文件豁免。
+const SKIP_FILES = new Set([
+  "scripts/check-privacy.mjs",
+  "docs/plan/2026-09-12-architecture-drift-audit.md",
+]);
 
 const RULES = [
   // X:\ 是文档中约定的占位盘符，不算泄露

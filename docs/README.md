@@ -45,6 +45,7 @@
 |------|------|
 | [2026-09-15-doc-code-drift-audit.md](plan/2026-09-15-doc-code-drift-audit.md) | **文档↔代码偏移度审查报告（最新）** — 46 条声明取证 + 残留清单 + 待办 |
 | [2026-09-14-dead-assertion-cleanup-report.md](plan/2026-09-14-dead-assertion-cleanup-report.md) | 死断言清理执行报告（281 条候选分流；配套 [plan](plan/2026-09-14-dead-assertion-cleanup-plan.md)） |
+| [2026-09-12-architecture-drift-audit.md](plan/2026-09-12-architecture-drift-audit.md) | 架构偏移审计底稿（"删 5,600 行死代码"的证据链来源；2026-09-16 自未合并分支 `arena/01a09648-valleyagent` 恢复，行号基准 HEAD `7021d83`） |
 | [2026-09-10-host-freeze-root-cause.md](plan/2026-09-10-host-freeze-root-cause.md) | 主机卡死复刻与原因定位（结论文档；附录 B 猜想台账范式） |
 | [2026-09-10-host-freeze-repro-plan.md](plan/2026-09-10-host-freeze-repro-plan.md) | 主机卡死复刻计划 |
 | [2026-09-09-multiplayer-client-parity-and-freeze-hunt-plan.md](plan/2026-09-09-multiplayer-client-parity-and-freeze-hunt-plan.md) | 房客可用性修复 + 卡死猎捕计划 |

@@ -52,6 +52,30 @@ powershell -ExecutionPolicy Bypass -File scripts\test\run-test-with-env.ps1 `
     -Model qwen-3.6-27b
 ```
 
+### 断言残留检查（`check:test-dead`，游戏跑完后的本地工具）
+
+`server/package.json` 的 `bun run check:test-dead` 调用本仓 `scripts/check-dead-assertions.mjs`，
+扫描 `logs/test_results/**/*_assertions.json`，统计"从未失败"的候选死断言。
+
+**前置条件**：`logs/test_results/` 由游戏内测试（TestMod）运行时写出，且已被
+`.gitignore` 忽略、不入库——干净 clone 上没有这个目录，直接跑必报"结果目录不存在"。
+必须先跑一轮游戏内测试产出断言 JSON：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test\run-tests.ps1 -Group All
+# 或 scripts\test\test-game.ps1；每轮在 logs/test_results/<时间戳>/ 写出 *_assertions.json
+```
+
+然后在仓库根目录运行：
+
+```bash
+cd server && bun run check:test-dead   # 等价于仓库根 node scripts/check-dead-assertions.mjs
+```
+
+退出码：0 = 无候选死断言；1 = 发现高风险候选；2 = 结果目录缺失 / 没有任何断言 JSON
+（脚本会打印自解释报错）。该工具定位为 **post-run 本地校验，不进 CI**——CI 拿不到
+gitignored 的历史断言日志。
+
 ## 游戏测试场景（v4.3 简化）
 
 | 场景 | 触发工具 | 验证点 |

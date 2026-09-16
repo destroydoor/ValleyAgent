@@ -7,6 +7,9 @@
  *   - 从未失败的断言（候选死断言——断言永远为真，测不到任何东西）
  *   - 有反例约束（AssertEx 的 counterexample）但从未失败的高危候选
  *
+ * 前置条件（post-run 本地工具）：logs/test_results/ 由游戏内测试（TestMod）运行时
+ * 写出，且被 .gitignore 忽略不入库——干净 clone 上没有，必须先跑一轮游戏内测试。
+ *
  * 用法：
  *   node scripts/check-dead-assertions.mjs [--min-runs N] [--dir <logs/test_results>]
  *
@@ -23,7 +26,15 @@ const dirIdx = args.indexOf("--dir");
 const resultsDir = dirIdx >= 0 ? resolve(args[dirIdx + 1]) : defaultDir;
 
 if (!existsSync(resultsDir)) {
-  console.error(`结果目录不存在: ${resultsDir}`);
+  console.error(`结果目录不存在: ${resultsDir}
+
+本工具是"游戏跑完之后"的本地校验（post-run），无法在干净环境单独运行：
+  缺什么  : 结果目录（默认 logs/test_results/，可用 --dir 覆盖）及其下的 *_assertions.json
+  怎么产出: 先在游戏内跑一轮测试（TestMod，由 scripts/test/run-tests.ps1 或
+            scripts/test/test-game.ps1 驱动），每轮会在 logs/test_results/<时间戳>/
+            下写出断言 JSON
+  参考文档: scripts/TEST_README.md
+注意：该目录已被 .gitignore 忽略，不会随仓库分发，也无法进 CI。`);
   process.exit(2);
 }
 
@@ -40,7 +51,8 @@ function collectAssertionFiles(dir) {
 
 const files = collectAssertionFiles(resultsDir);
 if (files.length === 0) {
-  console.error(`未找到任何 *_assertions.json（目录: ${resultsDir}）`);
+  console.error(`未找到任何 *_assertions.json（目录: ${resultsDir}）
+这些文件由游戏内测试（TestMod）运行时写出——先在游戏里跑一轮测试（scripts/test/run-tests.ps1），再重试本工具；详见 scripts/TEST_README.md。`);
   process.exit(2);
 }
 
