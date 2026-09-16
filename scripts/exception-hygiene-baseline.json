@@ -6,7 +6,7 @@
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Chat/ChatBarRouter.cs": 1,
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Chat/ShoutReplyScheduler.cs": 1,
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Core/AgentTickLoop.cs": 3,
-  "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Initialization/EventHandlerInitializer.cs": 24,
+  "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Initialization/EventHandlerInitializer.cs": 23,
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Multiplayer/AgentSyncBroadcaster.cs": 1,
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Multiplayer/HostRequestHandlers.cs": 1,
   "CS-LOG-DEFAULT-LEVEL|src/ValleyAgent/Multiplayer/MultiplayerEventRouter.cs": 4,
@@ -82,6 +82,5 @@
   "TS-FAIL-AT-LOG-LEVEL|server/packages/core/src/llm-provider.ts": 2,
   "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/console-log-subscriber.ts": 1,
   "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/protocol-adapter.ts": 11,
-  "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/stardew-agent-registry.ts": 2,
-  "TS-UNKNOWN-TYPE-SILENT|server/packages/stardew/src/protocol-adapter.ts": 1
+  "TS-FAIL-AT-LOG-LEVEL|server/packages/stardew/src/stardew-agent-registry.ts": 2
 }

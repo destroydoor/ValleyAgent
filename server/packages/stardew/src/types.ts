@@ -128,6 +128,27 @@ export interface PongResponse {
   requestId: string;
 }
 
+/**
+ * TS→C# 统一错误码（issue #22，协议登记见 server/protocol/messages.json 的 error 条目）。
+ * - bad_request: 帧不是合法 JSON（无法提取 requestId）
+ * - validation_failed: JSON 合法但不是合规消息对象（非 object / 数组 / 缺 type）
+ * - unknown_type: routeMessage 无此 case（协议漂移/单端先行）
+ * - internal_error: handler 内部抛异常
+ */
+export type ProtocolErrorCode = "bad_request" | "validation_failed" | "unknown_type" | "internal_error";
+
+/**
+ * TS→C# 统一错误帧（issue #22）。requestId 能从原始帧解析就带（C# 按 requestId
+ * 完成 pending request 快速失败，不再 120s 盲等），解析不出就省略（C# 落
+ * OnUnsolicitedMessage 的 Warn 日志留痕）。
+ */
+export interface ErrorFrame {
+  type: "error";
+  code: ProtocolErrorCode;
+  message: string;
+  requestId?: string;
+}
+
 export interface ActionResultMessage {
   type: "action_result";
   requestId: string;
@@ -335,7 +356,7 @@ export type IncomingMessage =
   | DirectorCommandMessage
   | AdjustResultMessage
   | ReconnectSyncMessage;
-export type OutgoingMessage = DialogueResponse | HelloResponse | PongResponse | RouteShoutResponse | AllocateAgentMessage | DirectorCommandMessage | ExecuteAdjustMessage | { type: "ack"; requestId: string };
+export type OutgoingMessage = DialogueResponse | HelloResponse | PongResponse | RouteShoutResponse | AllocateAgentMessage | DirectorCommandMessage | ExecuteAdjustMessage | ErrorFrame | { type: "ack"; requestId: string };
 
 // SceneState — TS 内部表示，由 WorldSnapshotDecoder 转换得到
 export interface SceneState {

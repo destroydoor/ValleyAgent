@@ -765,7 +765,13 @@ export class ProtocolAdapter {
   }
 
   async routeMessage(msg: unknown): Promise<OutgoingMessage> {
-    const m = msg as { type: string };
+    // issue #22：非对象帧（null/数组/标量）此前直接在 `m.type` 上抛 TypeError，
+    // 由 server.ts 兜底成无分类 error 帧；现在在入口显式拒绝并留痕。
+    if (typeof msg !== "object" || msg === null || Array.isArray(msg)) {
+      console.warn(`[protocol] rejected non-object frame (validation_failed): ${truncate(String(msg), 200)}`);
+      return { type: "error", code: "validation_failed", message: "msg is not an object" };
+    }
+    const m = msg as { type: string; requestId?: unknown };
     switch (m.type) {
       case "hello": return this.handleHello(m as HelloRequest);
       case "ping": return this.handlePing(m as PingRequest);
@@ -781,7 +787,21 @@ export class ProtocolAdapter {
       case "execute_adjust": return this.handleExecuteAdjust(m as ExecuteAdjustMessage);
       case "adjust_result": return this.handleAdjustResult(m as AdjustResultMessage);
       case "reconnect_sync": return this.handleReconnectSync(m as ReconnectSyncMessage);
-      default: return { type: "ack", requestId: "unknown" };
+      default: {
+        // issue #22 / AGENTS.md §3.6：未知类型此前静默回 {"type":"ack","requestId":"unknown"}
+        // 零日志（TS-UNKNOWN-TYPE-SILENT 唯一存量），协议漂移完全不可见。现改回
+        // error 帧（unknown_type）+ WARN，requestId 能 echo 就 echo（C# 快速失败）。
+        const reqId = typeof m.requestId === "string" ? m.requestId : undefined;
+        console.warn(
+          `[protocol] unknown message type "${String(m.type)}" rejected (unknown_type), requestId=${reqId ?? "n/a"}`,
+        );
+        return {
+          type: "error",
+          code: "unknown_type",
+          message: `unknown message type: ${String(m.type)}`,
+          ...(reqId !== undefined ? { requestId: reqId } : {}),
+        };
+      }
     }
   }
 }

@@ -1286,7 +1286,7 @@ public class EventHandlerInitializer
     /// <summary>
     ///     收到非 pending request 响应的 unsolicited 消息时按 type 路由。
     ///     目前仅处理 allocate_agent（TS→C#，导演请求分配某 NPC 为 Agent，设计文档 §4.2.2）。
-    ///     其余类型仅 Trace 日志，不抛异常。
+    ///     其余类型 Warn 日志（含消息体前 200 字符，issue #22），不抛异常。
     /// </summary>
     private void OnUnsolicitedMessage(string json)
     {
@@ -1312,8 +1312,14 @@ public class EventHandlerInitializer
                     EnqueueWsCommand(ProtocolV2.MessageTypeExecuteAdjust, json, "ExecuteAdjust");
                     break;
                 default:
-                    _monitor?.Log($"[WS] Unhandled unsolicited message type: {type}");
+                {
+                    // issue #22：默认分支原为 Trace 级（控制台默认不可见）且不读消息体——
+                    // TS 崩溃/协议漂移的 error 帧或未知帧被静默吞掉，玩家侧退化成 120s 盲等。
+                    // 提升到 Warn 并打印前 200 字符，保证不可归因帧至少留痕。
+                    var preview = json?.Length > 200 ? json[..200] + "..." : json;
+                    _monitor?.Log($"[WS] Unhandled unsolicited message type: {type ?? "(null)"}; body: {preview}", LogLevel.Warn);
                     break;
+                }
             }
         }
         catch (Exception ex)
