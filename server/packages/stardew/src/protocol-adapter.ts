@@ -44,6 +44,17 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max) + "...";
 }
 
+/** ops 金额/物品摘要（issue #27：dead_letter ERROR 日志里人能一眼看懂账目内容）。 */
+function describeOps(ops: AdjustOp[]): string {
+  return ops
+    .map((op) =>
+      op.kind === "money"
+        ? `${op.target} money ${op.amount}g`
+        : `${op.target} ${op.itemId ?? op.itemName ?? "?"} x${op.quantity}`,
+    )
+    .join(", ");
+}
+
 export interface ProtocolAdapterOptions {
   sendToCsharp?: (msg: unknown) => void;
   gameCtxMgr?: GameContextManager;
@@ -73,6 +84,8 @@ export interface ProtocolAdapterOptions {
 const ADJUST_TIMEOUT_MS = 10_000;
 /** 超时对账重发间隔（2026-08-17）：超时后凭原 instructionId 重发，C# 幂等缓存返回原回执。 */
 const ADJUST_RECONCILE_RETRY_MS = 30_000;
+/** 超时对账重发上限（issue #27 ①）：超限后账本条目落 dead_letter 终态，停止无限重发循环。 */
+const MAX_RECONCILE_ATTEMPTS = 3;
 /**
  * runDialogue 服务端兜底超时（issue #23 / 审计 §3.8）。90s < C# LLMTimeoutSeconds=120：
  * 服务端先放弃并释放会话锁、回 fallback——不把"锁必被释放"寄托在客户端超时上。
@@ -104,10 +117,14 @@ export class ProtocolAdapter {
   // 2026-08-15 账本迁移（步骤 1）：execute_adjust 回执等待表（instructionId → waiter）。
   // sendAdjust 挂等待；adjust_result 到达时按 instructionId 解析（超时 10s 回滚 pending）。
   private readonly pendingAdjusts = new Map<string, PendingAdjustWaiter>();
-  // 2026-08-17 对账闭环：超时后待重发的指令（instructionId → msg）。超时**不进终态**
-  // （pending 保留、账本不回滚）——C# 可能已真实执行，回滚会让 LLM 重试导致双倍扣钱；
-  // 30s 后凭原 instructionId 重发，C# 幂等缓存命中返回原回执 → 正常 commit/rollback 闭环。
-  private readonly pendingReconciles = new Map<string, ExecuteAdjustMessage>();
+  // 2026-08-17 对账闭环：超时后待重发的指令（instructionId → msg + 定时器）。
+  // 超时**不进终态**（pending 保留、账本不回滚）——C# 可能已真实执行，回滚会让 LLM
+  // 重试导致双倍扣钱；30s 后凭原 instructionId 重发，C# 幂等缓存命中返回原回执 →
+  // 正常 commit/rollback 闭环。回执到达时取消定时器（issue #27：迟到回执后不再空转重发）。
+  private readonly pendingReconciles = new Map<string, { msg: ExecuteAdjustMessage; timer: ReturnType<typeof setTimeout> }>();
+  // issue #27 ①：对账重发次数（instructionId → 已安排的重发次数）。回执到达即清零；
+  // 超过 MAX_RECONCILE_ATTEMPTS 仍无回执 → 账本条目 dead_letter，停止重发循环。
+  private readonly reconcileAttempts = new Map<string, number>();
 
   constructor(
     private readonly registry: StardewAgentRegistry,
@@ -419,22 +436,54 @@ export class ProtocolAdapter {
   }
 
   /**
-   * 超时对账重发（2026-08-17）：超时后凭原 instructionId 重发 execute_adjust。
-   * C# 幂等缓存（256 条环形）命中返回原回执 → handleAdjustResult 正常驱动 pending
-   * → committed/rolled_back 闭环；未执行过则 C# 新执行（回执再次超时则 pending 保留
-   * 等 reconnect_sync 对账）。重发幂等：pendingReconciles 去重 + sendAdjust 内部去重。
+   * 超时对账重发（2026-08-17，issue #27 加重发上限）：超时后凭原 instructionId 重发
+   * execute_adjust，最多 MAX_RECONCILE_ATTEMPTS 次。C# 幂等缓存（256 条环形）命中返回
+   * 原回执 → handleAdjustResult 正常驱动 pending → committed/rolled_back 闭环；
+   * 未执行过则 C# 新执行（回执再次超时则 pending 保留等 reconnect_sync 对账）。
+   * 超限：console.error 留痕 + 账本条目落 dead_letter 终态（不再重发，停止 ~40s 一轮的
+   * 无限循环）；dead_letter 条目随账本 JSON 落盘，listDeadLetters 可查，人工裁决。
+   * 重发幂等：pendingReconciles 去重 + sendAdjust 内部去重。
    */
   private scheduleReconcile(msg: ExecuteAdjustMessage): void {
     if (this.pendingReconciles.has(msg.instructionId)) return;
-    this.pendingReconciles.set(msg.instructionId, msg);
+
+    const attempts = (this.reconcileAttempts.get(msg.instructionId) ?? 0) + 1;
+    if (attempts > MAX_RECONCILE_ATTEMPTS) {
+      // 超限：ERROR 级留痕（instructionId + 金额摘要，issue #27 验收口径），落 dead_letter，停止循环。
+      this.reconcileAttempts.delete(msg.instructionId);
+      console.error(
+        `[${timestamp()}] [execute_adjust] ${msg.instructionId} reconcile gave up after ${MAX_RECONCILE_ATTEMPTS} attempts `
+        + `(npc=${msg.npcName}, ops=[${describeOps(msg.ops)}]) — ledger entry -> dead_letter, no further resend`,
+      );
+      const ledger = this.options?.ledger;
+      if (ledger) {
+        const entry = ledger.deadLetter(
+          msg.npcName,
+          msg.instructionId,
+          `reconcile exhausted after ${MAX_RECONCILE_ATTEMPTS} attempts (receipt never arrived)`,
+        );
+        if (entry) {
+          this.pendingSaves.push(
+            ledger.save(msg.npcName).catch((err) => {
+              console.error(`[execute_adjust] ledger.save failed after dead_letter for ${msg.npcName}:`, err);
+            }),
+          );
+        }
+      }
+      return;
+    }
+
+    this.reconcileAttempts.set(msg.instructionId, attempts);
     const retryMs = this.options?.adjustReconcileRetryMs ?? ADJUST_RECONCILE_RETRY_MS;
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       this.pendingReconciles.delete(msg.instructionId);
       console.log(
-        `[${timestamp()}] [execute_adjust] ${msg.instructionId} reconciling after timeout (C# idempotent cache should return original receipt)`,
+        `[${timestamp()}] [execute_adjust] ${msg.instructionId} reconciling after timeout `
+        + `(attempt ${attempts}/${MAX_RECONCILE_ATTEMPTS}; C# idempotent cache should return original receipt)`,
       );
       void this.sendAdjust(msg);
     }, retryMs);
+    this.pendingReconciles.set(msg.instructionId, { msg, timer });
   }
 
   /**
@@ -456,6 +505,15 @@ export class ProtocolAdapter {
       // 幂等由 C# 指令结果缓存保证，账本由 handleAdjustResult 的 pending 状态判断驱动。
       console.log(`[${timestamp()}] [adjust_result] no pending waiter for ${req.instructionId} (重复回执/waiter 已超时，幂等跳过)`);
     }
+
+    // issue #27：回执到达即取消对账重发（迟到回执 + 定时器已排程 → 不再空转重发），
+    // 并清零重发计数（同 instructionId 不会复用，防 Map 无界增长）。
+    const scheduled = this.pendingReconciles.get(req.instructionId);
+    if (scheduled) {
+      clearTimeout(scheduled.timer);
+      this.pendingReconciles.delete(req.instructionId);
+    }
+    this.reconcileAttempts.delete(req.instructionId);
 
     const ledger = this.options?.ledger;
     const npcName = req.npcName || pending?.npcName;

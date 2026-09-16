@@ -4,7 +4,7 @@ import { writeFileAtomic } from "./atomic-fs";
 import type { AdjustOp, AdjustResultMessage, AdjustStepResult, SceneState } from "./types";
 
 /**
- * 单笔 pending 账目（TS 账本状态机：pending → committed | rolled_back）。
+ * 单笔 pending 账目（TS 账本状态机：pending → committed | rolled_back | dead_letter）。
  * pending 记账不修改 money/items——余额只在实际入账（committed）或回滚时变化。
  */
 export interface PendingAdjust {
@@ -12,7 +12,8 @@ export interface PendingAdjust {
   requestId: string;
   npcName: string;
   ops: AdjustOp[];
-  status: "pending" | "committed" | "rolled_back";
+  /** dead_letter 是对账重发超限的终态（issue #27）：条目保留在 pending 表内供人工/诊断查验。 */
+  status: "pending" | "committed" | "rolled_back" | "dead_letter";
   createdAt: string;
   /** 2026-08-16 联机：指令发起玩家（execute_adjust.playerId 原样存，断线重发保持）。可选。 */
   playerId?: string;
@@ -21,6 +22,8 @@ export interface PendingAdjust {
    * 短暂存在，供当次调用方消费，不再留存在账本里。 */
   result?: AdjustResultMessage;
   rollbackReason?: string;
+  /** dead_letter 原因（issue #27：对账重发超限的 ERROR 摘要，落盘供事后排障）。 */
+  deadLetterReason?: string;
 }
 
 /** 账本中一件物品的存量（key 为 qualified item id，如 "(O)128"）。 */
@@ -52,7 +55,8 @@ export type BeginPendingResult =
  * 权威经济账本（2026-08-15 账本迁移设计 §4.1，步骤 1 骨架）。
  * TS 是经济权威：业务校验（NPC 余额/库存）在这里做；C# 只做物理校验 + 原语执行。
  * 流程：beginPending（业务校验 + 记 pending）→ execute_adjust 下发 → adjust_result 回执
- * → commit（pending→committed，应用余额/物品）或 rollback（pending→rolled_back，零变更）。
+ * → commit（pending→committed，应用余额/物品）或 rollback（pending→rolled_back，零变更）；
+ * 对账重发超限 → deadLetter（pending→dead_letter，issue #27，条目保留供人工/诊断查验）。
  * 持久化：agents/{npc}_ledger.json（镜像 AgentMemory 文件风格）；首次见 NPC 从 worldSnapshot 播种。
  * 步骤 1 不拦截任何工具——旧路径完全不动，账本只被 adjust_result 路由消费与播种。
  */
@@ -254,6 +258,36 @@ export class AgentLedger {
     // 终态即时清理（同 commit）：rolled_back 条目零副作用，无保留价值。
     delete state.pending[instructionId];
     return pending;
+  }
+
+  /**
+   * 对账重发超限：pending → dead_letter（issue #27 终态，唯一**不即时删除**的终态）。
+   * C# 回执下落不明、且 3 次对账重发仍未闭环——真实执行与否不可判定，账目不能当作
+   * 干净失败回滚（回滚会让 LLM 重试导致双倍扣钱），也不能一直挂着 pending 无限重发。
+   * 条目留在 pending 表内随账本 JSON 落盘：人肉排障 / 诊断命令可直接读到
+   * instructionId、ops 与 deadLetterReason，人工裁决后手工修正账目。
+   */
+  deadLetter(npcName: string, instructionId: string, reason: string): PendingAdjust | undefined {
+    const state = this.getOrCreate(npcName);
+    const pending = state.pending[instructionId];
+    if (!pending || pending.status !== "pending") return undefined;
+
+    pending.status = "dead_letter";
+    pending.deadLetterReason = reason;
+    return pending;
+  }
+
+  /** 全部 NPC 的 dead_letter 条目（诊断/人工对账用；正常稳态应为空）。 */
+  listDeadLetters(): Array<{ npcName: string; pending: PendingAdjust }> {
+    const out: Array<{ npcName: string; pending: PendingAdjust }> = [];
+    for (const [npcName, state] of this.states) {
+      for (const pending of Object.values(state.pending)) {
+        if (pending.status === "dead_letter") {
+          out.push({ npcName, pending });
+        }
+      }
+    }
+    return out;
   }
 
   getPending(npcName: string, instructionId: string): PendingAdjust | undefined {
