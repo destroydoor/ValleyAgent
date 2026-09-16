@@ -109,6 +109,28 @@ test("handleDialogue returns dialogue response with speech", async () => {
   }
 });
 
+// ─── issue #26 批⑤（审计 §4.5 误诊修复）：缺 worldSnapshot 不再误标 llm_error ───
+
+test("handleDialogue missing worldSnapshot → bad_request fallback（非 llm_error）", async () => {
+  const { adapter, dir } = makeAdapter();
+  try {
+    const resp = await adapter.handleDialogue({
+      type: "dialogue",
+      requestId: "req-no-snap",
+      npcName: "Abigail",
+      playerInput: "你好",
+      worldSnapshot: undefined as never,
+    });
+    expect(resp.type).toBe("dialogue_response");
+    expect(resp.fallback).toBe(true);
+    expect(resp.fallbackReason).toBe("bad_request");
+    expect(resp.speech.length).toBeGreaterThan(0);
+  } finally {
+    await adapter.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("handleDialogue returns fallback on LLM failure", async () => {
   const dir = mkdtempSync(join(tmpdir(), "valley-adapter-test-"));
   const loader = new NpcPromptLoader(DATA_PATH);

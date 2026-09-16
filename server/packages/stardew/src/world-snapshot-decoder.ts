@@ -2,10 +2,17 @@ import type { WorldSnapshot, SceneState } from "./types";
 
 const REQUIRED_FIELDS = ["season", "day", "time", "weather", "location", "friendship", "farmerName"] as const;
 
+/**
+ * issue #26 批⑤（审计 §4.5）：worldSnapshot 结构校验失败（缺必填字段）。此前抛普通
+ * Error，会被 rule-engine 兜底统一标成 llm_error——排障被误导去查 LLM key/配额。
+ * 类型化后由 rule-engine 分类为 fallbackReason="validation_failed"。
+ */
+export class SnapshotValidationError extends Error {}
+
 export function decodeWorldSnapshot(snap: WorldSnapshot): SceneState {
   for (const field of REQUIRED_FIELDS) {
     if (snap[field] === undefined || snap[field] === null) {
-      throw new Error(`WorldSnapshot missing required field: ${field}`);
+      throw new SnapshotValidationError(`WorldSnapshot missing required field: ${field}`);
     }
   }
 

@@ -625,6 +625,17 @@ export class ProtocolAdapter {
     console.log(`[${timestamp()}] [recv] dialogue npc=${req.npcName} player="${truncate(req.playerInput, 80)}"`);
 
     try {
+      // issue #26 批⑤（审计 §4.5 误诊修复）：缺 worldSnapshot 是坏请求——此前会在
+      // decodeWorldSnapshot 上抛 TypeError 被统一 catch 标成 llm_error，排障被误导去查
+      // LLM key/配额。现在显式分类 bad_request（整体缺失=载荷没带；个别必填字段缺失由
+      // SnapshotValidationError 分类为 validation_failed）。本请求未做任何处理，不写记忆。
+      if (!req.worldSnapshot) {
+        console.error(
+          `[${timestamp()}] [dialogue] ${req.npcName}: request missing worldSnapshot — bad_request fallback (check C# WorldSnapshotBuilder side, not LLM)`,
+        );
+        return this.ruleEngine.buildFallbackResponse(req, new Error("missing worldSnapshot"), "bad_request");
+      }
+
       const agent = this.registry.getOrCreate(req.npcName);
 
       // Load memory if not yet loaded (lazy load on first dialogue)

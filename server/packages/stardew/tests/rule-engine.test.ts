@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { RuleEngine } from "../src/rule-engine";
-import { LLMBillingError, LLMUnavailableError } from "@valley/core";
+import { LLMBillingError, LLMBudgetError, LLMUnavailableError } from "@valley/core";
+import { SnapshotValidationError } from "../src/world-snapshot-decoder";
 import type { DialogueRequest } from "../src/types";
 
 const req: DialogueRequest = {
@@ -53,6 +54,41 @@ test("buildFallbackResponse for non-Error thrown value", () => {
   const resp = engine.buildFallbackResponse(req, "string error");
   expect(resp.speech).toBe("......");
   expect(resp.fallback).toBe(true);
+});
+
+// ─── issue #26 批⑤：fallbackReason 扩档（审计 §4.5——代码缺陷不再误标 llm_error）───
+
+test("buildFallbackResponse for LLMBudgetError → config", () => {
+  const engine = new RuleEngine();
+  const err = new LLMBudgetError("Token budget exceeded: used 100, budget 100");
+  const resp = engine.buildFallbackResponse(req, err);
+  expect(resp.fallback).toBe(true);
+  expect(resp.fallbackReason).toBe("config");
+  expect(resp.speech.length).toBeGreaterThan(0);
+});
+
+test("buildFallbackResponse for TypeError → internal_error（§4.5 误诊修复）", () => {
+  const engine = new RuleEngine();
+  const err = new TypeError("Cannot read properties of undefined (reading 'season')");
+  const resp = engine.buildFallbackResponse(req, err);
+  expect(resp.fallback).toBe(true);
+  expect(resp.fallbackReason).toBe("internal_error");
+});
+
+test("buildFallbackResponse for SnapshotValidationError → validation_failed", () => {
+  const engine = new RuleEngine();
+  const err = new SnapshotValidationError("WorldSnapshot missing required field: season");
+  const resp = engine.buildFallbackResponse(req, err);
+  expect(resp.fallback).toBe(true);
+  expect(resp.fallbackReason).toBe("validation_failed");
+});
+
+test("buildFallbackResponse forcedReason 直通（缺 worldSnapshot 守卫 → bad_request）", () => {
+  const engine = new RuleEngine();
+  const resp = engine.buildFallbackResponse(req, new Error("missing worldSnapshot"), "bad_request");
+  expect(resp.fallback).toBe(true);
+  expect(resp.fallbackReason).toBe("bad_request");
+  expect(resp.speech.length).toBeGreaterThan(0);
 });
 
 test("buildFallbackResponse always returns non-empty speech", () => {

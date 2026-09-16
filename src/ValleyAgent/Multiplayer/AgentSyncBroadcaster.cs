@@ -124,7 +124,9 @@ public class AgentSyncBroadcaster
     ///     fallback 为 TS 规则引擎降级标记（BUSY 等），farmhand 端据此走灰色系统提示（2026-08-23 审计补齐）。
     ///     requestId 为房客请求关联 ID 的回填（2026-09-09）：farmhand 端据此精确配对 pending；
     ///     null（旧调用点/兜底无上下文时）farmhand 退回 FIFO 匹配。
-    ///     fallbackReason 为降级原因（busy/llm_error/billing/unavailable，2026-09-13 R2），透传自 TS
+    ///     fallbackReason 为降级原因（busy/llm_error/billing/unavailable/config/bad_request/
+    ///     validation_failed/internal_error，2026-09-13 R2 立档 + issue #26 批⑤扩档，
+    ///     取值约定见 server/protocol/messages.json），透传自 TS
     ///     DialogueResponse.FallbackReason；null = 旧客户端/本地兜底无降级上下文。
     /// </summary>
     public void SendDialogueResponse(string npcName, string text, string emotion, string? action, long targetPlayerId,
