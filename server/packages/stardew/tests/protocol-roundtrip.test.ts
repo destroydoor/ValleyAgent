@@ -14,6 +14,7 @@ import type {
   ExecuteAdjustMessage,
   AdjustResultMessage,
   ReconnectSyncMessage,
+  ErrorFrame,
 } from "../src/types";
 
 // ---------------------------------------------------------------------------
@@ -369,6 +370,7 @@ test("all active message types preserve their type field through round-trip", ()
     { type: "ack" },
     { type: "dialogue" },
     { type: "dialogue_response" },
+    { type: "error" },
     { type: "action_result" },
     { type: "state_changed" },
     { type: "director_command" },
@@ -379,6 +381,47 @@ test("all active message types preserve their type field through round-trip", ()
   for (const m of messages) {
     const rt = roundtrip(m);
     expect(rt.type, `type "${m.type}" should survive round-trip`).toBe(m.type);
+  }
+});
+
+// ─── error 帧（issue #22：TS 统一错误帧，ts_to_csharp） ───
+
+test("error frame round-trip preserves code/message/requestId when requestId present", () => {
+  const frame: ErrorFrame = {
+    type: "error",
+    code: "unknown_type",
+    message: "unknown message type: consolidate_day",
+    requestId: "req-unknown-1",
+  };
+  const rt = roundtrip(frame);
+  expect(rt.type).toBe("error");
+  expect(rt.code).toBe("unknown_type");
+  expect(rt.message).toBe("unknown message type: consolidate_day");
+  expect(rt.requestId).toBe("req-unknown-1");
+});
+
+test("error frame round-trip omits requestId when unparseable (畸形帧场景)", () => {
+  const frame: ErrorFrame = {
+    type: "error",
+    code: "bad_request",
+    message: "SyntaxError: Unexpected token",
+  };
+  const rt = roundtrip(frame);
+  expect(rt.type).toBe("error");
+  expect(rt.code).toBe("bad_request");
+  expect(rt.requestId).toBeUndefined();
+  // wire 上不应出现 requestId 键（C# 端 TryGetProperty 判断的是存在性）
+  expect("requestId" in rt).toBe(false);
+});
+
+test("error frame round-trip preserves all four error codes", () => {
+  const codes = ["bad_request", "validation_failed", "unknown_type", "internal_error"] as const;
+  for (const code of codes) {
+    const frame: ErrorFrame = { type: "error", code, message: `detail for ${code}`, requestId: `req-${code}` };
+    const rt = roundtrip(frame);
+    expect(rt.type).toBe("error");
+    expect(rt.code).toBe(code);
+    expect(rt.requestId).toBe(`req-${code}`);
   }
 });
 

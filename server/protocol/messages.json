@@ -240,6 +240,42 @@
       ]
     },
     {
+      "type": "error",
+      "direction": "ts_to_csharp",
+      "transport": "fire_and_forget",
+      "status": "active",
+      "routed_by_ts": false,
+      "sent_by_csharp": false,
+      "description": "TS 统一错误帧（issue #22）：JSON 解析失败 / payload 校验失败 / 未知类型 / handler 异常时由 TS 返回。requestId 能从原始帧解析就带（C# HandleMessage 按 requestId 完成 pending request 快速失败）；解析不出就省略（落到 C# OnUnsolicitedMessage 的 Warn 日志留痕）。兼容性：老 TS 只发 message 不发 code；C# CheckErrorResponse 兼容读 message 与 error 双字段（更老的 TS 只填 error）。登记为 active 的依据与 pong/dialogue_response 同类：direction=ts_to_csharp 且 sent_by_csharp=false 且 routed_by_ts=false（TS-only 响应，不进 routeMessage、C# 从不发送，不会误报死管道）。",
+      "fields": [
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "value": "error"
+        },
+        {
+          "name": "requestId",
+          "type": "string",
+          "required": false,
+          "description": "从原始帧解析成功时回填，C# 据此匹配 pending request；畸形帧解析不出时省略"
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true,
+          "value": "bad_request | internal_error | unknown_type | validation_failed",
+          "description": "稳定错误码：bad_request=帧不是合法 JSON（此时无 requestId）；validation_failed=JSON 合法但不是合规消息对象（非 object/数组/缺 type）；unknown_type=routeMessage 无此 case（协议漂移/单端先行）；internal_error=handler 内部抛异常"
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "人类可读错误详情（含异常类型名前缀，如 TypeError: ...，供归因）"
+        }
+      ]
+    },
+    {
       "type": "action_result",
       "direction": "csharp_to_ts",
       "transport": "fire_and_forget",

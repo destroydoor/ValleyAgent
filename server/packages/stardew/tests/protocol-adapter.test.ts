@@ -429,3 +429,69 @@ test("handleDirectorCommand without sendToCsharp returns ack and drops", async (
     logSpy.mockRestore();
   }
 });
+
+// ─── issue #22：未知类型 / 非对象帧不再静默 ack，改回统一 error 帧 ───
+
+test("routeMessage unknown type returns error frame with unknown_type code and requestId echo", async () => {
+  const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+  const { adapter, dir } = makeAdapter();
+  try {
+    const resp = await adapter.routeMessage({ type: "consolidate_day", requestId: "req-unknown-1" });
+    expect(resp.type).toBe("error");
+    const err = resp as import("../src/types").ErrorFrame;
+    expect(err.code).toBe("unknown_type");
+    expect(err.message).toContain("consolidate_day");
+    // requestId 能 echo 就 echo——C# 按 requestId 完成 pending 快速失败
+    expect(err.requestId).toBe("req-unknown-1");
+    // AGENTS.md §3.6：被丢弃的类型与原因必须有 WARN 日志
+    const lines = warnSpy.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes("[protocol]") && l.includes("consolidate_day"))).toBe(true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    warnSpy.mockRestore();
+  }
+});
+
+test("routeMessage unknown type without requestId omits requestId field", async () => {
+  const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+  const { adapter, dir } = makeAdapter();
+  try {
+    const resp = await adapter.routeMessage({ type: "totally_bogus" });
+    expect(resp.type).toBe("error");
+    const err = resp as import("../src/types").ErrorFrame;
+    expect(err.code).toBe("unknown_type");
+    expect(err.requestId).toBeUndefined();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    warnSpy.mockRestore();
+  }
+});
+
+test("routeMessage no longer silently acks unknown types (TS-UNKNOWN-TYPE-SILENT 回归)", async () => {
+  const { adapter, dir } = makeAdapter();
+  try {
+    const resp = await adapter.routeMessage({ type: "beat_plan", requestId: "req-dead-1" });
+    // 旧行为：{ type: "ack", requestId: "unknown" } 零日志——协议漂移完全不可见
+    expect(resp).not.toEqual({ type: "ack", requestId: "unknown" });
+    expect(resp.type).toBe("error");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("routeMessage non-object frame returns validation_failed error", async () => {
+  const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+  const { adapter, dir } = makeAdapter();
+  try {
+    for (const bad of [null, 42, "a string", [1, 2, 3]]) {
+      const resp = await adapter.routeMessage(bad);
+      expect(resp.type).toBe("error");
+      const err = resp as import("../src/types").ErrorFrame;
+      expect(err.code).toBe("validation_failed");
+      expect(err.message).toContain("not an object");
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    warnSpy.mockRestore();
+  }
+});

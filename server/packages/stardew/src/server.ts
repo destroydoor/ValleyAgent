@@ -8,6 +8,7 @@ import { GameContextManager } from "./game-context";
 import { AgentLedger } from "./agent-ledger";
 import { EmotionEngine } from "./emotion-engine";
 import { attachConsoleTee } from "./log-tee";
+import type { ErrorFrame, ProtocolErrorCode } from "./types";
 
 // 2026-09-11 观测补强：VALLEY_SERVER_LOGFILE 由 C# 端在"可见控制台窗口"模式
 // （ServerConsoleWindow=true，发行包默认）下设置——该模式 stdout 无法重定向，
@@ -47,6 +48,50 @@ export interface ServerConfig {
 export interface ServerHandle {
   port: number;
   stop: () => Promise<void>;
+}
+
+/**
+ * 从原始帧文本提取 requestId（issue #22）——能 JSON.parse 且 requestId 是 string
+ * 才返回；畸形帧解析不出就不带（调用方省略该字段）。
+ */
+export function extractRequestIdFromFrame(rawFrame: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(rawFrame);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      const reqId = (parsed as { requestId?: unknown }).requestId;
+      if (typeof reqId === "string") return reqId;
+    }
+  } catch {
+    // 帧本身不是合法 JSON（bad_request 场景）——本就没有可归因的 requestId
+  }
+  return undefined;
+}
+
+/**
+ * 构造统一 error 帧（issue #22，审计 §3.5 的落点修复）：requestId 能从原始帧
+ * 解析就回填——C# 端按 requestId 完成 pending request 并立即抛出带 code 的
+ * 异常（快速失败），而不是 120s 盲等超时。
+ */
+export function buildErrorFrame(code: ProtocolErrorCode, err: unknown, rawFrame?: string): ErrorFrame {
+  const requestId = rawFrame !== undefined ? extractRequestIdFromFrame(rawFrame) : undefined;
+  return {
+    type: "error",
+    code,
+    // 保留 String(err)（含 "TypeError: ..." 前缀）而非 err.message——异常类型名是归因线索
+    message: String(err),
+    ...(requestId !== undefined ? { requestId } : {}),
+  };
+}
+
+/** 发送 error 帧；catch 块中也要检查 ws 状态，避免二次抛出导致进程崩溃。 */
+function sendErrorFrame(ws: import("bun").ServerWebSocket<unknown>, frame: ErrorFrame): void {
+  try {
+    if (ws.readyState === 1) { // WebSocket.OPEN
+      ws.send(JSON.stringify(frame));
+    }
+  } catch (sendErr) {
+    console.error("[server] failed to send error response:", sendErr);
+  }
 }
 
 export async function startServer(config: ServerConfig): Promise<ServerHandle> {
@@ -168,9 +213,17 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
         activeWs = ws;
       },
       async message(ws, message) {
+        const text = typeof message === "string" ? message : new TextDecoder().decode(message);
+        let parsed: unknown;
         try {
-          const text = typeof message === "string" ? message : new TextDecoder().decode(message);
-          const parsed = JSON.parse(text);
+          parsed = JSON.parse(text);
+        } catch (err) {
+          // issue #22：帧不是合法 JSON → bad_request，畸形帧解析不出 requestId 就不带
+          console.error("[server] incoming frame is not valid JSON (bad_request):", err);
+          sendErrorFrame(ws, buildErrorFrame("bad_request", err));
+          return;
+        }
+        try {
           const response = await adapter.routeMessage(parsed);
           // ws 可能在 await routeMessage 期间关闭，send 前必须检查状态
           if (ws.readyState === 1) { // WebSocket.OPEN
@@ -180,14 +233,9 @@ export async function startServer(config: ServerConfig): Promise<ServerHandle> {
           }
         } catch (err) {
           console.error("[server] message handler error:", err);
-          // catch 块中也要检查 ws 状态，避免二次抛出导致进程崩溃
-          try {
-            if (ws.readyState === 1) {
-              ws.send(JSON.stringify({ type: "error", message: String(err) }));
-            }
-          } catch (sendErr) {
-            console.error("[server] failed to send error response:", sendErr);
-          }
+          // issue #22：handler 抛异常 → internal_error，requestId 能解析就回填，
+          // C# 按 requestId 匹配 pending 立即失败，不再 120s 盲等。
+          sendErrorFrame(ws, buildErrorFrame("internal_error", err, text));
         }
       },
       close(ws, code, reason) {
