@@ -30,7 +30,7 @@
   "CS-LOG-NO-STACK|src/ValleyAgent/Economy/AdjustExecutor.cs": 1,
   "CS-LOG-NO-STACK|src/ValleyAgent/Goals/GoalExecutor.cs": 1,
   "CS-LOG-NO-STACK|src/ValleyAgent/Initialization/EventHandlerInitializer.cs": 32,
-  "CS-LOG-NO-STACK|src/ValleyAgent/ModEntry.cs": 10,
+  "CS-LOG-NO-STACK|src/ValleyAgent/ModEntry.cs": 9,
   "CS-LOG-NO-STACK|src/ValleyAgent/Multiplayer/AgentSyncBroadcaster.cs": 6,
   "CS-LOG-NO-STACK|src/ValleyAgent/Multiplayer/HostRequestHandlers.cs": 6,
   "CS-LOG-NO-STACK|src/ValleyAgent/Multiplayer/Transports/FarmhandDialogueTransport.cs": 1,

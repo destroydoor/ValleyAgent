@@ -213,46 +213,62 @@ public class EventHandlerInitializer
         QueueTelemetry.WarnIfDeep("pre-speak", _pendingPreSpeakActions.Count, null);
     }
 
+    /// <summary>
+    ///     弱服务解析（issue #25）：ServiceInitializer 分段降级时部分服务未注册，
+    ///     GetService 的"未注册即抛"会把单段故障放大成整模组降级（EventHandlerInitializer
+    ///     在 InitializeHostMode 中紧随其后）。改 TryGetService 语义：缺的只是那个服务，
+    ///     各事件处理器对字段本就有 null 守卫。
+    /// </summary>
+    private T? Service<T>() where T : class => _services.TryGetService<T>(out var service) ? service : null;
+
     public void Initialize()
     {
-        _agentService = _services.GetService<AgentService>();
-        _config = _services.GetService<ModConfig>();
-        _bioLoader = _services.GetService<ValleyTalkBioLoader>();
-        _locationGraph = _services.GetService<LocationGraph>();
-        _agentNavigator = _services.GetService<AgentNavigator>();
-        _movementService = _services.GetService<IMovementService>();
-        _agentServerProvider = _services.GetService<DualPathAgentServerProvider>();
-        _serverProcessManager = _services.GetService<ServerProcessManager>();
-        _agentTickLoop = _services.GetService<AgentTickLoop>();
-        _sparkAllocator = _services.GetService<SparkAllocator>();
-        _allocateAgentHandler = _services.GetService<AllocateAgentHandler>();
+        _agentService = Service<AgentService>();
+        _config = Service<ModConfig>();
+        _bioLoader = Service<ValleyTalkBioLoader>();
+        _locationGraph = Service<LocationGraph>();
+        _agentNavigator = Service<AgentNavigator>();
+        _movementService = Service<IMovementService>();
+        _agentServerProvider = Service<DualPathAgentServerProvider>();
+        _serverProcessManager = Service<ServerProcessManager>();
+        _agentTickLoop = Service<AgentTickLoop>();
+        _sparkAllocator = Service<SparkAllocator>();
+        _allocateAgentHandler = Service<AllocateAgentHandler>();
         if (_agentTickLoop != null)
         {
             _agentTickLoop.OnVanillaReleaseFinalized += OnVanillaReleaseFinalized;
         }
 
-        _agentRenderer = _services.GetService<AgentRenderer>();
-        _agentHud = _services.GetService<AgentHUD>();
-        _hudRenderer = _services.GetService<SmaHUDRenderer>();
-        _decisionContextBuilder = _services.GetService<DecisionContextBuilder>();
-        _monsterAggroManager = _services.GetService<MonsterAggroManager>();
-        _saveDataManager = _services.GetService<SaveDataManager>();
-        _commandExecutor = _services.GetService<CommandExecutor>();
-        _adjustExecutor = _services.GetService<AdjustExecutor>();
-        _debugLogger = _services.GetService<DebugLogger>();
-        _friendshipSystem = _services.GetService<FriendshipSystem>();
-        _proactiveSpeechQuota = _services.GetService<ProactiveSpeechQuota>();
+        _agentRenderer = Service<AgentRenderer>();
+        _agentHud = Service<AgentHUD>();
+        _hudRenderer = Service<SmaHUDRenderer>();
+        _decisionContextBuilder = Service<DecisionContextBuilder>();
+        _monsterAggroManager = Service<MonsterAggroManager>();
+        _saveDataManager = Service<SaveDataManager>();
+        _commandExecutor = Service<CommandExecutor>();
+        _adjustExecutor = Service<AdjustExecutor>();
+        _debugLogger = Service<DebugLogger>();
+        _friendshipSystem = Service<FriendshipSystem>();
+        _proactiveSpeechQuota = Service<ProactiveSpeechQuota>();
         ChatBarRouter.ProactiveQuota = _proactiveSpeechQuota; // E5-3: 话痨度引用配额
-        _multiplayerBroadcaster = _services.GetService<AgentSyncBroadcaster>();
-        _transcriptSink = _services.GetService<TranscriptSink>();
+        _multiplayerBroadcaster = Service<AgentSyncBroadcaster>();
+        _transcriptSink = Service<TranscriptSink>();
         // E3-5: NPC 求购服务（长 TTL 求购单）。NPCGiftPatch 注入其自持 Registry 供求购命中判定
         // （2026-08-15 步骤 2：结算已迁 TS，C# 只做命中提示）。
-        _purchaseRequestService = _services.GetService<NpcPurchaseRequestService>();
+        _purchaseRequestService = Service<NpcPurchaseRequestService>();
         NPCGiftPatch.PurchaseOffers = _purchaseRequestService?.PurchaseOffers;
         // 阶段 3 (3.6): 玩家行为采样跟踪器（10-tick 采样，day_started 聚合）
-        _playerActionTracker = _services.GetService<PlayerActionTracker>();
+        _playerActionTracker = Service<PlayerActionTracker>();
         // 阶段 3 (3.7): Director 上下文拼装器（day_started 压缩 800-1500 token 文本随 day_started 发 TS）
-        _directorContextBuilder = _services.GetService<DirectorContextBuilder>();
+        _directorContextBuilder = Service<DirectorContextBuilder>();
+
+        // issue #25：关键服务缺失（初始化分段降级）时显式登记，让 status/diag 能解释
+        // "为什么 AI 没反应"——而不是只留下半套接线。
+        if (_agentService == null)
+        {
+            DegradedFeatures.Report("event-handler-wiring", "AgentService 未注册（初始化分段降级），事件处理不接线");
+            _monitor.Log("[Init] AgentService not registered — event handlers will not be wired (degraded)", LogLevel.Error);
+        }
 
         if (_config != null)
         {
@@ -344,11 +360,16 @@ public class EventHandlerInitializer
 
     public void RegisterHarmonyPatches(IManifest _)
     {
-        try
-        {
-            var harmony = new Harmony(GameConstants.HarmonyId);
-            var translation = _services.GetService<ITranslationProvider>();
+        var harmony = new Harmony(GameConstants.HarmonyId);
+        var translation = Service<ITranslationProvider>();
 
+        // issue #25（异常处理审计 PR3）：按补丁类拆段。此前单一 PatchAll + 只捕
+        // TargetInvocationException：一处补丁冲突（HarmonyException/AmbiguousMatch 等）中断
+        // 整个注册流程，而已打上的补丁留在游戏里——最坏组合"半套补丁生效 + 无 AI 后端接管"。
+        // 现在每个补丁类独立段：失败捕全异常（HarmonyException 在其中）、Error 归因、
+        // 对该补丁 Unpatch 回退原版，其余补丁继续注册；降级记入 DegradedFeatures（status/diag 可查）。
+        PatchSegment(harmony, nameof(NPCDialoguePatch), typeof(NPCDialoguePatch), () =>
+        {
             NPCDialoguePatch.AgentService = _agentService;
             NPCDialoguePatch.AgentServerProvider = _agentServerProvider;
             NPCDialoguePatch.Monitor = _monitor;
@@ -356,10 +377,14 @@ public class EventHandlerInitializer
             NPCDialoguePatch.Config = _config;
             // Spark 激活回调：玩家与非 Agent 村民对话时低概率激活为 Agent（设计文档 §4.2.3）
             NPCDialoguePatch.OnSparkCandidate = TrySparkActivate;
+        });
 
+        PatchSegment(harmony, nameof(DialogueBoxInputPatch), typeof(DialogueBoxInputPatch), () =>
             DialogueBoxInputPatch.Initialize(_monitor, _agentService, _agentServerProvider, _commandExecutor,
-                _bioLoader, WireAgentStateEvents);
+                _bioLoader, WireAgentStateEvents));
 
+        PatchSegment(harmony, "ChatBoxInputPatch+ChatBarRouter", typeof(ChatBoxInputPatch), () =>
+        {
             // E2-2: 聊天栏玩家→NPC 路由（ChatBox 输入拦截 + 四层消歧 + 会话模式）
             ChatBoxInputPatch.Initialize(_monitor);
             ChatBarRouter.Initialize(
@@ -369,28 +394,102 @@ public class EventHandlerInitializer
                 _commandExecutor,
                 _config,
                 _proactiveSpeechQuota,
-                _services.GetService<NpcScheduleService>());
+                Service<NpcScheduleService>());
+        });
 
+        PatchSegment(harmony, nameof(NPCGiftPatch), typeof(NPCGiftPatch), () =>
+        {
             NPCGiftPatch.AgentService = _agentService;
             NPCGiftPatch.AgentServerProvider = _agentServerProvider;
             NPCGiftPatch.Monitor = _monitor;
+        });
+
+        PatchSegment(harmony, nameof(SocialPagePatch), typeof(SocialPagePatch), () =>
+        {
             SocialPagePatch.AgentService = _agentService;
             SocialPagePatch.Monitor = _monitor;
+        });
+    }
 
-            harmony.PatchAll();
-            _monitor.Log("Harmony patches applied successfully", LogLevel.Debug);
-        }
-        catch (TargetInvocationException ex)
+    /// <summary>
+    ///     单个 Harmony 补丁段的注册 + 失败回退（issue #25）。
+    ///     先执行静态字段注入（init），再对该补丁类 <c>CreateClassProcessor(...).Patch()</c>
+    ///     （与 PatchAll 对该类的处理等价）；任一步失败：捕全异常（HarmonyException 在其中）、
+    ///     Error 归因 + ModErrorLog 落盘 + DegradedFeatures 登记，并把该补丁类**已打上的部分**
+    ///     全部 Unpatch 回退原版（处理器中途失败可能已 patch 了同类的前几个目标方法）——
+    ///     绝不留下"半套补丁生效但无 AI 后端"的组合；其余补丁段不受影响继续注册。
+    /// </summary>
+    private void PatchSegment(Harmony harmony, string name, Type patchClass, Action init)
+    {
+        try
         {
-            _monitor.Log($"Failed to apply Harmony patches: {ex.Message}", LogLevel.Error);
+            init();
+            harmony.CreateClassProcessor(patchClass).Patch();
+            _monitor.Log($"[Harmony] patch segment '{name}' applied", LogLevel.Debug);
+        }
+        catch (Exception ex)
+        {
+            UnpatchFailedClass(harmony, patchClass, name);
+            DegradedFeatures.Report(
+                $"harmony:{name}",
+                $"补丁应用失败，该补丁已回退原版行为: {ex.GetType().Name}: {ex.Message}",
+                ex);
+            _monitor.Log(
+                $"[Harmony] patch segment '{name}' failed — rolled back to vanilla for this patch "
+                + $"(other patches unaffected): {ex}",
+                LogLevel.Error);
+            ModErrorLog.LogError("HarmonyPatch", $"patch segment '{name}' failed", ex);
+        }
+    }
+
+    /// <summary>
+    ///     把指定补丁类在本 mod id 下已生效的补丁全部卸掉（回退原版）。
+    ///     目标方法从 Harmony 全局补丁表反查（owner == 本 id 且补丁方法声明类型 == 该补丁类），
+    ///     不重新解析 HarmonyAttribute 的类级/方法级合并语义——反查已生效集合天然准确。
+    ///     回退自身失败只 Warn 留痕：回退失败不能反过来中断其余补丁的注册流程。
+    /// </summary>
+    private void UnpatchFailedClass(Harmony harmony, Type patchClass, string name)
+    {
+        try
+        {
+            var unpatched = 0;
+            foreach (var original in Harmony.GetAllPatchedMethods())
+            {
+                var info = Harmony.GetPatchInfo(original);
+                if (info == null || !info.Owners.Contains(harmony.Id))
+                {
+                    continue;
+                }
+
+                var ownedByClass = info.Prefixes.Concat(info.Postfixes)
+                    .Concat(info.Transpilers).Concat(info.Finalizers)
+                    .Any(p => p.owner == harmony.Id && p.PatchMethod?.DeclaringType == patchClass);
+                if (!ownedByClass)
+                {
+                    continue;
+                }
+
+                harmony.Unpatch(original, HarmonyPatchType.All, harmony.Id);
+                unpatched++;
+            }
+
+            _monitor.Log(
+                $"[Harmony] patch segment '{name}' rolled back: {unpatched} method(s) restored to vanilla",
+                LogLevel.Debug);
+        }
+        catch (Exception rollbackEx)
+        {
+            _monitor.Log($"[Harmony] rollback for patch segment '{name}' failed: {rollbackEx}", LogLevel.Warn);
         }
     }
 
     public void RegisterConsoleCommands()
     {
-        var consoleCommands = _services.GetService<ConsoleCommands>();
-        if (consoleCommands == null)
+        // issue #25：TryGetService 语义——控制台命令是降级排障的工具本身，
+        // 未注册（初始化降级）时静默返回而非抛出中断初始化链。
+        if (!_services.TryGetService(out ConsoleCommands? consoleCommands) || consoleCommands == null)
         {
+            _monitor.Log("[Init] ConsoleCommands not registered — ValleyAgent_status/_diag unavailable", LogLevel.Warn);
             return;
         }
 
@@ -524,6 +623,13 @@ public class EventHandlerInitializer
 
         // 7. 最近一次失败原因（ValleyAgent-error.log 最后一条）
         sb.AppendLine($"Last failure: {ExtractLastFailure(ModErrorLog.ErrorLogPath)}");
+
+        // 8. 降级特性（issue #25）：初始化分段失败 / Harmony 补丁回退 / 整体降级，一屏可见。
+        sb.AppendLine($"Degraded features: {(DegradedFeatures.Any ? DegradedFeatures.Snapshot().Count.ToString() : "none")}");
+        if (DegradedFeatures.Any)
+        {
+            sb.AppendLine(DegradedFeatures.Describe());
+        }
 
         return sb.ToString().TrimEnd();
     }
