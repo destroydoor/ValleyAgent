@@ -66,15 +66,6 @@
       "source_files": [
         "ModConfig.cs:66"
       ]
-    },
-    "aiDailyTopicCount": {
-      "value": 3,
-      "default": 3,
-      "description": "Number of AI-initiated daily conversation topics per NPC",
-      "config_field": "AIDailyTopicCount",
-      "source_files": [
-        "ModConfig.cs:117"
-      ]
     }
   },
   "dialogue": {
@@ -94,24 +85,6 @@
       "config_field": "DialogueTemperature",
       "source_files": [
         "ModConfig.cs:75"
-      ]
-    },
-    "fallbackAIMixProbability": {
-      "value": 0.5,
-      "default": 0.5,
-      "description": "Probability of using AI vs vanilla fallback when AI fails",
-      "config_field": "FallbackAIMixProbability",
-      "source_files": [
-        "ModConfig.cs:102"
-      ]
-    },
-    "fallbackLiveGenerationProbability": {
-      "value": 0.15,
-      "default": 0.15,
-      "description": "Probability of live generation vs cached fallback",
-      "config_field": "FallbackLiveGenerationProbability",
-      "source_files": [
-        "ModConfig.cs:105"
       ]
     },
     "maxGreetingLines": {

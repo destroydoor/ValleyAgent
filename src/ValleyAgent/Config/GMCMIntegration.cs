@@ -62,7 +62,8 @@ public static class GMCMIntegration
         T("紧急状态与状态机 (Emergency & State)", "Emergency & State Machine", c);
 
     private static string SectionEmotion(ModConfig c) => T("情绪与健康 (Emotion & Health)", "Emotion & Health", c);
-    private static string SectionDebug(ModConfig c) => T("调试 (Debug)", "Debug", c);
+    // SectionDebug 已随 issue #13 摘除（2026-09-16）：该段三个条目（调试日志/开发者模式/
+    // 自定义系统提示）均为零消费孤儿配置，删空后段标题一并撤除。
     private static string SectionServer(ModConfig c) => T("服务器高级 (Server Advanced)", "Server Advanced", c);
     private static string SectionDynamicSpeed(ModConfig c) => T("动态速度 (Dynamic Speed)", "Dynamic Speed", c);
     private static string SectionChatBar(ModConfig c) => T("聊天栏路由 (Chat Bar Routing)", "Chat Bar Routing", c);
@@ -261,8 +262,7 @@ public static class GMCMIntegration
         gmcm.AddTextOption(
             manifest,
             name: () => T("对话语言", "Dialogue Language", config),
-            tooltip: () => T("AI 对话使用的语言；Custom 走 CustomSystemPrompt",
-                "Language used for AI dialogue. Custom uses CustomSystemPrompt.", config),
+            tooltip: () => T("AI 对话使用的语言", "Language used for AI dialogue.", config),
             getValue: () => config.Language.ToString(),
             setValue: value =>
             {
@@ -426,12 +426,8 @@ public static class GMCMIntegration
             getValue: () => config.EnableHire,
             setValue: value => config.EnableHire = value);
 
-        gmcm.AddBoolOption(
-            manifest,
-            name: () => T("导演模式", "Director Mode", config),
-            tooltip: () => T("开启叙事编排；关闭则 NPC 完全自主", "Enable director; off = fully autonomous", config),
-            getValue: () => config.EnableDirector,
-            setValue: value => config.EnableDirector = value);
+        // 导演模式开关已随 issue #17 摘除（2026-09-16）：EnableDirector 零行为消费
+        // （C# 侧导演工具层无条件注册，TS 侧编排已砍），--disable-director 透传一并撤除。
 
         gmcm.AddBoolOption(
             manifest,
@@ -553,16 +549,7 @@ public static class GMCMIntegration
             getValue: () => config.PauseAllDialogue,
             setValue: value => config.PauseAllDialogue = value);
 
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("每日 AI 话题数", "Daily AI Topic Count", config),
-            tooltip: () => T("每天生成的 AI 主动话题数量 (1 - 20)", "Number of proactive AI topics generated per day (1 - 20).",
-                config),
-            getValue: () => config.AIDailyTopicCount,
-            setValue: value => config.AIDailyTopicCount = Math.Clamp(value, 1, 20),
-            min: 1,
-            max: 20,
-            interval: 1);
+        // AIDailyTopicCount（每日 AI 话题数）已随 issue #13 摘除：零消费孤儿配置。
 
         gmcm.AddNumberOption(
             manifest,
@@ -778,27 +765,8 @@ public static class GMCMIntegration
             max: 50,
             interval: 1);
 
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("AI 混入概率", "Fallback AI Mix Probability", config),
-            tooltip: () => T("回退路径中调用 AI 决策的比例 (0 - 1)", "Probability of invoking AI in the fallback path (0 - 1).",
-                config),
-            getValue: () => config.FallbackAIMixProbability,
-            setValue: value => config.FallbackAIMixProbability = Math.Clamp(value, 0f, 1f),
-            min: 0f,
-            max: 1f,
-            interval: 0.05f);
-
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("实时生成概率", "Live Generation Probability", config),
-            tooltip: () => T("回退路径中实时生成对话的比例 (0 - 1)", "Probability of live-generating dialogue in fallback (0 - 1).",
-                config),
-            getValue: () => config.FallbackLiveGenerationProbability,
-            setValue: value => config.FallbackLiveGenerationProbability = Math.Clamp(value, 0f, 1f),
-            min: 0f,
-            max: 1f,
-            interval: 0.05f);
+        // FallbackAIMixProbability / FallbackLiveGenerationProbability（回退路径两类概率）
+        // 已随 issue #13 摘除：回退决策链消费者已删除，GMCM 不再渲染。
 
         // ─── Section 6: Dynamic Speed ────────────────────────────────────
         gmcm.AddSectionTitle(manifest, () => SectionDynamicSpeed(config));
@@ -929,33 +897,8 @@ public static class GMCMIntegration
             getValue: () => config.Economy.Enabled,
             setValue: value => config.Economy.Enabled = value);
 
-        gmcm.AddBoolOption(
-            manifest,
-            name: () => T("启用还价", "Enable Haggle", config),
-            tooltip: () => T("允许玩家与 NPC 买卖时讨价还价", "Allow haggling when trading with NPCs.", config),
-            getValue: () => config.Haggle.Enabled,
-            setValue: value => config.Haggle.Enabled = value);
-
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("最大让步轮次", "Max Haggle Rounds", config),
-            tooltip: () => T("还价最多进行几轮 (1 - 10)", "Maximum haggling rounds (1 - 10).", config),
-            getValue: () => config.Haggle.MaxRounds,
-            setValue: value => config.Haggle.MaxRounds = Math.Clamp(value, 1, 10),
-            min: 1,
-            max: 10,
-            interval: 1);
-
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("恶意低价阈值", "Hostile Threshold", config),
-            tooltip: () => T("低于公道价多少比例被视为恶意 (0.05 - 0.95)",
-                "Price ratio below fair price considered hostile (0.05 - 0.95).", config),
-            getValue: () => (float)config.Haggle.HostileThreshold,
-            setValue: value => config.Haggle.HostileThreshold = Math.Clamp(value, 0.05f, 0.95f),
-            min: 0.05f,
-            max: 0.95f,
-            interval: 0.05f);
+        // 启用还价 / 最大让步轮次 / 恶意低价阈值三项已随 issue #13 摘除（2026-09-16）：
+        // 还价状态机唯一实现在 TS 侧，C# 端这三个字段零消费。
 
         gmcm.AddNumberOption(
             manifest,
@@ -1034,27 +977,7 @@ public static class GMCMIntegration
             max: 10000,
             interval: 50);
 
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("状态拒绝冷却（ticks）", "State Rejection Cooldown (ticks)", config),
-            tooltip: () => T("状态被拒绝后到下次决策的冷却 ticks (0 - 10000)",
-                "Cooldown ticks after a state is rejected (0 - 10000).", config),
-            getValue: () => config.StateRejectionCooldownTicks,
-            setValue: value => config.StateRejectionCooldownTicks = Math.Clamp(value, 0, 10000),
-            min: 0,
-            max: 10000,
-            interval: 30);
-
-        gmcm.AddNumberOption(
-            manifest,
-            name: () => T("最大状态拒绝次数", "Max State Rejections", config),
-            tooltip: () => T("连续拒绝状态多少次后强制释放 (0 - 10)", "Consecutive state rejections before forced release (0 - 10).",
-                config),
-            getValue: () => config.MaxStateRejections,
-            setValue: value => config.MaxStateRejections = Math.Clamp(value, 0, 10),
-            min: 0,
-            max: 10,
-            interval: 1);
+        // 状态拒绝冷却 / 最大状态拒绝次数已随 issue #13 摘除：状态拒绝链消费者已删除。
 
         gmcm.AddNumberOption(
             manifest,
@@ -1113,30 +1036,9 @@ public static class GMCMIntegration
             max: 1000,
             interval: 10);
 
-        // ─── Section 12: Debug ───────────────────────────────────────────
-        gmcm.AddSectionTitle(manifest, () => SectionDebug(config));
-
-        gmcm.AddBoolOption(
-            manifest,
-            name: () => T("调试日志", "Debug Log Enabled", config),
-            tooltip: () => T("输出详细调试日志，可能影响性能", "Emit verbose debug logs. May impact performance.", config),
-            getValue: () => config.DebugLogEnabled,
-            setValue: value => config.DebugLogEnabled = value);
-
-        gmcm.AddBoolOption(
-            manifest,
-            name: () => T("开发者模式", "Developer Mode", config),
-            tooltip: () => T("启用开发者专用的调试命令与诊断功能", "Enable developer-only debug commands and diagnostics.", config),
-            getValue: () => config.DevMode,
-            setValue: value => config.DevMode = value);
-
-        gmcm.AddTextOption(
-            manifest,
-            name: () => T("自定义系统提示", "Custom System Prompt", config),
-            tooltip: () => T("覆盖默认系统提示；留空表示使用内置模板",
-                "Override the default system prompt. Empty = use built-in template.", config),
-            getValue: () => config.CustomSystemPrompt ?? string.Empty,
-            setValue: value => config.CustomSystemPrompt = value ?? string.Empty);
+        // ─── Section 12: Debug 已整段撤除（issue #13，2026-09-16）─────────
+        // 调试日志 / 开发者模式 / 自定义系统提示三项均为零消费孤儿配置；
+        // MinimumStateDuration 说明段落保留（该字典字段仍有效，见下方段落）。
 
         gmcm.AddParagraph(manifest, () => NoteMinStateDuration(config));
     }
@@ -1241,7 +1143,6 @@ public static class GMCMIntegration
     {
         target.Provider = source.Provider;
         target.LlmApiKey = source.LlmApiKey;
-        target.ServerAddress = source.ServerAddress;
         target.LlmModel = source.LlmModel;
         target.MinAgentNpcs = source.MinAgentNpcs;
         target.NormalAgentNpcs = source.NormalAgentNpcs;
@@ -1265,16 +1166,10 @@ public static class GMCMIntegration
         target.DynamicSpeedNearMultiplier = source.DynamicSpeedNearMultiplier;
         target.DynamicSpeedMidMultiplier = source.DynamicSpeedMidMultiplier;
         target.DynamicSpeedFarMultiplier = source.DynamicSpeedFarMultiplier;
-        target.FallbackAIMixProbability = source.FallbackAIMixProbability;
-        target.FallbackLiveGenerationProbability = source.FallbackLiveGenerationProbability;
         target.Language = source.Language;
-        target.CustomSystemPrompt = source.CustomSystemPrompt;
         target.EnableFirstClickVanilla = source.EnableFirstClickVanilla;
-        target.AIDailyTopicCount = source.AIDailyTopicCount;
         target.MaxConsecutiveIdleBeforeRelease = source.MaxConsecutiveIdleBeforeRelease;
         target.TaskCompleteDecisionCooldownTicks = source.TaskCompleteDecisionCooldownTicks;
-        target.StateRejectionCooldownTicks = source.StateRejectionCooldownTicks;
-        target.MaxStateRejections = source.MaxStateRejections;
         target.EmergencyHealthThreshold = source.EmergencyHealthThreshold;
         target.EmergencyMonsterDistance = source.EmergencyMonsterDistance;
         target.PlayerInDangerDistance = source.PlayerInDangerDistance;
@@ -1287,7 +1182,6 @@ public static class GMCMIntegration
         target.DefaultMaxHealth = source.DefaultMaxHealth;
         target.PauseAllDialogue = source.PauseAllDialogue;
         target.DialogueCooldownMs = source.DialogueCooldownMs;
-        target.DevMode = source.DevMode;
         target.UseAgentServer = source.UseAgentServer;
         target.AgentServerHost = source.AgentServerHost;
         target.AutoStartServer = source.AutoStartServer;
@@ -1309,12 +1203,9 @@ public static class GMCMIntegration
         target.ProactiveSpeechDailyLimit = source.ProactiveSpeechDailyLimit;
         target.ProactiveSpeechCooldownMinutes = source.ProactiveSpeechCooldownMinutes;
 
-        // E3-1 / E3-2 经济与还价
+        // E3-1 / E3-2 经济与还价（Enabled/MaxRounds/HostileThreshold 已随 issue #13 摘除）
         target.Economy.Enabled = source.Economy.Enabled;
         target.Economy.DataFile = source.Economy.DataFile;
-        target.Haggle.Enabled = source.Haggle.Enabled;
-        target.Haggle.MaxRounds = source.Haggle.MaxRounds;
-        target.Haggle.HostileThreshold = source.Haggle.HostileThreshold;
         target.Haggle.MaxSavvySpread = source.Haggle.MaxSavvySpread;
         target.Haggle.MinSavvySpread = source.Haggle.MinSavvySpread;
         target.Haggle.MarkdownRatios =
@@ -1335,7 +1226,6 @@ public static class GMCMIntegration
         target.GiftCooldownMs = source.GiftCooldownMs;
         target.ChatBubbleEnabled = source.ChatBubbleEnabled;
         target.LongTextIntervalMs = source.LongTextIntervalMs;
-        target.DebugLogEnabled = source.DebugLogEnabled;
         target.NonAgentAIChatEnabled = source.NonAgentAIChatEnabled;
 
         // 多 Provider 模式（Task 6.4）
@@ -1367,10 +1257,9 @@ public static class GMCMIntegration
         target.EnableProtagonistMapping = source.EnableProtagonistMapping;
         target.ProtagonistNpcs = source.ProtagonistNpcs;
 
-        // 功能开关
+        // 功能开关（EnableDirector 已随 issue #17 摘除：零行为消费）
         target.EnableTrade = source.EnableTrade;
         target.EnableHire = source.EnableHire;
-        target.EnableDirector = source.EnableDirector;
         target.EnableProactiveSpeech = source.EnableProactiveSpeech;
         target.EnableInfiniteDialogue = source.EnableInfiniteDialogue;
 

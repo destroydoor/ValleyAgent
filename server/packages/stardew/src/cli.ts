@@ -76,6 +76,14 @@ Options:
   --help                     Show this help
 `);
         process.exit(0);
+      default:
+        // 未知参数告警（issue #17）：不做静默丢弃——C# 端透传了 TS 端已无消费者的参数时
+        // （如旧版 --disable-director / --director-probability，导演 TS 编排 2026-09-14 已砍除），
+        // 必须在控制台可见，防止"C# 传了 / TS 装没看见"的静默漂移再发生。保持不 exit 的既有行为。
+        console.error(
+          `[valley-ai-server] WARNING: unknown argument "${arg}" ignored (no consumer for this flag; see --help for supported options)`,
+        );
+        break;
     }
   }
 

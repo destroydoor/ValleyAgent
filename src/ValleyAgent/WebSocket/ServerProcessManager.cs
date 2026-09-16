@@ -44,8 +44,8 @@ public class ServerProcessManager : IDisposable
     /// <summary>
     ///     重绑配置实例：本管理器可能在 GameLaunched 预启动（ServiceInitializer 复用 externalServerManager）
     ///     时持有旧 config 实例，而容器内当前实例可能已被 GMCM 热改/测试修改。
-    ///     不复绑会导致重启后 --director-probability 等参数静默漂移（实测：测试改
-    ///     TriggerProbability=1.0，server 仍收到旧实例的 0.1）。
+    ///     不复绑会导致重启后 --llm-config/--llm-provider 等参数读旧实例，GMCM/测试热改静默失效。
+    ///     （2026-09-16 随 issue #17 撤除 --disable-director/--director-probability 死透传，此处例子已换。）
     /// </summary>
     internal void RebindConfig(ModConfig config)
     {
@@ -325,19 +325,6 @@ public class ServerProcessManager : IDisposable
                     + (string.IsNullOrEmpty(llmBaseUrl) ? "" : $" --llm-base-url {llmBaseUrl}")
                     + $" --agents-dir \"{agentsDir}\"";
             }
-
-            // 导演开关：关闭时追加 --disable-director（TS 端 cli.ts 解析）
-            if (!_config.EnableDirector)
-            {
-                serverArgs += " --disable-director";
-            }
-
-            // 导演触发概率：透传 --director-probability（TS 端 handleDayStarted roll 用）
-            // 诊断：打印实际概率值（不含 API 密钥，安全），避免"测试改了 1.0 但 server 收到 0.1"这类静默漂移。
-            _monitor.Log(
-                $"Starting server with directorTriggerProbability={_config.Director?.TriggerProbability ?? 0.1} (enableDirector={_config.EnableDirector}, multiProvider={_config.MultiProviderEnabled})",
-                LogLevel.Info);
-            serverArgs += $" --director-probability {_config.Director?.TriggerProbability ?? 0.1}";
 
             ProcessStartInfo psi;
             if (ConsoleWindow)

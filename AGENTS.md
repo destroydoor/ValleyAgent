@@ -125,7 +125,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 
 **2026-09-14 裁决**：旧叙事 Director（director.ts morningPlan→beat→allocate_agent）因产出无人消费（runBeat 从未接入生产、beat 唯一副作用是保活占池）已整体砍除；C# 的 9 个 DirectorTools + `director_command` 通道 + DirectorContextBuilder 每日推送**保留**，作为未来"工具型 Director 造脑"的就绪层（B4 的按需建身体逻辑同样保留）。
 
-**就绪层的两个已登记缺口（2026-09-15 偏移审查 §3 实证，未修，等造脑时一并处理）**：①`ServerProcessManager.cs:291,301` 仍向 TS 透传 `--disable-director` / `--director-probability`，而 `cli.ts` 对未知参数**静默忽略**——即这两个上游配置项（`EnableDirector` / `Director.TriggerProbability`）目前对 TS 无实际效果；②`TestMod/Tests/Integration/DIR_DirectorBehaviorRecord.cs`（仍注册在 `V3TestRunner.cs:724`）等的是已被砍除的 `morningPlan end` 日志——**2026-09-15 起默认 `Skip()`**（不再空等 180s；`VALLEY_DIRECTOR_TEST=1` 强制跑，跑满也只得空报告）——造脑接线时应同时复活此测试或删除它（跟踪：issue #17）。
+**就绪层缺口收口（2026-09-16，issue #17）**：2026-09-15 偏移审查登记的两个缺口均已关闭——①`ServerProcessManager` 的 `--disable-director` / `--director-probability` 死透传已撤除（`EnableDirector` / `Director.TriggerProbability` 两个零消费配置项随 #13/#17 一并摘除；`cli.ts` parseArgs 补了未知参数告警 default 分支，杜绝同类静默漂移）；②`DIR_DirectorBehaviorRecord` 空跑测试已删除并摘除 `V3TestRunner` 注册（其等待的 `morningPlan end` 日志随旧叙事 Director 砍除而消失）。造脑接线时按真实 beat/`allocate_agent` 链路重写测试与开关，不再恢复旧断言。
 
 ### 3.6 已知坑（详见旧版参考 §2.1.1）
 
@@ -133,7 +133,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 - `src/ValleyAgent/config.json` 不得作为 csproj 部署项（会覆盖用户配置）。
 - 服务器生命周期绑定 Mod 而非存档，返回标题不杀进程。
 - **导演日志静默 bug（2026-08-04）**：降级是行为上的（不崩溃），日志是可观测性的（必须可见）。任何 LLM 调用必须 log prompt 输入和 response 输出；任何决策分支必须 log 分支结果和原因；任何过滤/丢弃必须 log 被丢弃项和原因。
-- **配置项「可改但无效」陷阱（2026-09-15 登记）**：`ModConfig` 里有一批**消费者已删除的孤儿配置**——仍在 GMCM 面板可见、仍被 `Validate()` 钳制，但设置它们不产生任何效果（`ServerAddress` / `DevMode` / `DebugLogEnabled` / `CustomSystemPrompt` / `AIDailyTopicCount` / `StateRejectionCooldownTicks` / `MaxStateRejections` / `FallbackAI*Probability` / `TodayEventsMaxCount` / `Haggle.{Enabled,MaxRounds,HostileThreshold}`）。另有一批是**刻意的兼容垫片，勿删**（`AutoStartPythonServer` 等 5 个 `[Obsolete]` 项 + `ModelName` + `DialogueTemperature`，见 `ModConfig.cs` 顶部登记块与 `MigrateLegacyFields()`）。名单与摘除顺序见 `Config/ModConfig.cs` 顶注 + 偏移审查报告 §3 C4（摘除跟踪：issue #13）。
+- **配置项「可改但无效」陷阱（2026-09-15 登记，2026-09-16 已摘除收口）**：`ModConfig` 曾有一批消费者已删除的孤儿配置（`ServerAddress` / `DevMode` / `DebugLogEnabled` / `CustomSystemPrompt` / `AIDailyTopicCount` / `StateRejectionCooldownTicks` / `MaxStateRejections` / `FallbackAIMixProbability` / `FallbackLiveGenerationProbability` / `TodayEventsMaxCount` / `Haggle.{Enabled,MaxRounds,HostileThreshold}` / `EnableDirector` / `Director.TriggerProbability`）——GMCM 可见、`Validate()` 钳制，但零行为效果。2026-09-16 已按 `ModConfig 属性 → Validate 钳制 → GMCM 条目 → CopyFrom 复制` 顺序一次摘净（issue #13 + #17；`constants.json`/`config.json` 模板残留键同步清理）。**仍须注意**：另一批是刻意的兼容垫片，勿删（`AutoStartPythonServer` 等 5 个 `[Obsolete]` 项 + `ModelName` + `DialogueTemperature`，见 `ModConfig.cs` 顶部登记块与 `MigrateLegacyFields()`）——删它们等于放弃老 config.json 迁移。
 
 ### 3.7 联机支持（2026-08-16 M1 已落地）
 
