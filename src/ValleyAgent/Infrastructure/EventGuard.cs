@@ -36,19 +36,30 @@ public static class EventGuard
         }
         catch (Exception ex)
         {
-            if (QueueTelemetry.ShouldWarn($"safeseg:{segmentName}"))
-            {
-                var message = $"[SafeRun] segment '{segmentName}' failed (downstream segments unaffected): {ex}";
-                monitor?.Log(message, LogLevel.Error);
-                ModErrorLog.LogError("SafeRun", message, ex);
-            }
-            else
-            {
-                // 节流窗口内的重复故障：不丢可观测性——Trace 级留一行（类型+消息，不落盘防日志膨胀）
-                monitor?.Log(
-                    $"[SafeRun] segment '{segmentName}' failed again (throttled): {ex.GetType().Name}: {ex.Message}",
-                    LogLevel.Trace);
-            }
+            // 统一留痕：QueueTelemetry 节流 + ModErrorLog 落盘，见 ReportFailure
+            ReportFailure(monitor, segmentName, ex);
+        }
+    }
+
+    /// <summary>
+    ///     段级失败统一留痕：同段首报 Error 全栈 + ModErrorLog 落盘；节流窗口内的重复降级
+    ///     Trace 一行（可观测性铁律：被节流丢弃的也要留痕，但不落盘防日志膨胀）。
+    ///     供 <see cref="SafeRun"/> 与"必须手写 try/catch 控制回落语义"的调用方
+    ///     （Harmony 补丁入口要按返回值回落原版）共用。
+    /// </summary>
+    public static void ReportFailure(IMonitor? monitor, string segmentName, Exception ex)
+    {
+        if (QueueTelemetry.ShouldWarn($"safeseg:{segmentName}"))
+        {
+            var message = $"[SafeRun] segment '{segmentName}' failed (downstream segments unaffected): {ex}";
+            monitor?.Log(message, LogLevel.Error);
+            ModErrorLog.LogError("SafeRun", message, ex);
+        }
+        else
+        {
+            monitor?.Log(
+                $"[SafeRun] segment '{segmentName}' failed again (throttled): {ex.GetType().Name}: {ex.Message}",
+                LogLevel.Trace);
         }
     }
 }

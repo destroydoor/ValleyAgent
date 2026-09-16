@@ -1131,54 +1131,71 @@ public class EventHandlerInitializer
 #pragma warning disable CS0618
             var saveData = new AgentSaveData();
 
+            // issue #24：per-agent 隔离——一个 agent 序列化抛异常只丢它自己的存档条目，
+            // 不影响同批其余 agent；段名带 npcName 归因。
             foreach (var agent in _agentService.GetAllAgents())
             {
-                saveData.Agents.Add(new AgentData
+                var target = agent;
+                SafeRun($"saving:{target.NpcName}", () =>
                 {
-                    NpcName = agent.NpcName,
-                    CurrentState = agent.StateMachine.CurrentStateFlag.ToString(),
-                    IsManuallyOverridden = _agentService!.AllocationManager.IsManuallyOverridden(agent.NpcName),
-                    Health = agent.Health.Health,
-                    Inventory = agent.Inventory.GetAllItems()
-                        .Where(i => i != null)
-                        .Select(i => $"{i!.QualifiedItemId ?? i.ItemId}:{i.Stack}")
-                        .ToList(),
-                    Money = agent.Inventory.Money,
-                    Emotion = agent.Brain.Emotion.ToString(),
-                    FarmerNickname = agent.Brain.FarmerNickname,
-                    ShortTermMemories = agent.Brain.ShortTermMemories.Select(m => m.Text).ToList(),
-                    StructuredMemories = agent.Brain.ShortTermMemories.Select(m => m.ToSaveData()).ToList(),
-                    LongTermMemories = agent.Brain.LongTermMemories.Select(m => m.ToSaveData()).ToList(),
-                    EmotionHistory = agent.Brain.EmotionHistory.ToList(),
-                    LastDecisionState = agent.Brain.LastDecisionState,
-                    LastDecisionReason = agent.Brain.LastDecisionReason
+                    saveData.Agents.Add(new AgentData
+                    {
+                        NpcName = target.NpcName,
+                        CurrentState = target.StateMachine.CurrentStateFlag.ToString(),
+                        IsManuallyOverridden = _agentService!.AllocationManager.IsManuallyOverridden(target.NpcName),
+                        Health = target.Health.Health,
+                        Inventory = target.Inventory.GetAllItems()
+                            .Where(i => i != null)
+                            .Select(i => $"{i!.QualifiedItemId ?? i.ItemId}:{i.Stack}")
+                            .ToList(),
+                        Money = target.Inventory.Money,
+                        Emotion = target.Brain.Emotion.ToString(),
+                        FarmerNickname = target.Brain.FarmerNickname,
+                        ShortTermMemories = target.Brain.ShortTermMemories.Select(m => m.Text).ToList(),
+                        StructuredMemories = target.Brain.ShortTermMemories.Select(m => m.ToSaveData()).ToList(),
+                        LongTermMemories = target.Brain.LongTermMemories.Select(m => m.ToSaveData()).ToList(),
+                        EmotionHistory = target.Brain.EmotionHistory.ToList(),
+                        LastDecisionState = target.Brain.LastDecisionState,
+                        LastDecisionReason = target.Brain.LastDecisionReason
+                    });
                 });
             }
 
-            _helper.Data.WriteSaveData(GameConstants.SaveDataKey, saveData);
+            SafeRun("saving:write-legacy",
+                () => _helper.Data.WriteSaveData(GameConstants.SaveDataKey, saveData));
 #pragma warning restore CS0618
 
-            var structuredSaveData = BuildStructuredSaveData();
-            if (_saveDataManager != null)
+            SafeRun("saving:write-structured", () =>
             {
-                if (_saveDataManager.Validate(structuredSaveData))
+                var structuredSaveData = BuildStructuredSaveData();
+                if (_saveDataManager != null)
                 {
-                    _helper.Data.WriteSaveData(GameConstants.StructuredSaveDataKey, structuredSaveData);
-                    _monitor.Log(
-                        $"Saved {structuredSaveData.AgentStates.Count} agents via SaveDataManager (v{SaveDataManager.CurrentVersion})",
-                        LogLevel.Debug);
+                    if (_saveDataManager.Validate(structuredSaveData))
+                    {
+                        _helper.Data.WriteSaveData(GameConstants.StructuredSaveDataKey, structuredSaveData);
+                        _monitor.Log(
+                            $"Saved {structuredSaveData.AgentStates.Count} agents via SaveDataManager (v{SaveDataManager.CurrentVersion})",
+                            LogLevel.Debug);
+                    }
+                    else
+                    {
+                        _monitor.Log("SaveDataManager validation failed — structured save skipped", LogLevel.Warn);
+                    }
                 }
-                else
-                {
-                    _monitor.Log("SaveDataManager validation failed — structured save skipped", LogLevel.Warn);
-                }
-            }
+            });
 
             _monitor.Log($"Saved {saveData.Agents.Count} agents to save data", LogLevel.Debug);
         }
         catch (InvalidOperationException ex)
         {
             _monitor.Log($"Failed to save ValleyAgent data: {ex.Message}", LogLevel.Error);
+        }
+        catch (Exception ex)
+        {
+            // issue #24 宽捕兜底：窄捕之上的 NRE/IO 穿透不再外抛（OnSaving 正处于游戏落盘流程，
+            // 异常外抛会中断原版存档）——节流留痕 + 落盘归因。
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("on-saving-outer", ex);
         }
     }
 
@@ -1230,6 +1247,21 @@ public class EventHandlerInitializer
             return;
         }
 
+        // issue #24：换日初始化是一条长链（额度重置/记忆修剪/求购生成/分配重估/日程检查），
+        // 任一环抛异常不再让链后半程静默丢失——宽捕兜底（内层 checkSchedule 窄捕语义保留在 Core）。
+        try
+        {
+            OnDayStartedCore();
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("on-day-started", ex);
+        }
+    }
+
+    private void OnDayStartedCore()
+    {
         _monitor.Log("Day started - reevaluating agents and clearing caches", LogLevel.Debug);
 
         // B0/E5-3: 新的一天重置主动发言额度（每日计数 + 冷却），E5-2 喊话/E5-3 搭话共享。
@@ -1242,9 +1274,9 @@ public class EventHandlerInitializer
         // 配置在 L2.TodayEventsRetentionDays）。全部 Brain（活跃 + 休眠）统一清理。
         var dateIso = GetGameDateIso(Game1.year, Game1.currentSeason, Game1.dayOfMonth);
         var prunedTotal = 0;
-        foreach (var brainAgent in _agentService.AllBrains)
+        foreach (var brainAgent in _agentService!.AllBrains)
         {
-            prunedTotal += brainAgent.Brain.PruneTodayEvents(dateIso, _config.L2.TodayEventsRetentionDays);
+            prunedTotal += brainAgent.Brain.PruneTodayEvents(dateIso, _config!.L2.TodayEventsRetentionDays);
         }
 
         if (prunedTotal > 0)
@@ -1268,7 +1300,7 @@ public class EventHandlerInitializer
         if (hasTestMod)
         {
             _monitor.Log("TestMod detected — skipping auto-allocation.", LogLevel.Debug);
-            TestModHelper.ForceAllocateTestAgents(_agentService, _bioLoader!, _config, _monitor, WireAgentStateEvents);
+            TestModHelper.ForceAllocateTestAgents(_agentService, _bioLoader!, _config!, _monitor, WireAgentStateEvents);
         }
 
         // 设计文档 §4.3.1：NPC 不在 day_started 时自动分配。
@@ -1280,7 +1312,7 @@ public class EventHandlerInitializer
 
         var agents = _agentService.GetAllAgents();
         _monitor.Log(
-            $"Active agents: {agents.Count} (target [Min={_config.MinAgentNpcs}, Normal={_config.NormalAgentNpcs}, Max={_config.MaxAgentNpcs}])",
+            $"Active agents: {agents.Count} (target [Min={_config!.MinAgentNpcs}, Normal={_config!.NormalAgentNpcs}, Max={_config!.MaxAgentNpcs}])",
             LogLevel.Debug);
         foreach (var agent in agents)
         {
@@ -1389,6 +1421,20 @@ public class EventHandlerInitializer
     }
 
     private void OnDayEnding(object? sender, DayEndingEventArgs e)
+    {
+        // issue #24：纯统计日志段，异常只丢本次状态日志，不外抛。
+        try
+        {
+            OnDayEndingCore();
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("day-ending", ex);
+        }
+    }
+
+    private void OnDayEndingCore()
     {
         if (_agentService == null)
         {
@@ -1903,11 +1949,26 @@ public class EventHandlerInitializer
             return;
         }
 
+        // issue #24：宽捕兜底——窄捕（InvalidOperationException）之上的 NRE 等穿透
+        // 会让同 tick 剩余命令与下游泵全部跳过；单命令失败只丢该命令。
+        try
+        {
+            ProcessPendingMainThreadCommandsCore();
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("mainthread-commands-outer", ex);
+        }
+    }
+
+    private void ProcessPendingMainThreadCommandsCore()
+    {
         while (_pendingMainThreadCommands.TryDequeue(out var item))
         {
             try
             {
-                _commandExecutor.ExecuteCommands(item.npcName, item.commands);
+                _commandExecutor!.ExecuteCommands(item.npcName, item.commands);
             }
             catch (InvalidOperationException ex)
             {
@@ -1923,6 +1984,21 @@ public class EventHandlerInitializer
     ///     必须在 OnUpdateTicked（主线程）中调用，避免跨线程访问 Game1。
     /// </summary>
     private void ProcessPendingPreSpeakActions()
+    {
+        // issue #24：宽捕兜底——窄捕（InvalidOperationException/ArgumentException）之上的穿透
+        // 不再逃出 while 循环；单条 pre_speak 失败只丢该条，队列必须排干。
+        try
+        {
+            ProcessPendingPreSpeakActionsCore();
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("pre-speak-outer", ex);
+        }
+    }
+
+    private void ProcessPendingPreSpeakActionsCore()
     {
         while (_pendingPreSpeakActions.TryDequeue(out var item))
         {
@@ -1958,6 +2034,10 @@ public class EventHandlerInitializer
     /// </summary>
     private void SafeRun(string segmentName, Action action) => EventGuard.SafeRun(_monitor, segmentName, action);
 
+    /// <summary>Core 方法 + 手写 try/catch 包装的统一留痕（EventGuard.ReportFailure 实例简写）。</summary>
+    private void ReportSegmentFailure(string segmentName, Exception ex) =>
+        EventGuard.ReportFailure(_monitor, segmentName, ex);
+
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
     {
         // issue #24 最后一道兜底：正常路径所有子系统都在 OnUpdateTickedCore 的 SafeRun 段内，
@@ -1968,11 +2048,8 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            if (QueueTelemetry.ShouldWarn("safeseg:on-update-ticked"))
-            {
-                _monitor.Log($"[SafeRun] OnUpdateTicked outer guard (segment boundary missed): {ex}", LogLevel.Error);
-                ModErrorLog.LogError("SafeRun", "OnUpdateTicked outer guard (segment boundary missed)", ex);
-            }
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            EventGuard.ReportFailure(_monitor, "on-update-ticked-outer", ex);
         }
     }
 
@@ -2437,6 +2514,20 @@ public class EventHandlerInitializer
 
     private void OnTimeChanged(object? sender, TimeChangedEventArgs e)
     {
+        // issue #24：时间跳驱动段（B5.2 空闲回收 + E5-3 主动发言），各自独立守卫。
+        try
+        {
+            OnTimeChangedCore(e);
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("time-changed", ex);
+        }
+    }
+
+    private void OnTimeChangedCore(TimeChangedEventArgs e)
+    {
         // 情绪衰减由 TS Agent Server 管理，C# 不再本地执行 TickEmotionDecay
 
         // B5.2 周期驱动（设计 §3.4 步骤 2）：每个时间跳（游戏内 10 分钟）做一次池位级空闲回收。
@@ -2616,6 +2707,21 @@ public class EventHandlerInitializer
 
     private void OnMenuChanged(object? sender, MenuChangedEventArgs e)
     {
+        // issue #24：对话关闭恢复/决策触发段——这里丢失会让 NPC 停在对话前状态之外，
+        // 但异常外抛会打断 SMAPI 菜单事件链，宽捕留痕。
+        try
+        {
+            OnMenuChangedCore(e);
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("menu-changed", ex);
+        }
+    }
+
+    private void OnMenuChangedCore(MenuChangedEventArgs e)
+    {
         if (_agentService == null)
         {
             return;
@@ -2655,6 +2761,21 @@ public class EventHandlerInitializer
     }
 
     private void OnPlayerWarped(object? sender, WarpedEventArgs e)
+    {
+        // issue #24：跨图跟随/任务中断段——丢失会让 FOLLOW NPC 留在旧地图，
+        // 宽捕留痕（丢失本身有下一轮 warp/决策兜底）。
+        try
+        {
+            OnPlayerWarpedCore(e);
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("player-warped", ex);
+        }
+    }
+
+    private void OnPlayerWarpedCore(WarpedEventArgs e)
     {
         if (_agentService == null)
         {
@@ -2764,6 +2885,20 @@ public class EventHandlerInitializer
 
     private void OnRenderedHud(object? sender, RenderedHudEventArgs e)
     {
+        // issue #24：HUD 渲染失败只丢本帧 HUD，不能把异常注入原版渲染循环。
+        try
+        {
+            OnRenderedHudCore();
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("rendered-hud", ex);
+        }
+    }
+
+    private void OnRenderedHudCore()
+    {
         if (_agentHud == null || _hudRenderer == null)
         {
             return;
@@ -2778,6 +2913,20 @@ public class EventHandlerInitializer
     }
 
     private void OnButtonPressed(object? sender, ButtonPressedEventArgs e)
+    {
+        // issue #24：调试 HUD 开关（F9），异常只丢本次按键响应。
+        try
+        {
+            OnButtonPressedCore(e);
+        }
+        catch (Exception ex)
+        {
+            // 节流留痕（QueueTelemetry 节流 + ModErrorLog 落盘）统一在 EventGuard：
+            ReportSegmentFailure("button-pressed", ex);
+        }
+    }
+
+    private void OnButtonPressedCore(ButtonPressedEventArgs e)
     {
         if (e.Button == SButton.F9)
         {

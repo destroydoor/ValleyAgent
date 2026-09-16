@@ -5,6 +5,7 @@ using StardewModdingAPI;
 using StardewValley;
 using ValleyAgent.Config;
 using ValleyAgent.Handlers;
+using ValleyAgent.Infrastructure;
 using ValleyAgent.Navigation;
 using ValleyAgent.Protocol;
 using ValleyAgent.Services;
@@ -221,12 +222,59 @@ public class GoalExecutor
         _monitor.Log($"[Goal] {npcName}: goal cancelled ({reason})", LogLevel.Info);
     }
 
+    /// <summary>
+    ///     目标 tick 异常后的自愈收尾（issue #24）：Fail → 回报 TS → 清引用 → ForceIdle。
+    ///     Fail 只在 Executing 态转移（幂等）；PendingGoal 已清空（目标刚正常收尾时异常）
+    ///     则只做 ForceIdle。自身再抛异常只留痕，绝不外抛回状态机。
+    /// </summary>
+    private void TryFinalizeAsFailure(AgentInstance agent, string reason)
+    {
+        try
+        {
+            var goal = agent.Brain.PendingGoal;
+            if (goal != null)
+            {
+                goal.Fail(reason);
+                SendGoalResult(goal, success: false);
+                agent.Brain.PendingGoal = null;
+                ClearHandlerTargets(agent.NpcName);
+            }
+
+            ForceIdle(agent, reason);
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"[Goal] {agent.NpcName}: goal cleanup after tick failure also failed: {ex}", LogLevel.Error);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // 状态 action：EXECUTING_GOAL / TRAVELING_TO_REPORT
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>注册为 EXECUTING_GOAL 状态 action：每 tick 驱动目标并做收尾决策。</summary>
     public void TickExecuting(NPC npc, AgentInstance agent, int currentTick)
+    {
+        // issue #24：状态 action 泵隔离。目标 tick 抛异常 → 判定该目标失败并自愈
+        // （Fail → 回报 TS → 清引用 → ForceIdle，复用 FinalizeFailure 语义），
+        // 不让 NPC 永久卡在 EXECUTING_GOAL 每 tick 重演同一条异常；自愈再失败也只留痕。
+        try
+        {
+            TickExecutingCore(npc, agent, currentTick);
+        }
+        catch (Exception ex)
+        {
+            if (QueueTelemetry.ShouldWarn($"safeseg:goal-executing:{agent.NpcName}"))
+            {
+                _monitor.Log($"[Goal] {agent.NpcName}: TickExecuting failed — failing goal: {ex}", LogLevel.Error);
+                ModErrorLog.LogError("SafeRun", $"TickExecuting failed for {agent.NpcName}", ex);
+            }
+
+            TryFinalizeAsFailure(agent, "goal_tick_error");
+        }
+    }
+
+    private void TickExecutingCore(NPC npc, AgentInstance agent, int currentTick)
     {
         var goal = agent.Brain.PendingGoal;
         if (goal == null)
@@ -274,6 +322,46 @@ public class GoalExecutor
 
     /// <summary>注册为 TRAVELING_TO_REPORT 状态 action：寻路回玩家 + 到达触发汇报。</summary>
     public void TickReporting(NPC npc, AgentInstance agent, int currentTick)
+    {
+        // issue #24：汇报链泵隔离。汇报阶段异常 → 按完成收尾（目标工作大概率已完成，
+        // 正在回程汇报；照 FallbackSend 语义回报成功），避免 NPC 永久卡在 TRAVELING_TO_REPORT；
+        // 收尾自身再抛也只留痕。
+        try
+        {
+            TickReportingCore(npc, agent, currentTick);
+        }
+        catch (Exception ex)
+        {
+            if (QueueTelemetry.ShouldWarn($"safeseg:goal-reporting:{agent.NpcName}"))
+            {
+                _monitor.Log($"[Goal] {agent.NpcName}: TickReporting failed — finalizing report: {ex}", LogLevel.Error);
+                ModErrorLog.LogError("SafeRun", $"TickReporting failed for {agent.NpcName}", ex);
+            }
+
+            TryFinishReportingAfterFailure(npc, agent);
+        }
+    }
+
+    /// <summary>汇报链异常后的收尾（issue #24）：照 FallbackSend 语义回报成功并 FinishReport；再失败只留痕。</summary>
+    private void TryFinishReportingAfterFailure(NPC npc, AgentInstance agent)
+    {
+        try
+        {
+            var goal = agent.Brain.PendingGoal;
+            if (goal != null)
+            {
+                SendGoalResult(goal, success: true);
+            }
+
+            FinishReport(agent, npc, "report_error");
+        }
+        catch (Exception ex)
+        {
+            _monitor.Log($"[Goal] {agent.NpcName}: report cleanup after failure also failed: {ex}", LogLevel.Error);
+        }
+    }
+
+    private void TickReportingCore(NPC npc, AgentInstance agent, int currentTick)
     {
         var goal = agent.Brain.PendingGoal;
         if (goal == null)
