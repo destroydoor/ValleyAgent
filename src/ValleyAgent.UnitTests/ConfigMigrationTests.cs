@@ -97,7 +97,8 @@ public static class ConfigMigrationTests
         Assert.False(config.MultiProviderEnabled);
         Assert.True(config.EnableTrade);
         Assert.True(config.EnableHire);
-        Assert.True(config.EnableDirector);
+        // EnableDirector 断言已随 issue #17 摘除（2026-09-16）：该开关零行为消费，
+        // 配置项与 --disable-director 透传一并撤除。
         Assert.True(config.EnableProactiveSpeech);
         Assert.True(config.EnableInfiniteDialogue);
         Assert.True(config.EnableProtagonistMapping);

@@ -35,16 +35,17 @@ public enum LanguageMode
 //   删除它们等于放弃老 config.json 的迁移，需连 MigrateLegacyFields + scripts/docker/prep-mods.ps1
 //   一起改（该脚本会写 AutoStartPythonServer=false）。**A 类不在 #13 的摘除范围内。**
 //
-// 【B 类：消费者已被删除的孤儿配置 —— 待摘除，需一次带编译验证的改动】
+// 【B 类：消费者已被删除的孤儿配置 —— 已摘除 2026-09-16（issue #13 + #17）】
+//   以下 15 项经全仓 grep（C# + TS + 脚本）逐项验证零真实消费后一并摘除：
 //   ServerAddress（直连 LLM 通路已禁，改走 TS Agent Server）、DevMode、DebugLogEnabled、
 //   CustomSystemPrompt、AIDailyTopicCount、StateRejectionCooldownTicks、MaxStateRejections、
 //   FallbackAIMixProbability、FallbackLiveGenerationProbability、TodayEventsMaxCount（L2）、
-//   Haggle.Enabled / Haggle.MaxRounds / Haggle.HostileThreshold（还价结算链已随账本迁 TS 删除）。
-//   这些项仍被 Validate() 钳制；除 ServerAddress / TodayEventsMaxCount 外**都还渲染在 GMCM
-//   面板上**——即玩家能改、能保存，但不产生任何效果。
-//   摘除顺序：ModConfig 属性 → Validate 钳制 → GMCMIntegration 条目 → CopyFrom 复制，
-//   并在有 dotnet 的环境跑 `dotnet build`（TestMod/UnitTests 均 TreatWarningsAsErrors）。
-//   摘除进度跟踪：GitHub issue #13（"配置项可改但无效"）。
+//   Haggle.Enabled / Haggle.MaxRounds / Haggle.HostileThreshold（还价结算链已随账本迁 TS 删除）、
+//   EnableDirector / Director.TriggerProbability（导演 TS 编排 2026-09-14 砍除后零消费：
+//   C# 侧保留的 DirectorTools/DirectorContextBuilder 工具层为无条件注册，不受该开关门控；
+//   --disable-director / --director-probability 透传随 issue #17 一并撤除）。
+//   摘除顺序已按 ModConfig 属性 → Validate 钳制 → GMCMIntegration 条目 → CopyFrom 复制执行。
+//   工具型 Director 造脑接线时按需重新引入开关（见 issue #17 验收口径）。
 // ────────────────────────────────────────────────────────────────────────────
 public class ModConfig
 {
@@ -53,12 +54,6 @@ public class ModConfig
     [Obsolete("Use LlmApiKey instead. Retained for config.json backward compat.")]
     [DefaultValue("")]
     public string ApiKey { get; set; } = "";
-
-    // DISABLED: must route through TS Agent Server. Direct LLM HTTP calls to
-    // localhost:1234 are blocked. The C# mod routes ALL dialogue through the
-    // TS Agent Server (valley-ai-server.exe) at ws://127.0.0.1:8765.
-    [DefaultValue("http://localhost:1234")]
-    public string ServerAddress { get; set; } = "http://localhost:1234";
 
     [Obsolete("Use LlmModel instead. Retained for config.json backward compat.")]
     [DefaultValue("")]
@@ -150,8 +145,6 @@ public class ModConfig
     [DefaultValue("https://api.minimax.chat/v1")]
     public string LlmBaseUrl { get; set; } = "https://api.minimax.chat/v1";
 
-    [DefaultValue(false)] public bool DevMode { get; set; } = false;
-
     [DefaultValue(60)] public int LLMTimeoutSeconds { get; set; } = 60;
 
     [DefaultValue(3)] public int MaxRetries { get; set; } = 3;
@@ -204,8 +197,6 @@ public class ModConfig
     [DefaultValue(2.0f)]
     public float DynamicSpeedFarMultiplier { get; set; } = 2.0f;
 
-    [DefaultValue(0.5f)] public float FallbackAIMixProbability { get; set; } = 0.5f;
-
     // ─── E2-2 聊天栏玩家→NPC 路由 ─────────────────────────────────────
     // 玩家在聊天栏打字即视为对在场/跟随中的 NPC 说话；四层路由消歧；
     // 会话模式 60s 超时；会话内来回不计主动额度（额度强制是 E5-3）。
@@ -242,23 +233,13 @@ public class ModConfig
     [DefaultValue(30)]
     public int ProactiveSpeechCooldownMinutes { get; set; } = 30;
 
-    [DefaultValue(0.15f)] public float FallbackLiveGenerationProbability { get; set; } = 0.15f;
-
     [DefaultValue(LanguageMode.Chinese)] public LanguageMode Language { get; set; } = LanguageMode.Chinese;
 
-    [DefaultValue("")] public string CustomSystemPrompt { get; set; } = "";
-
     [DefaultValue(true)] public bool EnableFirstClickVanilla { get; set; } = true;
-
-    [DefaultValue(3)] public int AIDailyTopicCount { get; set; } = 3;
 
     [DefaultValue(3)] public int MaxConsecutiveIdleBeforeRelease { get; set; } = 3;
 
     [DefaultValue(300)] public int TaskCompleteDecisionCooldownTicks { get; set; } = 300;
-
-    [DefaultValue(180)] public int StateRejectionCooldownTicks { get; set; } = 180;
-
-    [DefaultValue(2)] public int MaxStateRejections { get; set; } = 2;
 
     [DefaultValue(0.3f)] public float EmergencyHealthThreshold { get; set; } = 0.3f;
 
@@ -385,10 +366,6 @@ public class ModConfig
     /// </summary>
     [DefaultValue(2000)]
     public int LongTextIntervalMs { get; set; } = 2000;
-
-    /// <summary>Whether to emit verbose debug logs. Legacy DebugMode field retained for save compatibility.</summary>
-    [DefaultValue(false)]
-    public bool DebugLogEnabled { get; set; } = false;
 
     // ─── 多 Provider 模式（3 角色 × 主备） ───────────────────────────
 
@@ -563,10 +540,6 @@ public class ModConfig
     /// <summary>NPC 雇佣功能总开关。</summary>
     [DefaultValue(true)]
     public bool EnableHire { get; set; } = true;
-
-    /// <summary>叙事导演功能总开关（false 时 NPC 完全自主）。</summary>
-    [DefaultValue(true)]
-    public bool EnableDirector { get; set; } = true;
 
     /// <summary>NPC 主动发言（喊话/搭话）总开关。</summary>
     [DefaultValue(true)]
@@ -843,18 +816,6 @@ public class ModConfig
             changed = true;
         }
 
-        if (FallbackAIMixProbability < 0f || FallbackAIMixProbability > 1f)
-        {
-            FallbackAIMixProbability = 0.5f;
-            changed = true;
-        }
-
-        if (FallbackLiveGenerationProbability < 0f || FallbackLiveGenerationProbability > 1f)
-        {
-            FallbackLiveGenerationProbability = 0.15f;
-            changed = true;
-        }
-
         if (MaxConsecutiveIdleBeforeRelease < 1 || MaxConsecutiveIdleBeforeRelease > 10)
         {
             MaxConsecutiveIdleBeforeRelease = 3;
@@ -899,20 +860,9 @@ public class ModConfig
             changed = true;
         }
 
-        // E3-2 还价配置：轮次 [1,10]、恶意阈值 (0,1)、浮动率 0 ≤ min ≤ max ≤ 1、让步比例逐项 (0,1] 且累积 ≤ 1
+        // E3-2 还价配置：浮动率 0 ≤ min ≤ max ≤ 1、让步比例逐项 (0,1] 且累积 ≤ 1
+        // （Enabled/MaxRounds/HostileThreshold 已随 C# 还价链删除摘除，还价唯一实现在 TS 侧）
         Haggle ??= new HaggleConfig();
-        if (Haggle.MaxRounds < 1 || Haggle.MaxRounds > 10)
-        {
-            Haggle.MaxRounds = 3;
-            changed = true;
-        }
-
-        if (Haggle.HostileThreshold <= 0 || Haggle.HostileThreshold >= 1)
-        {
-            Haggle.HostileThreshold = 0.5;
-            changed = true;
-        }
-
         if (Haggle.MaxSavvySpread <= 0 || Haggle.MaxSavvySpread > 1)
         {
             Haggle.MaxSavvySpread = 0.5;
@@ -1012,24 +962,12 @@ public class ModConfig
             changed = true;
         }
 
-        // 导演触发概率 [0, 1]
-        if (Director.TriggerProbability < 0 || Director.TriggerProbability > 1)
-        {
-            Director.TriggerProbability = 0.1;
-            changed = true;
-        }
-
-        // 阶段 3 L2 配置：todayEvents 保留天数 [1, 7]、条数上限 [1, 20]
+        // 阶段 3 L2 配置：todayEvents 保留天数 [1, 7]
+        // （TodayEventsMaxCount 已随 issue #13 摘除：todayEvents 条数上限的消费链已删除）
         L2 ??= new L2Config();
         if (L2.TodayEventsRetentionDays < 1 || L2.TodayEventsRetentionDays > 7)
         {
             L2.TodayEventsRetentionDays = 3;
-            changed = true;
-        }
-
-        if (L2.TodayEventsMaxCount < 1 || L2.TodayEventsMaxCount > 20)
-        {
-            L2.TodayEventsMaxCount = 5;
             changed = true;
         }
 
@@ -1056,12 +994,6 @@ public class ModConfig
         if (TalkRejectionFollowThreshold < 0 || TalkRejectionFollowThreshold > 2500)
         {
             TalkRejectionFollowThreshold = 200;
-            changed = true;
-        }
-
-        if (AIDailyTopicCount < 1 || AIDailyTopicCount > 20)
-        {
-            AIDailyTopicCount = 3;
             changed = true;
         }
 
@@ -1112,18 +1044,6 @@ public class ModConfig
         if (TaskCompleteDecisionCooldownTicks < 0 || TaskCompleteDecisionCooldownTicks > 10000)
         {
             TaskCompleteDecisionCooldownTicks = 300;
-            changed = true;
-        }
-
-        if (StateRejectionCooldownTicks < 0 || StateRejectionCooldownTicks > 10000)
-        {
-            StateRejectionCooldownTicks = 180;
-            changed = true;
-        }
-
-        if (MaxStateRejections < 0 || MaxStateRejections > 10)
-        {
-            MaxStateRejections = 2;
             changed = true;
         }
 
@@ -1222,22 +1142,14 @@ public class EconomyConfig
 }
 
 /// <summary>
-///     E3-2 还价/定价配置。默认值与 EconomyConstants 一致；Validate() 钳制到安全范围。
+///     E3-2 还价/定价配置。2026-08-15 步骤 2 起还价状态机唯一实现在 TS 侧（账本迁 TS），
+///     C# 端 Enabled/MaxRounds/HostileThreshold 已随 issue #13 摘除（零消费）；
+///     精明度浮动与让步比例字段不在 #13 摘除清单内暂保留（当前亦无行为消费者，
+///     若后续审计判定为同类孤儿应走同一摘除流程）。Validate() 钳制到安全范围。
 ///     设计文档：docs/ideas/e32-implementation-思路.md §5。
 /// </summary>
 public class HaggleConfig
 {
-    /// <summary>还价状态机总开关。</summary>
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>最大让步轮次（第 MaxRounds+1 轮必拒）。</summary>
-    [DefaultValue(3)]
-    public int MaxRounds { get; set; } = 3;
-
-    /// <summary>恶意低价阈值（公道价比例，0.5 = 低于公道价一半视为恶意）。</summary>
-    [DefaultValue(0.5)]
-    public double HostileThreshold { get; set; } = 0.5;
-
     /// <summary>精明度 0 时的心理价浮动率（对钱没概念 ±50%）。</summary>
     [DefaultValue(0.5)]
     public double MaxSavvySpread { get; set; } = 0.5;
@@ -1291,24 +1203,18 @@ public class DirectorConfig
     [DefaultValue(120)]
     public int BeatDefaultDurationMinutes { get; set; } = 120;
 
-    /// <summary>
-    ///     导演每日触发概率（0-1）。TS 端 handleDayStarted 每次 roll，命中才调用 Director.morningPlan()。
-    ///     默认 0.1（每天 10% 概率导演出手编排）；测试/调试可临时调 1.0 强制触发。
-    /// </summary>
-    [DefaultValue(0.1)]
-    public double TriggerProbability { get; set; } = 0.1;
+    // TriggerProbability（导演每日触发概率）已随 issue #17 摘除（2026-09-16）：
+    // 其唯一消费链是 --director-probability 透传 → TS 端 handleDayStarted roll，
+    // 导演 TS 编排 2026-09-14 砍除后两端皆无消费者。造脑接线时按真实触发链路重新设计。
 }
 
 /// <summary>
-///     阶段 3 L2 状态摘要配置。默认值对应设计 doc §11.4：todayEvents 保留 3 天、条数 ≤5。
+///     阶段 3 L2 状态摘要配置。默认值对应设计 doc §11.4：todayEvents 保留 3 天。
+///     （TodayEventsMaxCount 已随 issue #13 摘除：条数上限消费链已删，保留天数仍有效。）
 /// </summary>
 public class L2Config
 {
     /// <summary>todayEvents 保留天数（近 N 天，day_started 清理更早的条目）。</summary>
     [DefaultValue(3)]
     public int TodayEventsRetentionDays { get; set; } = 3;
-
-    /// <summary>todayEvents 条数上限（超出丢弃最旧）。</summary>
-    [DefaultValue(5)]
-    public int TodayEventsMaxCount { get; set; } = 5;
 }

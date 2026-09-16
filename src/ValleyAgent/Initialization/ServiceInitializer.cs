@@ -279,7 +279,7 @@ public class ServiceInitializer
         serverManager.MaxRestartAttempts = config.ServerMaxRestartAttempts;
         serverManager.LogCallback += msg => _monitor.Log($"[AgentServer] {msg}");
         // 复用 GameLaunched 预启动的管理器时，把其内部配置重绑为容器当前实例
-        // （否则重启 server 时 --director-probability 等参数读旧实例，GMCM/测试热改静默失效）。
+        // （否则重启 server 时 --llm-config/--llm-provider 等参数读旧实例，GMCM/测试热改静默失效）。
         serverManager.RebindConfig(config);
         _container.RegisterSingleton(serverManager);
 

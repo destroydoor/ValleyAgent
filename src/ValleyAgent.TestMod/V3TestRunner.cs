@@ -721,7 +721,9 @@ public class V3TestRunner
             TryAdd(new IT12_SetGoal_ChopTree(_helper, _monitor));
             TryAdd(new IT13_DirectorTools(_helper, _monitor));
             TryAdd(new IT14_MultiplayerAdjust(_helper, _monitor));
-            TryAdd(new DIR_DirectorBehaviorRecord(_helper, _monitor));
+            // DIR_DirectorBehaviorRecord 已删除（issue #17-2，2026-09-16）：该测试等待的
+            // morningPlan end 日志随 2026-09-14 旧叙事 Director 砍除而消失，Skip 过渡态收口。
+            // 工具型 Director 造脑接线时按真实 beat/allocate_agent 链路重写，不再恢复旧断言。
         }
 
         // NOTE: Real scenario tests (Real_OneFullDay, Scene_*) were removed

@@ -108,17 +108,9 @@ if (Test-Path $autoLoadCfg) {
     Write-Host "AutoLoadGame LastFileLoaded = $SaveName"
 }
 
-# 导演 morningPlan 受 TriggerProbability 概率门控（dev 默认 0.1 → 90% 跳过）。
-# 本测试必须确定性触发：临时改 1.0，finally 恢复。
-$valleyCfg = "$gameDir\Mods\ValleyAgent\config.json"
-$cfgBackup = "$gameDir\Mods\ValleyAgent\config.json.m3-bak"
-if (Test-Path $valleyCfg) {
-    Copy-Item $valleyCfg $cfgBackup -Force
-    $cfgText = Get-Content $valleyCfg -Raw -Encoding UTF8
-    $cfgText = $cfgText -replace '"TriggerProbability"\s*:\s*[0-9.]+', '"TriggerProbability": 1.0'
-    [System.IO.File]::WriteAllText($valleyCfg, $cfgText, (New-Object System.Text.UTF8Encoding $false))
-    Write-Host "Director TriggerProbability -> 1.0 (backup at config.json.m3-bak)"
-}
+# 导演 morningPlan 概率门控已随 issue #17 摘除（2026-09-16）：
+# Director.TriggerProbability 配置项与 --director-probability 透传均不存在，
+# 原先"临时改 1.0 / finally 恢复"的 config.json 改写块已删除。
 
 $hostLog = "$logDir\SMAPI-latest.txt"            # 第 1 个 claim 的实例（host）
 $farmhandLog = "$logDir\SMAPI-latest.player-2.txt"   # 第 2 个（farmhand A）
@@ -283,11 +275,6 @@ finally {
     # 兜底：引用丢失的实例（Start-GameInstance 在赋值前抛异常时）不留僵尸
     Get-Process -Name "StardewModdingAPI", "Stardew Valley" -ErrorAction SilentlyContinue |
         ForEach-Object { Write-Host "Killing orphan game process PID=$($_.Id)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
-    # 恢复导演概率配置
-    if (Test-Path $cfgBackup) {
-        Move-Item $cfgBackup $valleyCfg -Force
-        Write-Host "Director TriggerProbability restored."
-    }
     Write-Host "Artifacts:"
     Write-Host "  Host log:     $hostLog"
     Write-Host "  Farmhand log: $farmhandLog"
