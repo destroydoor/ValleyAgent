@@ -25,12 +25,10 @@ public static class LlmConfigWriter
 
     /// <summary>
     ///     写 runtime JSON。仅在 <see cref="ModConfig.MultiProviderEnabled" />=true 时调用。
-    ///     序列化 9 组 provider 字段（3 角色 × 主备）+ 角色标记 + global 段。
+    ///     序列化 3 角色 ×（主 + 备用链）+ 角色标记 + global 段。
+    ///     备用链 = 第一备 + 第二备，任何一项四字段不齐（含 apiKey 空）即整条跳过——
+    ///     TS 端校验器对空 apiKey 直接抛错拒绝启动，宁缺勿坏（跳过项留 Info 日志）。
     /// </summary>
-    /// <param name="config">Mod 配置实例。</param>
-    /// <param name="modDir">mod 根目录（IModHelper.DirectoryPath）。</param>
-    /// <param name="monitor">可选的 SMAPI 日志器，传入时记录写入结果。</param>
-    /// <returns>写入的文件路径；失败返回 null。</returns>
     public static string? WriteRuntimeConfig(ModConfig config, string modDir, IMonitor? monitor = null)
     {
         try
@@ -42,21 +40,21 @@ public static class LlmConfigWriter
                 version = 1,
                 roles = new
                 {
-                    director = BuildRole(
-                        config.DirectorPrimaryProvider, config.DirectorPrimaryApiKey,
-                        config.DirectorPrimaryModel, config.DirectorPrimaryBaseUrl,
-                        config.DirectorFallbackProvider, config.DirectorFallbackApiKey,
-                        config.DirectorFallbackModel, config.DirectorFallbackBaseUrl),
-                    protagonist = BuildRole(
-                        config.ProtagonistPrimaryProvider, config.ProtagonistPrimaryApiKey,
-                        config.ProtagonistPrimaryModel, config.ProtagonistPrimaryBaseUrl,
-                        config.ProtagonistFallbackProvider, config.ProtagonistFallbackApiKey,
-                        config.ProtagonistFallbackModel, config.ProtagonistFallbackBaseUrl),
-                    npc = BuildRole(
-                        config.NpcPrimaryProvider, config.NpcPrimaryApiKey,
-                        config.NpcPrimaryModel, config.NpcPrimaryBaseUrl,
-                        config.NpcFallbackProvider, config.NpcFallbackApiKey,
-                        config.NpcFallbackModel, config.NpcFallbackBaseUrl)
+                    director = BuildRole(monitor,
+                        (config.DirectorPrimaryProvider, config.DirectorPrimaryApiKey, config.DirectorPrimaryModel, config.DirectorPrimaryBaseUrl),
+                        FallbackEntries(monitor, "director",
+                            (config.DirectorFallbackProvider, config.DirectorFallbackApiKey, config.DirectorFallbackModel, config.DirectorFallbackBaseUrl),
+                            (config.DirectorFallback2Provider, config.DirectorFallback2ApiKey, config.DirectorFallback2Model, config.DirectorFallback2BaseUrl))),
+                    protagonist = BuildRole(monitor,
+                        (config.ProtagonistPrimaryProvider, config.ProtagonistPrimaryApiKey, config.ProtagonistPrimaryModel, config.ProtagonistPrimaryBaseUrl),
+                        FallbackEntries(monitor, "protagonist",
+                            (config.ProtagonistFallbackProvider, config.ProtagonistFallbackApiKey, config.ProtagonistFallbackModel, config.ProtagonistFallbackBaseUrl),
+                            (config.ProtagonistFallback2Provider, config.ProtagonistFallback2ApiKey, config.ProtagonistFallback2Model, config.ProtagonistFallback2BaseUrl))),
+                    npc = BuildRole(monitor,
+                        (config.NpcPrimaryProvider, config.NpcPrimaryApiKey, config.NpcPrimaryModel, config.NpcPrimaryBaseUrl),
+                        FallbackEntries(monitor, "npc",
+                            (config.NpcFallbackProvider, config.NpcFallbackApiKey, config.NpcFallbackModel, config.NpcFallbackBaseUrl),
+                            (config.NpcFallback2Provider, config.NpcFallback2ApiKey, config.NpcFallback2Model, config.NpcFallback2BaseUrl)))
                 },
                 protagonistNpcs,
                 enableProtagonistMapping = config.EnableProtagonistMapping,
@@ -105,20 +103,52 @@ public static class LlmConfigWriter
     }
 
     /// <summary>
-    ///     构造单个角色的匿名配置对象（primary + 可选 fallback）。
-    ///     fallback 在 fProvider 或 fModel 为空时序列化为 null。
+    ///     收集一个角色的备用链条目：任何一项四字段不齐（provider/apiKey/model/baseUrl 任一为空）
+    ///    即整条跳过并留 Info 日志（§3.6：过滤/丢弃必须 log 被丢弃项和原因）。
     /// </summary>
-    private static object BuildRole(
-        string pProvider, string pKey, string pModel, string pUrl,
-        string fProvider, string fKey, string fModel, string fUrl)
+    private static (string provider, string apiKey, string model, string baseUrl)[] FallbackEntries(
+        IMonitor? monitor, string role,
+        (string provider, string apiKey, string model, string baseUrl) first,
+        (string provider, string apiKey, string model, string baseUrl) second)
     {
-        var primary = new { provider = pProvider, apiKey = pKey, model = pModel, baseUrl = pUrl };
-        object? fallback = null;
-        if (!string.IsNullOrWhiteSpace(fProvider) && !string.IsNullOrWhiteSpace(fModel))
+        var list = new List<(string, string, string, string)>();
+        foreach (var (entry, label) in new[] { (first, "fallback1"), (second, "fallback2") })
         {
-            fallback = new { provider = fProvider, apiKey = fKey, model = fModel, baseUrl = fUrl };
+            var missing = new List<string>();
+            if (string.IsNullOrWhiteSpace(entry.provider)) missing.Add(nameof(entry.provider));
+            if (string.IsNullOrWhiteSpace(entry.apiKey)) missing.Add(nameof(entry.apiKey));
+            if (string.IsNullOrWhiteSpace(entry.model)) missing.Add(nameof(entry.model));
+            if (string.IsNullOrWhiteSpace(entry.baseUrl)) missing.Add(nameof(entry.baseUrl));
+            if (missing.Count > 0)
+            {
+                monitor?.Log(
+                    $"[llm-config] {role}.{label} ({entry.provider}/{entry.model}) skipped: empty {string.Join(",", missing)}",
+                    LogLevel.Info);
+                continue;
+            }
+
+            list.Add(entry);
         }
 
-        return new { primary, fallback };
+        return list.ToArray();
+    }
+
+    /// <summary>
+    ///     构造单个角色的匿名配置对象：primary + fallback（旧字段=链首，旧 exe 兼容）+ fallbacks（完整备用链）。
+    /// </summary>
+    private static object BuildRole(
+        IMonitor? monitor,
+        (string provider, string apiKey, string model, string baseUrl) primary,
+        (string provider, string apiKey, string model, string baseUrl)[] fallbacks)
+    {
+        var primaryObj = new { provider = primary.provider, apiKey = primary.apiKey, model = primary.model, baseUrl = primary.baseUrl };
+        var entries = new List<object>();
+        foreach (var fb in fallbacks)
+        {
+            entries.Add(new { provider = fb.provider, apiKey = fb.apiKey, model = fb.model, baseUrl = fb.baseUrl });
+        }
+
+        object? legacyFallback = entries.Count > 0 ? entries[0] : null;
+        return new { primary = primaryObj, fallback = legacyFallback, fallbacks = entries };
     }
 }

@@ -59,22 +59,27 @@ public class ThinClientCapabilityMatrixTests
     private static string ThinClientInitBody() =>
         ExtractMethodBody(ReadSource("src", "ValleyAgent", "ModEntry.cs"), "InitializeThinClientMode(IModHelper helper)");
 
-    /// <summary>绿色回归守卫：主机侧确实每 tick 排空三个主线程队列。</summary>
+    /// <summary>绿色回归守卫：主机侧确实每 tick 排空全部主线程队列（逐泵隔离形态）。</summary>
     [Fact]
     public void Host_UpdateTicked_DrainsAllMainThreadQueues()
     {
         var src = ReadSource("src", "ValleyAgent", "Initialization", "EventHandlerInitializer.cs");
-        Assert.Contains("NPCGiftPatch.ProcessMainThreadActions()", src);
-        Assert.Contains("DialogueBoxInputPatch.ProcessPendingReplies()", src);
-        Assert.Contains("Multiplayer.HostRequestHandlers.ProcessMainThreadActions()", src);
+        // 2026-09-13 死锁专项：泵改为逐泵隔离形态（Pump 助手，每泵独立 try/catch）——
+        // 单个泵抛异常不得跳过下游泵（下游含房客唯一的 ModMessage 发送泵）。
+        // 断言锁定 Pump 包裹形态：退回裸调用/共用一个 try 的旧写法会在这里红。
+        Assert.Contains("Pump(\"gift-actions\", NPCGiftPatch.ProcessMainThreadActions)", src);
+        Assert.Contains("Pump(\"dialogue-replies\", DialogueBoxInputPatch.ProcessPendingReplies)", src);
+        Assert.Contains("Pump(\"host-request-mainthread\", Multiplayer.HostRequestHandlers.ProcessMainThreadActions)", src);
+        // 陈旧等待自愈泵：回包与超时兜底双双丢失时强制解锁输入框，必须每 tick 被驱动
+        Assert.Contains("Pump(\"dialogue-stale-wait\", DialogueBoxInputPatch.ResetStaleWait)", src);
     }
 
     /// <summary>
-    ///     红色缺口：房客 UpdateTicked 只驱动 renderer 位置插值，三个主线程队列无人排水——
-    ///     对话回包渲染（_pendingReplies）、送礼反应与好感落账（_mainThreadActions）、
-    ///     HostRequestHandlers 主线程队列在房客机器上永不消费。
-    ///     网络层全部正确（请求到达主机、回包到达房客），但结果永远不落地——
-    ///     即「网络上对了也没法实际使用」。
+    ///     绿色回归守卫（2026-09-12 死锁专项后更新）：房客 UpdateTicked 必须逐泵隔离排空
+    ///     全部主线程队列。2026-09-13 死锁专项前这里的缺口是"只驱动 renderer、队列无人排水"；
+    ///     修复后又出现过一次回退风险——泵被改回共用一个 try/catch 的裸调用形态时，
+    ///     上游泵抛异常会饿死下游发送泵（房客唯一的 ModMessage 出口）⇒ 对话框永久锁死。
+    ///     所以断言锁定 Pump 包裹形态 + 自愈泵在位：回退旧写法在这里红。
     /// </summary>
     [Fact]
     public void ThinClient_UpdateTicked_MustDrainMainThreadQueues()
@@ -82,18 +87,20 @@ public class ThinClientCapabilityMatrixTests
         var body = ThinClientInitBody();
         var missing = new[]
             {
-                "DialogueBoxInputPatch.ProcessPendingReplies()",
-                "NPCGiftPatch.ProcessMainThreadActions()",
-                "Multiplayer.HostRequestHandlers.ProcessMainThreadActions()"
+                "Pump(\"dialogue-replies\", DialogueBoxInputPatch.ProcessPendingReplies)",
+                "Pump(\"chat-replies\", ChatBarRouter.ProcessPendingReplies)",
+                "Pump(\"gift-actions\", NPCGiftPatch.ProcessMainThreadActions)",
+                "Pump(\"host-request-mainthread\", Multiplayer.HostRequestHandlers.ProcessMainThreadActions)",
+                "Pump(\"dialogue-stale-wait\", DialogueBoxInputPatch.ResetStaleWait)"
             }
             .Where(fragment => !body.Contains(fragment, StringComparison.Ordinal))
             .ToList();
 
         Assert.True(missing.Count == 0,
-            "ThinClient 的 UpdateTicked 订阅（ModEntry.InitializeThinClientMode 第 6 步）只驱动 AgentRemoteRenderer.Update，"
-            + "未排空主线程队列: " + string.Join("; ", missing)
-            + " → 后果：房客 AI 回复不渲染、送礼反应与好感写入不落地（后台线程入队后无人消费）。"
-            + "修复方向：房客 tick 内追加与主机相同的三处排水调用。");
+            "ThinClient 的 UpdateTicked 订阅（ModEntry.InitializeThinClientMode 第 6 步）必须逐泵隔离排空主线程队列，"
+            + "缺失的泵: " + string.Join("; ", missing)
+            + " → 后果：房客 AI 回复不渲染、送礼反应与好感写入不落地；或单个泵抛异常饿死下游发送泵"
+            + "（对话框永久锁死，2026-09-12 死锁专项已修——禁止回退成共用一个 try/catch 的裸调用）。");
     }
 
     /// <summary>
@@ -115,7 +122,7 @@ public class ThinClientCapabilityMatrixTests
             "ModEntry.InitializeThinClientMode 未初始化房客版 ChatBarRouter → "
             + "房客聊天栏输入被 ChatBoxInputPatch 捕获后无人路由，聊天栏 NPC 对话在客户端不可用。");
 
-        Assert.True(body.Contains("ChatBarRouter.ProcessPendingReplies()", StringComparison.Ordinal),
+        Assert.True(body.Contains("Pump(\"chat-replies\", ChatBarRouter.ProcessPendingReplies)", StringComparison.Ordinal),
             "房客 UpdateTicked 未排空 ChatBarRouter 的回复队列 → "
             + "主机回包到达房客后只入队不渲染（后台线程入队、主线程消费，缺排水即黑屏）。");
 

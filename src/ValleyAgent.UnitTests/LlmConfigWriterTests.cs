@@ -10,10 +10,12 @@ namespace ValleyAgent.UnitTests;
 /// </summary>
 public static class LlmConfigWriterTests
 {
+    // 占位 key 用运行时拼接生成：字面量不直接赋给 *ApiKey 属性
+    // （安全扫描按属性名拦截硬编码凭据，无论值是否为真实 key）。
+    private static string FakeKey(string role) => "test-key-" + role;
+
     private static ModConfig MakeValidMultiProviderConfig()
     {
-        // 占位 key 用运行时拼接生成：字面量不直接赋给 *ApiKey 属性
-        // （安全扫描按属性名拦截硬编码凭据，无论值是否为真实 key）。
         static string fakeKey(string role) => "test-key-" + role;
 
         var c = new ModConfig
@@ -130,6 +132,103 @@ public static class LlmConfigWriterTests
             // director 有 fallback，应序列化为 object
             Assert.NotNull(obj["roles"]!["director"]!["fallback"]);
             Assert.Equal("deepseek", obj["roles"]!["director"]!["fallback"]!["provider"]!.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(tmpDir))
+            {
+                Directory.Delete(tmpDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public static void WriteRuntimeConfig_FallbackChain_BothEntriesWritten_LegacyFieldIsFirst()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), $"llm-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tmpDir);
+            var config = MakeValidMultiProviderConfig();
+            // 第二备：四字段齐全 → fallbacks 应有两条，legacy fallback = 链首
+            config.DirectorFallback2Provider = "anthropic";
+            config.DirectorFallback2ApiKey = FakeKey("director-fallback2");
+            config.DirectorFallback2Model = "deepseek-flash";
+            config.DirectorFallback2BaseUrl = "https://api.deepseek.com/anthropic/v1";
+
+            var path = LlmConfigWriter.WriteRuntimeConfig(config, tmpDir);
+            Assert.NotNull(path);
+            var obj = JsonNode.Parse(File.ReadAllText(path!))!.AsObject();
+
+            var director = obj["roles"]!["director"]!.AsObject();
+            var chain = director["fallbacks"]!.AsArray();
+            Assert.Equal(2, chain.Count);
+            Assert.Equal("deepseek", chain[0]!["provider"]!.GetValue<string>());
+            Assert.Equal("anthropic", chain[1]!["provider"]!.GetValue<string>());
+            Assert.Equal("deepseek", director["fallback"]!["provider"]!.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(tmpDir))
+            {
+                Directory.Delete(tmpDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public static void WriteRuntimeConfig_EmptyApiKeyEntry_SkippedFromChain()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), $"llm-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tmpDir);
+            var config = MakeValidMultiProviderConfig();
+            // 第一备 key 为空 → 跳过；第二备齐全 → 链上只剩它，legacy fallback = 第二备
+            config.NpcFallbackApiKey = "";
+            config.NpcFallback2Provider = "anthropic";
+            config.NpcFallback2ApiKey = FakeKey("npc-fallback2");
+            config.NpcFallback2Model = "deepseek-flash";
+            config.NpcFallback2BaseUrl = "https://api.deepseek.com/anthropic/v1";
+
+            var path = LlmConfigWriter.WriteRuntimeConfig(config, tmpDir);
+            Assert.NotNull(path);
+            var obj = JsonNode.Parse(File.ReadAllText(path!))!.AsObject();
+
+            var npc = obj["roles"]!["npc"]!.AsObject();
+            var chain = npc["fallbacks"]!.AsArray();
+            Assert.Single(chain);
+            Assert.Equal("anthropic", chain[0]!["provider"]!.GetValue<string>());
+            Assert.Equal("anthropic", npc["fallback"]!["provider"]!.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(tmpDir))
+            {
+                Directory.Delete(tmpDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public static void WriteRuntimeConfig_AllFallbacksIncomplete_ChainEmptyLegacyNull()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), $"llm-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(tmpDir);
+            var config = MakeValidMultiProviderConfig();
+            // 两备模型齐全但 key 全空 → 整链跳过
+            config.ProtagonistFallbackApiKey = "";
+            config.ProtagonistFallback2ApiKey = "";
+
+            var path = LlmConfigWriter.WriteRuntimeConfig(config, tmpDir);
+            Assert.NotNull(path);
+            var obj = JsonNode.Parse(File.ReadAllText(path!))!.AsObject();
+
+            var protagonist = obj["roles"]!["protagonist"]!.AsObject();
+            Assert.Empty(protagonist["fallbacks"]!.AsArray());
+            Assert.Null(protagonist["fallback"]);
         }
         finally
         {

@@ -413,21 +413,37 @@ public class ModConfig
     [DefaultValue("https://api.minimax.chat/v1")]
     public string DirectorPrimaryBaseUrl { get; set; } = "https://api.minimax.chat/v1";
 
-    /// <summary>导演备 Provider 标识（留空=无回退）。</summary>
-    [DefaultValue("deepseek")]
-    public string DirectorFallbackProvider { get; set; } = "deepseek";
+    /// <summary>导演第一备 Provider 标识（protocol id，留空=无回退）。</summary>
+    [DefaultValue("sensenova")]
+    public string DirectorFallbackProvider { get; set; } = "sensenova";
 
-    /// <summary>导演备 Provider API Key。</summary>
+    /// <summary>导演第一备 Provider API Key。</summary>
     [DefaultValue("")]
     public string DirectorFallbackApiKey { get; set; } = "";
 
-    /// <summary>导演备 Provider 模型标识。</summary>
-    [DefaultValue("deepseek-chat")]
-    public string DirectorFallbackModel { get; set; } = "deepseek-chat";
+    /// <summary>导演第一备 Provider 模型标识（商汤仅 sensenova-* 自家模型免费）。</summary>
+    [DefaultValue("sensenova-6.8-flash-lite")]
+    public string DirectorFallbackModel { get; set; } = "sensenova-6.8-flash-lite";
 
-    /// <summary>导演备 Provider API Base URL。</summary>
-    [DefaultValue("https://api.deepseek.com/v1")]
-    public string DirectorFallbackBaseUrl { get; set; } = "https://api.deepseek.com/v1";
+    /// <summary>导演第一备 Provider API Base URL。</summary>
+    [DefaultValue("https://token.sensenova.cn/v1")]
+    public string DirectorFallbackBaseUrl { get; set; } = "https://token.sensenova.cn/v1";
+
+    /// <summary>导演第二备 Provider 标识（protocol id，如 sensenova/anthropic；留空=无第二备）。</summary>
+    [DefaultValue("anthropic")]
+    public string DirectorFallback2Provider { get; set; } = "anthropic";
+
+    /// <summary>导演第二备 Provider API Key。</summary>
+    [DefaultValue("")]
+    public string DirectorFallback2ApiKey { get; set; } = "";
+
+    /// <summary>导演第二备 Provider 模型标识。</summary>
+    [DefaultValue("deepseek-flash")]
+    public string DirectorFallback2Model { get; set; } = "deepseek-flash";
+
+    /// <summary>导演第二备 Provider API Base URL（anthropic 协议端点须含 /v1 后缀）。</summary>
+    [DefaultValue("https://api.deepseek.com/anthropic/v1")]
+    public string DirectorFallback2BaseUrl { get; set; } = "https://api.deepseek.com/anthropic/v1";
 
     // 主角 NPC
     /// <summary>主角 NPC 主 Provider 标识。</summary>
@@ -446,54 +462,86 @@ public class ModConfig
     [DefaultValue("https://api.minimax.chat/v1")]
     public string ProtagonistPrimaryBaseUrl { get; set; } = "https://api.minimax.chat/v1";
 
-    /// <summary>主角 NPC 备 Provider 标识。</summary>
-    [DefaultValue("deepseek")]
-    public string ProtagonistFallbackProvider { get; set; } = "deepseek";
+    /// <summary>主角 NPC 备 Provider 标识（protocol id，留空=无回退）。</summary>
+    [DefaultValue("sensenova")]
+    public string ProtagonistFallbackProvider { get; set; } = "sensenova";
 
     /// <summary>主角 NPC 备 Provider API Key。</summary>
     [DefaultValue("")]
     public string ProtagonistFallbackApiKey { get; set; } = "";
 
     /// <summary>主角 NPC 备 Provider 模型标识。</summary>
-    [DefaultValue("deepseek-chat")]
-    public string ProtagonistFallbackModel { get; set; } = "deepseek-chat";
+    [DefaultValue("sensenova-6.8-flash-lite")]
+    public string ProtagonistFallbackModel { get; set; } = "sensenova-6.8-flash-lite";
 
     /// <summary>主角 NPC 备 Provider API Base URL。</summary>
-    [DefaultValue("https://api.deepseek.com/v1")]
-    public string ProtagonistFallbackBaseUrl { get; set; } = "https://api.deepseek.com/v1";
+    [DefaultValue("https://token.sensenova.cn/v1")]
+    public string ProtagonistFallbackBaseUrl { get; set; } = "https://token.sensenova.cn/v1";
+
+    /// <summary>主角 NPC 第二备 Provider 标识（protocol id，如 anthropic；留空=无第二备）。</summary>
+    [DefaultValue("anthropic")]
+    public string ProtagonistFallback2Provider { get; set; } = "anthropic";
+
+    /// <summary>主角 NPC 第二备 Provider API Key。</summary>
+    [DefaultValue("")]
+    public string ProtagonistFallback2ApiKey { get; set; } = "";
+
+    /// <summary>主角 NPC 第二备 Provider 模型标识。</summary>
+    [DefaultValue("deepseek-flash")]
+    public string ProtagonistFallback2Model { get; set; } = "deepseek-flash";
+
+    /// <summary>主角 NPC 第二备 Provider API Base URL（anthropic 协议端点须含 /v1 后缀）。</summary>
+    [DefaultValue("https://api.deepseek.com/anthropic/v1")]
+    public string ProtagonistFallback2BaseUrl { get; set; } = "https://api.deepseek.com/anthropic/v1";
 
     // 普通 NPC
     /// <summary>普通 NPC 主 Provider 标识。</summary>
-    [DefaultValue("deepseek")]
-    public string NpcPrimaryProvider { get; set; } = "deepseek";
+    [DefaultValue("minimax")]
+    public string NpcPrimaryProvider { get; set; } = "minimax";
 
     /// <summary>普通 NPC 主 Provider API Key。</summary>
     [DefaultValue("")]
     public string NpcPrimaryApiKey { get; set; } = "";
 
     /// <summary>普通 NPC 主 Provider 模型标识。</summary>
-    [DefaultValue("deepseek-chat")]
-    public string NpcPrimaryModel { get; set; } = "deepseek-chat";
+    [DefaultValue("MiniMax-M2.7-highspeed")]
+    public string NpcPrimaryModel { get; set; } = "MiniMax-M2.7-highspeed";
 
     /// <summary>普通 NPC 主 Provider API Base URL。</summary>
-    [DefaultValue("https://api.deepseek.com/v1")]
-    public string NpcPrimaryBaseUrl { get; set; } = "https://api.deepseek.com/v1";
+    [DefaultValue("https://api.minimax.chat/v1")]
+    public string NpcPrimaryBaseUrl { get; set; } = "https://api.minimax.chat/v1";
 
-    /// <summary>普通 NPC 备 Provider 标识（留空=无回退）。</summary>
-    [DefaultValue("")]
-    public string NpcFallbackProvider { get; set; } = "";
+    /// <summary>普通 NPC 第一备 Provider 标识（protocol id，留空=无回退）。</summary>
+    [DefaultValue("sensenova")]
+    public string NpcFallbackProvider { get; set; } = "sensenova";
 
-    /// <summary>普通 NPC 备 Provider API Key。</summary>
+    /// <summary>普通 NPC 第一备 Provider API Key。</summary>
     [DefaultValue("")]
     public string NpcFallbackApiKey { get; set; } = "";
 
-    /// <summary>普通 NPC 备 Provider 模型标识。</summary>
-    [DefaultValue("")]
-    public string NpcFallbackModel { get; set; } = "";
+    /// <summary>普通 NPC 第一备 Provider 模型标识。</summary>
+    [DefaultValue("sensenova-6.8-flash-lite")]
+    public string NpcFallbackModel { get; set; } = "sensenova-6.8-flash-lite";
 
-    /// <summary>普通 NPC 备 Provider API Base URL。</summary>
+    /// <summary>普通 NPC 第一备 Provider API Base URL。</summary>
+    [DefaultValue("https://token.sensenova.cn/v1")]
+    public string NpcFallbackBaseUrl { get; set; } = "https://token.sensenova.cn/v1";
+
+    /// <summary>普通 NPC 第二备 Provider 标识（protocol id，如 anthropic；留空=无第二备）。</summary>
+    [DefaultValue("anthropic")]
+    public string NpcFallback2Provider { get; set; } = "anthropic";
+
+    /// <summary>普通 NPC 第二备 Provider API Key。</summary>
     [DefaultValue("")]
-    public string NpcFallbackBaseUrl { get; set; } = "";
+    public string NpcFallback2ApiKey { get; set; } = "";
+
+    /// <summary>普通 NPC 第二备 Provider 模型标识。</summary>
+    [DefaultValue("deepseek-flash")]
+    public string NpcFallback2Model { get; set; } = "deepseek-flash";
+
+    /// <summary>普通 NPC 第二备 Provider API Base URL（anthropic 协议端点须含 /v1 后缀）。</summary>
+    [DefaultValue("https://api.deepseek.com/anthropic/v1")]
+    public string NpcFallback2BaseUrl { get; set; } = "https://api.deepseek.com/anthropic/v1";
 
     // ─── 角色标记 ──────────────────────────────────────────────────
 

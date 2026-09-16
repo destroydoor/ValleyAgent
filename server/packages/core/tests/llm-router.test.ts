@@ -121,6 +121,74 @@ describe("LlmRouter.withFallback", () => {
   });
 });
 
+describe("LlmRouter 备用链（fallbacks）", () => {
+  function makeChainedConfig(): LlmRouterConfig {
+    const cfg = makeRouterConfig();
+    cfg.roles.npc = {
+      primary: { provider: "minimax", apiKey: "sk-npc-pri", model: "MiniMax-M3", baseUrl: "https://api.minimax.chat/v1" },
+      fallback: { provider: "sensenova", apiKey: "sk-fb1", model: "sensenova-6.8-flash-lite", baseUrl: "https://token.sensenova.cn/v1" },
+      fallbacks: [
+        { provider: "anthropic", apiKey: "sk-fb2", model: "deepseek-flash", baseUrl: "https://api.deepseek.com/anthropic/v1" },
+        { provider: "minimax", apiKey: "sk-fb3", model: "MiniMax-M2.7-highspeed", baseUrl: "https://api.minimax.chat/v1" },
+      ],
+    };
+    return cfg;
+  }
+
+  test("fallback 与 fallbacks 合并，fallback 在前", () => {
+    const router = new LlmRouter(makeChainedConfig());
+    const chain = router.getProviderFallbacks("npc");
+    expect(chain).toHaveLength(3);
+    expect(chain[0].config.model).toBe("sensenova-6.8-flash-lite");
+    expect(chain[1].config.model).toBe("deepseek-flash");
+    expect(chain[2].config.model).toBe("MiniMax-M2.7-highspeed");
+    // getProviderFallback 语义不变：返回第一级备用
+    expect(router.getProviderFallback("npc")!.config.model).toBe("sensenova-6.8-flash-lite");
+  });
+
+  test("billing 错误沿链逐级回退", async () => {
+    const router = new LlmRouter(makeChainedConfig());
+    const called: string[] = [];
+    const spy = (model: string, ok: boolean) => mock(() => {
+      called.push(model);
+      return ok ? Promise.resolve({ content: model, usage: {} }) : Promise.reject(new LLMBillingError(`402 ${model}`));
+    });
+    router.getProvider("npc")._setCallOverride(spy("primary", false) as any);
+    const chain = router.getProviderFallbacks("npc");
+    chain[0]._setCallOverride(spy("fb1", false) as any);
+    chain[1]._setCallOverride(spy("fb2", true) as any);
+    chain[2]._setCallOverride(spy("fb3", true) as any);
+
+    const result = await router.chatCompletion("npc", []);
+    expect(result.content).toBe("fb2");
+    expect(called).toEqual(["primary", "fb1", "fb2"]);
+  });
+
+  test("整链 billing 错误 → 抛最后一个 LLMBillingError", async () => {
+    const router = new LlmRouter(makeChainedConfig());
+    const boom = () => mock(() => Promise.reject(new LLMBillingError("429")));
+    router.getProvider("npc")._setCallOverride(boom() as any);
+    for (const p of router.getProviderFallbacks("npc")) p._setCallOverride(boom() as any);
+
+    await expect(router.chatCompletion("npc", [])).rejects.toThrow(LLMBillingError);
+  });
+
+  test("链中某级抛非 billing 错误 → 直接抛出不继续回退", async () => {
+    const router = new LlmRouter(makeChainedConfig());
+    router.getProvider("npc")._setCallOverride(
+      mock(() => Promise.reject(new LLMBillingError("402"))) as any,
+    );
+    const chain = router.getProviderFallbacks("npc");
+    chain[0]._setCallOverride(mock(() => Promise.reject(new LLMUnavailableError("500"))) as any);
+    const lastSpy = mock(() => Promise.resolve({ content: "fb3", usage: {} }));
+    chain[1]._setCallOverride(lastSpy as any);
+    chain[2]._setCallOverride(lastSpy as any);
+
+    await expect(router.chatCompletion("npc", [])).rejects.toThrow(LLMUnavailableError);
+    expect(lastSpy).toHaveBeenCalledTimes(0);
+  });
+});
+
 describe("LlmRouter 不变量", () => {
   test("provider 实例数 = 主数 + 备数（3 主 + 2 备 = 5）", () => {
     const router = new LlmRouter(makeRouterConfig());
@@ -217,6 +285,42 @@ describe("loadRouterConfig 校验", () => {
       enableProtagonistMapping: true,
     }));
     expect(() => loadRouterConfig(path)).toThrow(/apiKey/);
+  });
+
+  test("fallbacks 数组元素缺 apiKey → 抛错", () => {
+    const path = join(tmpDir, "bad-fallbacks.json");
+    writeFileSync(path, JSON.stringify({
+      version: 1,
+      roles: {
+        director: {
+          primary: { provider: "minimax", apiKey: "k", model: "m", baseUrl: "u" },
+          fallbacks: [{ provider: "deepseek", apiKey: "", model: "m", baseUrl: "u" }],
+        },
+        protagonist: { primary: { provider: "minimax", apiKey: "k", model: "m", baseUrl: "u" } },
+        npc: { primary: { provider: "deepseek", apiKey: "k", model: "m", baseUrl: "u" } },
+      },
+      protagonistNpcs: [],
+      enableProtagonistMapping: true,
+    }));
+    expect(() => loadRouterConfig(path)).toThrow(/apiKey/);
+  });
+
+  test("fallbacks 非数组 → 抛错", () => {
+    const path = join(tmpDir, "bad-fallbacks-type.json");
+    writeFileSync(path, JSON.stringify({
+      version: 1,
+      roles: {
+        director: {
+          primary: { provider: "minimax", apiKey: "k", model: "m", baseUrl: "u" },
+          fallbacks: "not-an-array",
+        },
+        protagonist: { primary: { provider: "minimax", apiKey: "k", model: "m", baseUrl: "u" } },
+        npc: { primary: { provider: "deepseek", apiKey: "k", model: "m", baseUrl: "u" } },
+      },
+      protagonistNpcs: [],
+      enableProtagonistMapping: true,
+    }));
+    expect(() => loadRouterConfig(path)).toThrow(/fallbacks/);
   });
 
   test("合法配置 → 正确加载", () => {
