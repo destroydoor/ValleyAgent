@@ -242,7 +242,7 @@ Python 时代遗留（5）：AutoStartPythonServer、PythonExecutablePath、Pyth
 | C5/C6 幽灵资产去留（`ValleyTalk.ApiTest`、根级 React 原型） | **未做** | #14 | 需用户决策（删/移/保留）；本轮只把它们**登记进 README 与报告**（从"无人知晓"变为"有据可查"） |
 | C7 `CompatibilityStubs` 兼容壳去留 | **未做** | #15 | 静态复核已确认其宣称的引用方（Narrative/N1-N5 测试）**已不存在**；但删净需"删掉后编译"验证，本环境无 dotnet |
 | P2-14 占位符逐个替换（实测 709 处） | **部分做** | #16 | 已在 `docs/README.md` 写明占位符映射约定（`<REPO_ROOT>`=本仓根、`<VALLEYAI_ROOT>`=`server/`），并把两个**活文档**（`scripts/*README.md`）改成真实路径；历史计划/设计文档里的占位符**保留原样**（它们是当时的记录，批量改写会污染历史） |
-| A9 补回 `2026-09-12-architecture-drift-audit.md` | **未做** | #12 | 底稿**并未丢失**：完整内容在未合并分支 `arena/01a09648-valleyagent`（23,482 B），可单文件 `git checkout` 恢复（§6bis 原措辞"无法凭空补写"已被本行更正）；本轮仅在 AGENTS 中明示"未随仓交付" |
+| A9 补回 `2026-09-12-architecture-drift-audit.md` | **已恢复（2026-09-16）** | #12 | 底稿已于 2026-09-16 自未合并分支 `arena/01a09648-valleyagent` 单文件 `git checkout` 恢复入 `main`（内容一字未改，仅文件头补来源说明；行号基准当时的 HEAD `7021d83`）；`AGENTS.md` banner 与 `docs/README.md` 索引已改回仓内正常引用。本行原状态「未做」自此作废 |
 
 ### 复验命令（本轮跑过的）
 

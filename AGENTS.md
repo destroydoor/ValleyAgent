@@ -1,6 +1,6 @@
 # ValleyAgent — 项目指南（AI 助手版）
 
-> **Last updated:** 2026-09-14（架构漂移审计收割：C# ~5,600 行死子系统 + TS react-guard 删除；**旧叙事 Director 砍除裁决**——morningPlan/beat 线产出无人消费，director.ts/beat-store/runBeat/BEAT 模板/PlayerDirectory 已删，协议 10 条 planned 死 schema 清理 + consolidate_day 降级 planned；C# 工具层与 directorContext 推送保留待未来造脑；审计底稿 `docs/plan/2026-09-12-architecture-drift-audit.md` **未随仓交付**——完整内容在未合并分支 `arena/01a09648-valleyagent`（23,482 B / 234 行，PR #2 closed 未 merge），`main` 上三处引用悬空、可追溯性断档，恢复方案见 issue #12；2026-09-15 偏移度审查记录见 `docs/plan/2026-09-15-doc-code-drift-audit.md` §1 A9 / §6ter）
+> **Last updated:** 2026-09-16（架构漂移审计收割：C# ~5,600 行死子系统 + TS react-guard 删除；**旧叙事 Director 砍除裁决**——morningPlan/beat 线产出无人消费，director.ts/beat-store/runBeat/BEAT 模板/PlayerDirectory 已删，协议 10 条 planned 死 schema 清理 + consolidate_day 降级 planned；C# 工具层与 directorContext 推送保留待未来造脑；审计底稿 `docs/plan/2026-09-12-architecture-drift-audit.md` 已于 2026-09-16 自未合并分支 `arena/01a09648-valleyagent` 单文件恢复入库，行号基准当时的 HEAD `7021d83`，见 issue #12；2026-09-15 偏移度审查记录见 `docs/plan/2026-09-15-doc-code-drift-audit.md` §1 A9 / §6ter）
 > **卡死排查结论**：`docs/plan/2026-09-10-host-freeze-root-cause.md`（"每玩家一导演"=误读；6 轮 soak 无进程级冻结；FOLLOW 跨图缺陷族行为级实证并已修；U1/U2/U3 猜想台账与实机终验流程见附录 B）
 > **当前执行依据**：`docs/plan/2026-08-05-three-tier-architecture-execution-plan.md`
 > **架构修订设计**：`docs/design/2026-08-15-ts-ledger-reflex-architecture.md`（经济账本迁 TS + C# 反射执行，**四步全部完成（2026-08-15）**：adjust 执行器 + TS 账本 + 经济工具同步编排 + TS 情绪引擎 + 断线对账）
