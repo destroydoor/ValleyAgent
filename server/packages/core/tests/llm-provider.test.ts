@@ -329,7 +329,8 @@ test("log: callOverride path annotates override=true", async () => {
 });
 
 test("log: retry emits retry line with attempt and backoff", async () => {
-  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  // issue #26 批④：重试是瞬态降级，落在 console.warn（可按 WARN grep），不再与正常日志同级
+  const logSpy = spyOn(console, "warn").mockImplementation(() => {});
   const config = makeConfig({ maxRetries: 3 });
   const provider = new VercelAIProvider(config);
   let calls = 0;
@@ -362,7 +363,8 @@ test("log: billing error emits billing line and skips retry", async () => {
 });
 
 test("log: final unavailable emits unavailable line", async () => {
-  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  // issue #26 批④：重试耗尽的最终失败落在 console.error（可按 ERROR grep）
+  const logSpy = spyOn(console, "error").mockImplementation(() => {});
   const config = makeConfig({ maxRetries: 2 });
   const provider = new VercelAIProvider(config);
   provider._setCallOverride(async () => {

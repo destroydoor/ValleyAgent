@@ -75,7 +75,7 @@ export class ConsoleLogSubscriber {
           break;
         }
         case "error":
-          console.log(`[${timestamp()}] [turn] ${this.npcName} error: ${ev.message}`);
+          console.error(`[${timestamp()}] [turn] ${this.npcName} error: ${ev.message}`);
           break;
       }
     } catch {

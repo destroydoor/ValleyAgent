@@ -280,13 +280,13 @@ export class VercelAIProvider implements ILLMProvider {
         if (attempt === this.config.maxRetries - 1) break;
         const baseDelay = Math.min(1000 * 2 ** attempt, 30000);
         const jitter = Math.random() * 0.3 * baseDelay;
-        console.log(
+        console.warn(
           `[${logTimestamp()}] [llm] retry ${attempt + 1}/${this.config.maxRetries} (HTTP ${statusCode ?? "n/a"}: ${describeError(err)}) backoff=${Math.round(baseDelay + jitter)}ms`
         );
         await new Promise((r) => setTimeout(r, baseDelay + jitter));
       }
     }
-    console.log(`[${logTimestamp()}] [llm] unavailable after ${this.config.maxRetries} retries: ${lastError?.message}`);
+    console.error(`[${logTimestamp()}] [llm] unavailable after ${this.config.maxRetries} retries: ${lastError?.message}`);
     throw new LLMUnavailableError(
       `LLM unavailable after ${this.config.maxRetries} retries: ${lastError?.message}`
     );

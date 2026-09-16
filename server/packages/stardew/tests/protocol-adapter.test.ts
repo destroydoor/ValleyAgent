@@ -411,7 +411,8 @@ test("handleDirectorCommand forwards to sendToCsharp and returns ack", async () 
 });
 
 test("handleDirectorCommand without sendToCsharp returns ack and drops", async () => {
-  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  // issue #26 批④：丢弃事件落在 console.error（可按 ERROR grep）
+  const logSpy = spyOn(console, "error").mockImplementation(() => {});
   const { adapter, dir } = makeAdapter();
   try {
     const cmd: DirectorCommandMessage = {
