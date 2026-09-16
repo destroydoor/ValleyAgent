@@ -125,7 +125,7 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 
 **2026-09-14 裁决**：旧叙事 Director（director.ts morningPlan→beat→allocate_agent）因产出无人消费（runBeat 从未接入生产、beat 唯一副作用是保活占池）已整体砍除；C# 的 9 个 DirectorTools + `director_command` 通道 + DirectorContextBuilder 每日推送**保留**，作为未来"工具型 Director 造脑"的就绪层（B4 的按需建身体逻辑同样保留）。
 
-**就绪层的两个已登记缺口（2026-09-15 偏移审查 §3 实证，未修，等造脑时一并处理）**：①`ServerProcessManager.cs:291,301` 仍向 TS 透传 `--disable-director` / `--director-probability`，而 `cli.ts` 对未知参数**静默忽略**——即这两个上游配置项（`EnableDirector` / `Director.TriggerProbability`）目前对 TS 无实际效果；②`TestMod/Tests/Integration/DIR_DirectorBehaviorRecord.cs`（仍注册在 `V3TestRunner.cs:724`）每轮都在等已被砍除的 `morningPlan end` 日志，必跑到超时才收尾并产出空报告——造脑接线时应同时复活此测试或删除它（跟踪：issue #17）。
+**就绪层的两个已登记缺口（2026-09-15 偏移审查 §3 实证，未修，等造脑时一并处理）**：①`ServerProcessManager.cs:291,301` 仍向 TS 透传 `--disable-director` / `--director-probability`，而 `cli.ts` 对未知参数**静默忽略**——即这两个上游配置项（`EnableDirector` / `Director.TriggerProbability`）目前对 TS 无实际效果；②`TestMod/Tests/Integration/DIR_DirectorBehaviorRecord.cs`（仍注册在 `V3TestRunner.cs:724`）等的是已被砍除的 `morningPlan end` 日志——**2026-09-15 起默认 `Skip()`**（不再空等 180s；`VALLEY_DIRECTOR_TEST=1` 强制跑，跑满也只得空报告）——造脑接线时应同时复活此测试或删除它（跟踪：issue #17）。
 
 ### 3.6 已知坑（详见旧版参考 §2.1.1）
 
@@ -168,9 +168,9 @@ set_npc_position / set_npc_inventory / set_npc_money / set_npc_mood / set_npc_re
 - **猜想台账**：排查/疑难任务先分档——已验证事实 / 未验证猜想 / 已排除；未验证猜想逐条记推理链、反证条件与终验方案（判据 → 结论），结案时逐条裁决；不凭猜动手（§2 第 10 条；范式见 `docs/plan/2026-09-10-host-freeze-root-cause.md` 附录 B）。
 - 评论 `//` 说"为什么"，XML 文档说"是什么"；NPC 名做字典 key 用 `StringComparer.OrdinalIgnoreCase`；LLM 调用全 async 不阻塞主线程。
 - Handler 退出前先收尾仪式再 `ForceTransition(IDLE)`；移动一律走 `IMovementService`，不直接碰 `npc.controller`。
-- **验证门槛**：TS 侧 `bun test` + `bun run typecheck`（仅 `packages/*/src`）+ **`bun run typecheck:tests`（必须同时跑，否则测试目录的悬空 import 与已删类型不会被发现）** + `check:protocol` 全绿；C# 侧编译 0 警告 + 游戏内实测（手动或 TestMod）。
+- **验证门槛**：TS 侧 `bun test` + `bun run typecheck`（三段串接：主代码 + stardew 测试 + core 测试，已覆盖全部测试目录）+ `check:protocol` 全绿；C# 侧编译 0 警告 + 游戏内实测（手动或 TestMod）。
 - 构建部署脚本见旧版参考附录 B（`scripts/build/build-deploy.ps1` 等）。
 - **分发包**：`scripts/build/package-distribution.ps1` 产出 `release/ValleyTalk-dist-*.zip`（单 ValleyAgent 文件夹 + TS 服务器 exe + 预写 key 的 config；不含 TestMod/Autopilot）。API key 的单一事实源是 dev 部署 `Stardew Valley/Mods/ValleyAgent/config.json`（gitignored）。
-- **第三方 LLM 兼容端点（sensenova/mimo）**：`@ai-sdk/openai` v2 对所有非 gpt-* 模型按新协议发 `developer` 角色 + `max_completion_tokens`，商汤会 400——provider 内用 `createCompatFetch` 改写回老式协议（`llm-provider.ts`）。商汤端点 `https://token.sensenova.cn/v1`（**仅 `sensenova-*` 自家模型免费；平台上的第三方模型如 glm-5.2/deepseek-v4-flash 消耗额度**；6.7-flash-lite 对 token plan key 报 route not found）；小米 `https://token-plan-cn.xiaomimimo.com/v1`（mimo-v2.5/mimo-v2.5-pro）。**当前编排：三角色主=minimax，备=统一 mimo-v2.5**。
+- **第三方 LLM 兼容端点（sensenova/mimo）**：`@ai-sdk/openai` v2 对所有非 gpt-* 模型按新协议发 `developer` 角色 + `max_completion_tokens`，商汤会 400——provider 内用 `createCompatFetch` 改写回老式协议（`llm-provider.ts`）。商汤端点 `https://token.sensenova.cn/v1`（**仅 `sensenova-*` 自家模型免费；平台上的第三方模型如 glm-5.2/deepseek-v4-flash 消耗额度**；6.7-flash-lite 对 token plan key 报 route not found）；小米 `https://token-plan-cn.xiaomimimo.com/v1`（mimo-v2.5/mimo-v2.5-pro）。**当前编排（2026-09-15 起）：三角色主=minimax，备用=商汤/DeepSeek 级联链（mimo 退场）**。
 - **运行时错误落盘**：`Infrastructure/ModErrorLog.cs` 写 `ValleyAgent-error.log`（未捕获异常/服务器崩溃/WS 错误）与 `ValleyAgent-server.log`（TS 服务器完整输出，需 `ServerConsoleWindow=false`）到 mod 目录，5MB 轮转。
 - **卡死取证仪器（2026-09-11 生产化，纯观测零行为改动）**：`Infrastructure/MainThreadWatchdog.cs` 随生产 mod 布防（发行包自带，不再依赖 TestMod）——主线程心跳停滞 >5s（`VALLEY_WATCHDOG_MS`）自动落 dbghelp MiniDump + 伴随日志（含 timeOfDay/联机上下文/线程概览）到 `Mods/ValleyAgent/watchdog/`（留 5 份）；同线程顺带轮询 `StuckOperationTracker`（后台操作 >60s 落 stuck-*.dmp，`VALLEY_STUCKOP_MS`；接线：决策批/好感度外部 delta——候选 2/3 静默死循环的唯一观测面）。告警双通道（SMAPI Monitor + ModErrorLog 立即落盘）。TestMod 看门狗在生产版在场时自动让位（防并发 MiniDumpWriteDump）。配套遥测：`QueueTelemetry`（主线程队列深度 ≥100/WS 命令滞留 >2s/OnUpdateTicked 排水段 >100ms 告警）、MoveTo >500ms 慢寻路告警（U1 负载证据）。**TS 侧**：`ServerConsoleWindow=true`（发行包默认）时 C# 经 `VALLEY_SERVER_LOGFILE` 让 TS 自把控制台 tee 到 `ValleyAgent-server.log`（`log-tee.ts`）；WS 连接建立/顶替/断连丢弃、day_started 重复（"多导演"误读观测面）均有日志。
