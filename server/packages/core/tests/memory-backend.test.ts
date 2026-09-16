@@ -19,8 +19,8 @@ test("MemoryBackend interface is structurally compatible with a minimal impl", (
       this.significantMemories.push({ text, timestamp: 0, category, emotionalWeight: weight, relatedNpcs, location });
       return true;
     },
-    getConversationContext(count = 10) { return ""; },
-    getRecentMemories(count = 5) { return ""; },
+    getConversationContext(_count = 10) { return ""; },
+    getRecentMemories(_count = 5) { return ""; },
     getSignificantMemoriesText() { return ""; },
     async load() { /* no-op */ },
     async save() { /* no-op */ },

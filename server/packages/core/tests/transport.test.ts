@@ -47,10 +47,11 @@ test("onConnect callback fires when client connects", async () => {
 
 test("onMessage callback fires when client sends message", async () => {
   const transport = new BunWebSocketTransport({ port: 18804 });
-  let receivedMessage: string | null = null;
+  // TS 无法跟踪闭包内赋值（会一直窄化到 null），用数组收集后按下标断言
+  const received: string[] = [];
 
-  transport.onMessage((conn, data) => {
-    receivedMessage = typeof data === "string" ? data : data.toString();
+  transport.onMessage((_conn, data) => {
+    received.push(typeof data === "string" ? data : data.toString());
   });
   await transport.start();
 
@@ -58,7 +59,7 @@ test("onMessage callback fires when client sends message", async () => {
   await new Promise((resolve) => { ws.onopen = () => resolve(null); });
   ws.send("hello world");
   await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(receivedMessage).toBe("hello world");
+  expect(received[0]).toBe("hello world");
 
   ws.close();
   await transport.stop();

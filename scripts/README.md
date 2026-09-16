@@ -2,10 +2,12 @@
 
 Scripts for building, testing, and managing the ValleyTalk project.
 
-> **Architecture note (v4.3+)**: The intelligence layer is the TypeScript
-> Agent Server (`valley-ai-server.exe`, source at `<VALLEYAI_ROOT>`). The
-> C# mod's `ServerProcessManager` auto-launches and supervises the exe — no
-> manual server start is needed. See `AGENTS.md` for the full architecture.
+> **Architecture note**: The intelligence layer is the TypeScript Agent Server
+> (`valley-ai-server.exe`), **source in this repo at `server/`** (bun workspace:
+> `packages/core` + `packages/stardew`). The C# mod's `ServerProcessManager`
+> auto-launches and supervises the exe — no manual server start is needed.
+> `scripts/lib/paths.ps1` resolves it as `<repo>/server` (env `VALLEYAI_ROOT`
+> overrides). See `AGENTS.md` for the full architecture.
 
 ## Directory Structure
 
@@ -27,13 +29,21 @@ scripts/
 │   ├── launch-test.ps1
 │   ├── run_farmhand_e2e.ps1
 │   └── analyze-multiplayer-logs.ps1
-├── screenshot_window.ps1  # BMP screenshot (legacy — do not modify per project rules)
-├── screenshot_desktop.ps1
-├── resize_window.ps1     # BMP-related (legacy — do not modify)
+├── check-dead-assertions.mjs   # 死断言检测（扫 logs/test_results/*_assertions.json）
+├── check-test-anti-cheat.mjs   # 测试防作弊扫描
+├── check-privacy.mjs           # 隐私/密钥扫描
+├── verify-all.ps1              # 一键验证（构建 + 测试 + 检查）
+├── ci/                         # CI 辅助脚本
+├── docker/                     # 容器化测试辅助（prep-mods 等）
+├── lib/paths.ps1               # 路径解析（RepoRoot / GamePath / ValleyAIRoot）
 └── utils/
     ├── clean-logs.ps1    # Archive old SMAPI logs
     └── status.ps1        # Show project status (build/game/Agent Server)
 ```
+
+> 2026-09-15 偏移审查修订：删除本表中原列的 `screenshot_window.ps1` /
+> `screenshot_desktop.ps1` / `resize_window.ps1` —— 这三个文件在仓库中**不存在**
+> （历史上已移除，且未像 Python 时代脚本那样登记）。
 
 > Removed in v4.3: `scripts/server/start-server.ps1`, `scripts/test/test-python.ps1`,
 > `run-python-tests.bat`, `run-all-tests.bat` (the Python server has been deleted;
@@ -94,16 +104,16 @@ since filenames encode timestamps and test type.
 - TestMod in-game SMAPI console commands
 - Full integration test of C# mod + TS Agent Server (`valley-ai-server.exe`)
 - The TS server is auto-launched by `ServerProcessManager` based on `ModConfig`
-- Groups: `Fuzzy` / `Edge` / `Functional` / `Real` / `Narrative` / `Visual` / `All`
+- Groups: `Fuzzy` / `Edge` / `Functional` / `Pipeline` / `Experience` / `Visual` / `All`
+  （`Narrative` 分组随旧叙事 Director 于 2026-09-14 砍除）
 - Commands: `vat_auto` (all phases), `vat_status`, `vat_abort`
 - Run: `scripts\test\run-tests.ps1 -Group <Group>` or `scripts\test\test-game.ps1`
 
-### TS Server Unit/Integration Tests (run inside <VALLEYAI_ROOT>)
-- `packages/core/tests/*.test.ts` — Agent framework primitives
-- `packages/stardew/tests/*.test.ts` — Stardew-specific (NPC, protocol, validator)
-- Run via `bun test` in the `<VALLEYAI_ROOT>` workspace
-- These tests are **not** invoked from ValleyTalk scripts — they belong to the
-  ValleyAI repo
+### TS Server Unit/Integration Tests (run in `server/`)
+- `server/packages/core/tests/*.test.ts` — Agent framework primitives
+- `server/packages/stardew/tests/*.test.ts` — Stardew-specific (NPC, protocol, validator)
+- Run via `bun test` in `server/`; 类型检查用 `bun run typecheck`（**已覆盖测试目录**）
+- 这些测试同样在本仓；游戏内脚本不自动调用，需单独运行
 
 ## Result File Format
 

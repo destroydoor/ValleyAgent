@@ -95,7 +95,8 @@ test("chatCompletionJson returns parsed object", async () => {
     };
   });
 
-  const result = await provider.chatCompletionJson([]);
+  // chatCompletionJson 的 T 缺省为 unknown（JSON.parse 结果），测试按契约显式声明形状
+  const result = await provider.chatCompletionJson<{ targetState: string; reason: string }>([]);
   expect(result.parsed.targetState).toBe("FARM");
   expect(result.parsed.reason).toBe("helping");
 });
@@ -220,9 +221,11 @@ test("chatWithTools returns toolCalls from LLM response", async () => {
   expect(result.content).toBe("Let me speak");
   expect(result.toolCalls).toBeDefined();
   expect(result.toolCalls).toHaveLength(1);
-  expect(result.toolCalls![0].id).toBe("call_1");
-  expect(result.toolCalls![0].name).toBe("speak");
-  expect(result.toolCalls![0].args).toEqual({ text: "hi" });
+  // noUncheckedIndexedAccess：先取出首元素，避免 [0] 带 undefined 直接取属性
+  const firstCall = result.toolCalls![0]!;
+  expect(firstCall.id).toBe("call_1");
+  expect(firstCall.name).toBe("speak");
+  expect(firstCall.args).toEqual({ text: "hi" });
 });
 
 // ─── E5: HTTP error classification (402/429 → LLMBillingError, 5xx → LLMUnavailableError) ───

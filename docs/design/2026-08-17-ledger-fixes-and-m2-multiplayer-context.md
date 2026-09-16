@@ -1,9 +1,10 @@
 # 账本 P1 修复 + C3 补全 + M2 多玩家上下文 — 设计与实施记录
 
 > **Created:** 2026-08-17
-> **状态:** 计划已批准，实施中
+> **状态:** **已完成**（2026-09-15 偏移审查时复核：`player_profile` 分键 + `LEGACY_PLAYER_ID` 惰性认领 +
+> `legacyMigrated` 迁移守卫 + 记忆双桶均已落地；原文"实施中"为撰写当时的快照）
 > **前置:** `docs/design/2026-08-16-multiplayer-boundary-analysis.md`（§4 决策 #1/#2 的落地）、`docs/design/2026-08-15-ts-ledger-reflex-architecture.md`
-> **涉及仓库:** ValleyTalk（C#）+ ValleyAI（TS）
+> **涉及仓库:** ValleyTalk（C#）+ ValleyAI（TS）——注意：ValleyAI 已于本仓成立 `server/` 工作区，文中 `<VALLEYAI_ROOT>` 即今天的 `server/`
 
 三个工作项独立可回滚、独立提交。
 

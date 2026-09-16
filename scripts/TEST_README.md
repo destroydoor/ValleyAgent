@@ -1,37 +1,39 @@
 # ValleyAgent 测试文档
 
-> **架构现状（v4.3+）**：智能层是 TypeScript Agent Server（`valley-ai-server.exe`，
-> 源码位于 `<VALLEYAI_ROOT>`）。C# Mod 通过 `ServerProcessManager` 自动拉起
-> 并监护该 exe，无需手动启动服务器。完整架构见根目录 `AGENTS.md`。
+> **架构现状**：智能层是 TypeScript Agent Server（`valley-ai-server.exe`），
+> **源码在本仓 `server/` 工作区**（`packages/core` + `packages/stardew`）。
+> C# Mod 通过 `ServerProcessManager` 自动拉起并监护该 exe，无需手动启动服务器。
+> 完整架构见根目录 `AGENTS.md`。
 
 ## 测试架构
 
 测试分为两个独立层面：
 
-1. **TS Agent Server 单元/集成测试**（位于 `<VALLEYAI_ROOT>`）
+1. **TS Agent Server 单元/集成测试**（位于本仓 `server/`）
    - `packages/core/tests/*.test.ts` — Agent 框架原语（agentLoop、CircuitBreaker、
      LLMProvider、TokenBudget、ToolRegistry、MemoryBackend 等）
    - `packages/stardew/tests/*.test.ts` — Stardew 实现（NPC prompt loader、
      output-validator、protocol-adapter、stardew-tools、stardew-agent、
      world-snapshot-decoder、rule-engine、agent-memory 等）
-   - 通过 `bun test` 在 ValleyAI 工作区运行，与 ValleyTalk 仓库解耦
+   - 通过 `bun test` 在 `server/` 工作区运行；`bun run typecheck` 同时检查 src 与 tests
 
 2. **游戏集成测试**（位于 `src/ValleyAgent.TestMod/`）
    - 模拟玩家点击 NPC、送礼、对话等场景，验证 C# 执行层 + TS Agent Server
      全链路（WebSocket 协议、tool_calling、记忆持久化、状态同步）
-   - 由 `V3TestRunner` 驱动，分组：`Fuzzy` / `Edge` / `Functional` / `Real` /
-     `Narrative` / `Visual`
+   - 由 `V3TestRunner` 驱动，分组：`Fuzzy` / `Edge` / `Functional` / `Pipeline` /
+     `Experience` / `ComplexScenario` / `Visual`（`Narrative` 随旧叙事 Director 砍除）
    - 通过 SMAPI 加载 TestMod，由标记文件 `auto_orchestrator_run.flag` 触发
 
 ## 测试方式
 
-### TS Agent Server 测试（在 <VALLEYAI_ROOT> 目录）
+### TS Agent Server 测试（在本仓 `server/` 目录）
 
 ```bash
-cd <VALLEYAI_ROOT>
+cd server
+bun install
 bun test                       # 运行所有 core + stardew 单元测试
-bun test packages/stardew      # 仅运行 Stardew 实现
-bun test packages/core         # 仅运行 core 框架
+bun run typecheck              # 类型检查：src + 两个包的 tests
+bun run check:protocol         # C# ↔ TS 协议契约静态检查
 ```
 
 ### 游戏集成测试（在本仓库）

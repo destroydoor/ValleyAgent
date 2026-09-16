@@ -23,6 +23,29 @@ public enum LanguageMode
 }
 
 // Serializable configuration container for ValleyAgent
+//
+// ─── 配置项健康度登记（2026-09-15 文档↔代码偏移审查 C4，底稿见
+//     docs/plan/2026-09-15-doc-code-drift-audit.md §3 C4）────────────────────────
+// 本类共约 150 个属性，扫描"除 ModConfig/GMCMIntegration 外零 C# 引用"后分两类：
+//
+// 【A 类：刻意的兼容垫片 —— 勿删】仅在 MigrateLegacyFields()（见 :546 附近）读取旧键：
+//   AutoStartPythonServer / PythonExecutablePath / PythonServerDirectory /
+//   PythonServerStartupTimeoutSeconds / PythonServerMaxRestartAttempts（均已 [Obsolete]，包在
+//   #pragma warning disable CS0618 内）、ModelName → LlmModel、DialogueTemperature（存档兼容）。
+//   删除它们等于放弃老 config.json 的迁移，需连 MigrateLegacyFields + scripts/docker/prep-mods.ps1
+//   一起改（该脚本会写 AutoStartPythonServer=false）。**A 类不在 #13 的摘除范围内。**
+//
+// 【B 类：消费者已被删除的孤儿配置 —— 待摘除，需一次带编译验证的改动】
+//   ServerAddress（直连 LLM 通路已禁，改走 TS Agent Server）、DevMode、DebugLogEnabled、
+//   CustomSystemPrompt、AIDailyTopicCount、StateRejectionCooldownTicks、MaxStateRejections、
+//   FallbackAIMixProbability、FallbackLiveGenerationProbability、TodayEventsMaxCount（L2）、
+//   Haggle.Enabled / Haggle.MaxRounds / Haggle.HostileThreshold（还价结算链已随账本迁 TS 删除）。
+//   这些项仍被 Validate() 钳制；除 ServerAddress / TodayEventsMaxCount 外**都还渲染在 GMCM
+//   面板上**——即玩家能改、能保存，但不产生任何效果。
+//   摘除顺序：ModConfig 属性 → Validate 钳制 → GMCMIntegration 条目 → CopyFrom 复制，
+//   并在有 dotnet 的环境跑 `dotnet build`（TestMod/UnitTests 均 TreatWarningsAsErrors）。
+//   摘除进度跟踪：GitHub issue #13（"配置项可改但无效"）。
+// ────────────────────────────────────────────────────────────────────────────
 public class ModConfig
 {
     [DefaultValue(LlmProvider.LMStudio)] public LlmProvider Provider { get; set; } = LlmProvider.LMStudio;

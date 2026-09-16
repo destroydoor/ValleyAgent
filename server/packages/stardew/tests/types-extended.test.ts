@@ -1,12 +1,15 @@
-// Type compilation tests for narrative director types (Task 1).
-// Verifies every newly-added interface/type can be constructed as an object literal.
+// 类型编译测试：验证仍存活的画像/游戏上下文类型能以对象字面量构造。
 // Run: bun test tests/types-extended.test.ts
+//
+// 2026-09-15 偏移审查 C1：本文件原有 3 个测试 + 1 个测试的一半在断言
+// 已随旧叙事 Director 砍除的类型（Beat / BeatStatus / ReActStep /
+// ActivityReportMessage / ActivityMilestoneMessage / BeatDirectiveMessage /
+// BeatActivateMessage / BeatEventMessage / BeatStateMessage /
+// PlayerStateUpdateMessage）——类型已从 src/types.ts 导出面删除，断言等于空跑，
+// 故整段删除；只保留活类型的编译守护（导入需与 src/types.ts / narrative-types.ts 一致）。
 
 import { test, expect } from "bun:test";
 import type {
-  Beat,
-  BeatStatus,
-  ReActStep,
   PlayStyleTag,
   PlayStyle,
   ActivityRank,
@@ -19,62 +22,13 @@ import type {
   NpcStateSnapshot,
   InventorySlot,
   GameContext,
-  ActivityReportMessage,
-  ActivityMilestoneMessage,
   GameContextSyncMessage,
-  BeatDirectiveMessage,
-  BeatActivateMessage,
-  BeatEventMessage,
-  BeatStateMessage,
-  PlayerStateUpdateMessage,
 } from "../src/types";
 
 // Helper for compile-time type checks.
 function expectType<T>(value: T): T {
   return value;
 }
-
-test("BeatStatus union accepts all 5 states", () => {
-  const scheduled: BeatStatus = "scheduled";
-  const active: BeatStatus = "active";
-  const completed: BeatStatus = "completed";
-  const skipped: BeatStatus = "skipped";
-  const failed: BeatStatus = "failed";
-  expect([scheduled, active, completed, skipped, failed]).toHaveLength(5);
-});
-
-test("ReActStep interface compiles", () => {
-  const step: ReActStep = {
-    stepIndex: 0,
-    thought: "玩家在钓鱼，我走过去打招呼",
-    toolCall: { tool: "move_to", args: { x: 32, y: 18 }, callId: "c1" },
-    toolResult: { success: true, result: "已到达" },
-    timestamp: "2026-07-21T14:05:00Z",
-    tokensUsed: 320,
-  };
-  expectType<ReActStep>(step);
-  expect(step.stepIndex).toBe(0);
-});
-
-test("Beat interface compiles", () => {
-  const beat: Beat = {
-    id: "beat-001",
-    npcName: "Willy",
-    triggerTime: "14:00",
-    windowEnd: "16:00",
-    directive: "下午去农场表达对玩家劳作的关心",
-    context: {
-      reasonGenerated: "玩家连续3天钓鱼，Willy 是钓鱼 NPC",
-      playerProfileSnapshot: null as unknown as PlayerProfile,
-      gameContextSnapshot: null as unknown as GameContext,
-      recentBeats: [],
-    },
-    status: "scheduled",
-    reactSteps: [],
-  };
-  expectType<Beat>(beat);
-  expect(beat.npcName).toBe("Willy");
-});
 
 test("PlayStyleTag union accepts all 7 tags", () => {
   const tags: PlayStyleTag[] = [
@@ -258,73 +212,12 @@ test("NpcStateSnapshot + InventorySlot + GameContext compile", () => {
   expect(ctx.time.season).toBe("summer");
 });
 
-test("8 message types compile", () => {
-  const activityReport: ActivityReportMessage = {
-    type: "activity_report",
-    requestId: "r1",
-    dailyActivity: null as unknown as DailyActivity,
-    farmSnapshot: [],
-  };
-  const milestone: ActivityMilestoneMessage = {
-    type: "activity_milestone",
-    requestId: "r2",
-    milestone: {
-      type: "FishingStreak",
-      description: "玩家连续第3天去海边钓鱼",
-      detectedAt: "2026-07-21T15:00:00Z",
-    },
-  };
+test("GameContextSyncMessage compiles", () => {
   const ctxSync: GameContextSyncMessage = {
     type: "game_context_sync",
     requestId: "r3",
     context: null as unknown as GameContext,
   };
-  const beatDirective: BeatDirectiveMessage = {
-    type: "beat_directive",
-    requestId: "r4",
-    beat: null as unknown as Beat,
-  };
-  const beatActivate: BeatActivateMessage = {
-    type: "beat_activate",
-    requestId: "r5",
-    beatId: "beat-001",
-    npcName: "Willy",
-  };
-  const beatEvent: BeatEventMessage = {
-    type: "beat_event",
-    requestId: "r6",
-    beatId: "beat-001",
-    eventType: "tool_result",
-    payload: { tool: "move_to", success: true },
-  };
-  const beatState: BeatStateMessage = {
-    type: "beat_state",
-    requestId: "r7",
-    beatId: "beat-001",
-    status: "completed",
-    toolCall: { tool: "speak", args: { text: "你好" } },
-  };
-  const playerState: PlayerStateUpdateMessage = {
-    type: "player_state_update",
-    requestId: "r8",
-    playerState: {
-      location: "Farm",
-      tile: { x: 32, y: 18 },
-      health: 95,
-      maxHealth: 100,
-      energy: 270,
-      maxEnergy: 300,
-      money: 8500,
-      inventory: [],
-    },
-  };
-  expectType<ActivityReportMessage>(activityReport);
-  expectType<ActivityMilestoneMessage>(milestone);
   expectType<GameContextSyncMessage>(ctxSync);
-  expectType<BeatDirectiveMessage>(beatDirective);
-  expectType<BeatActivateMessage>(beatActivate);
-  expectType<BeatEventMessage>(beatEvent);
-  expectType<BeatStateMessage>(beatState);
-  expectType<PlayerStateUpdateMessage>(playerState);
-  expect([activityReport, milestone, ctxSync, beatDirective, beatActivate, beatEvent, beatState, playerState]).toHaveLength(8);
+  expect(ctxSync.type).toBe("game_context_sync");
 });
