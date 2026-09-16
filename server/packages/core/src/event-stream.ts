@@ -23,7 +23,17 @@ export class EventStream<T> {
     }
     this.collectedEvents.push(event);
     for (const sub of this.subscribers) {
-      sub(event);
+      try {
+        sub(event);
+      } catch (err) {
+        // 订阅者隔离（issue #23，审计 §3.8）：单播抛异常只记错不传播——
+        // 此处抛出会打进生产者执行体（agentLoop 的 emit 调用点），若发生在
+        // 收尾 emit（agent_end/done 前的 error 事件）处，流就永远不再 done()。
+        console.error(
+          `[event-stream] subscriber ${sub.name || "(anonymous)"} threw during emit — isolated:`,
+          err,
+        );
+      }
     }
   }
 

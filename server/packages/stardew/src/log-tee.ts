@@ -28,9 +28,66 @@ let activeConfig: { filePath: string; maxBytes: number } | null = null;
 /** console 只 patch 一次（重复 attach 不叠加包装）。 */
 let patched = false;
 
-/** 参数序列化：string 原样；其余尝试 JSON.stringify（undefined/抛错退 String()）。 */
+/** Error cause / AggregateError.errors 递归深度上限（防病态链/自引用把日志行撑爆）。 */
+const MAX_ERROR_DEPTH = 4;
+
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+/**
+ * Error → 纯 JSON 结构（name/message/stack + 可枚举自定义属性 + cause 链 + AggregateError.errors）。
+ * 深度与循环双保险：超过 MAX_ERROR_DEPTH 截断为 "[max depth]"，已访问对象再遇记 "[circular]"。
+ * 背景（2026-09-15 审计 §3.6 / issue #21）：Error 的 message/stack 是不可枚举属性，
+ * JSON.stringify(Error) === "{}"——tee 是 ServerConsoleWindow=true 模式下唯一持久化现场，
+ * 此前所有 console.error(msg, err) 的错误详情在落盘层就被销毁。
+ */
+function errorToJson(err: Error, depth: number, seen: Set<object>): JsonValue {
+  const out: Record<string, JsonValue> = { name: err.name, message: err.message };
+  if (err.stack !== undefined) out.stack = err.stack;
+  // 可枚举自定义属性（如 err.code）随结构保留。
+  // cause/errors 跳过——下面有专门处理：否则同一子树会被序列化两次，
+  // 第二次必然命中 seen 集合被错标成 "[circular]"。
+  const isAgg = err instanceof AggregateError;
+  for (const [k, v] of Object.entries(err)) {
+    if (k === "cause" || (isAgg && k === "errors")) continue;
+    if (v !== undefined) out[k] = toJsonValue(v, depth + 1, seen);
+  }
+  // ES2022 cause 链：cause 是 Error（或含 Error 的结构）时继续下钻
+  const cause = err.cause;
+  if (cause !== undefined) out.cause = toJsonValue(cause, depth + 1, seen);
+  if (isAgg) {
+    out.errors = err.errors.map((e) => toJsonValue(e, depth + 1, seen));
+  }
+  return out;
+}
+
+/** 任意值 → 纯 JSON 值（Error 结构化；bigint/function/symbol 降级；循环引用标记）。 */
+function toJsonValue(v: unknown, depth: number, seen: Set<object>): JsonValue {
+  // 直接对 v 做 typeof（不经中间变量）：TS 只对前者做类型收窄
+  if (v === null || typeof v === "undefined") return null;
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+  if (typeof v === "bigint" || typeof v === "symbol" || typeof v === "function") return null;
+  if (depth >= MAX_ERROR_DEPTH) return "[max depth]";
+  if (seen.has(v)) return "[circular]";
+  seen.add(v);
+  if (v instanceof Error) return errorToJson(v, depth, seen);
+  if (Array.isArray(v)) return v.map((x) => toJsonValue(x, depth + 1, seen));
+  const out: Record<string, JsonValue> = {};
+  for (const [k, val] of Object.entries(v)) out[k] = toJsonValue(val, depth + 1, seen);
+  return out;
+}
+
+/** 参数序列化：string 原样；Error 结构化（issue #21）；其余尝试 JSON.stringify（undefined/抛错退 String()）。 */
 function serializeArg(arg: unknown): string {
   if (typeof arg === "string") return arg;
+  if (arg instanceof Error) {
+    try {
+      // 经 toJsonValue 入口（而非直调 errorToJson）：顶层 Error 也进 seen 集合，
+      // 否则自引用环 a↔b 会因根节点未登记而多绕一圈
+      return JSON.stringify(toJsonValue(arg, 0, new Set<object>())) ?? `${arg.name}: ${arg.message}`;
+    } catch {
+      return `${arg.name}: ${arg.message}`; // 理论不可达（纯结构），保底与 String(Error) 等价
+    }
+  }
   try {
     const s = JSON.stringify(arg);
     if (s !== undefined) return s;

@@ -47,9 +47,6 @@ const SILENT_CATCH_ALLOW = [
   "src/ValleyAgent/Infrastructure/MainThreadWatchdog.cs", // 取证仪器不得把进程带崩
 ];
 
-/** TS：console.* 里以裸标识符传入的"疑似 Error 对象"参数名（log-tee 会序列化成 "{}"）。 */
-const ERR_IDENT = /\b(err|err2|error|ex|e|reason|saveErr|sendErr|fallbackEx|abortErr|loadErr)\b/;
-
 /** TS：failure 语义关键词（用于识别"错误被打成 console.log"）。 */
 const FAIL_KEYWORDS = /(fail(ed|ure)?|error|unavailable|timeout|timed out|dropped|drop\b|rollback|rolled_back|BUSY|FALLBACK|invalid|corrupt|no pending|not wired|未配置|异常|失败|丢弃)/i;
 
@@ -61,7 +58,11 @@ const RULES = {
   "CS-LOG-NO-STACK": { sev: "P1", desc: "catch 里只记 ex.Message —— 丢异常类型与栈，NRE 类缺陷日志无定位价值" },
   "CS-SILENT-CATCH": { sev: "P1", desc: "catch 既不记日志也不重抛 —— 降级不可观测（违反 AGENTS.md §3.6 可观测性铁律）" },
   "CS-LOG-DEFAULT-LEVEL": { sev: "P2", desc: "Monitor.Log 未显式给 level —— SMAPI 默认 Trace，控制台默认不可见" },
-  "TS-ERR-OBJECT-TO-TEE": { sev: "P0", desc: "console.* 以裸标识符传 Error 对象 —— log-tee 的 JSON.stringify(Error) 落盘为 \"{}\"，持久化日志丢全部错误详情" },
+  // TS-ERR-OBJECT-TO-TEE 已于 2026-09-16 退役（issue #21 修复）：log-tee 的 serializeArg
+  // 增加 Error 分支后，Error 直传 console.* 会以 {name, message, stack} 结构落盘，
+  // `console.error(msg, err)` 成为**正确写法**（无需先 err.message/err.stack 手工展开）。
+  // 该规则是纯名字启发（按 err/ex/e 等标识符名猜测运行时类型），无法区分"Error 直传"
+  // 与其它场景，留着只会拦截正确代码。存量 13 处即-issue #21 列出的错误出口，保持原样。
   "TS-FAIL-AT-LOG-LEVEL": { sev: "P1", desc: "失败/丢弃/降级事件打在 console.log —— 落盘级别为 [log]，无法按 ERROR/WARN grep" },
   "TS-EMPTY-CATCH": { sev: "P2", desc: "空 catch 且无注释说明 —— 静默吞异常" },
   "TS-UNKNOWN-TYPE-SILENT": { sev: "P0", desc: "消息类型 switch 的 default 分支无日志 —— 协议漂移/畸形帧被静默 ack" },
@@ -98,19 +99,6 @@ function extractBlock(lines, i) {
     if (started && depth <= 0) break;
   }
   return { body, text: body.join("\n"), count: body.length };
-}
-
-/** 从 openIdx（"(" 的下标）开始按括号配平截取实参文本；配平失败则截到串尾。 */
-function extractCallArgs(s, openIdx) {
-  let depth = 0;
-  for (let i = openIdx; i < s.length; i++) {
-    if (s[i] === "(") depth++;
-    else if (s[i] === ")") {
-      depth--;
-      if (depth === 0) return s.slice(openIdx + 1, i);
-    }
-  }
-  return s.slice(openIdx + 1);
 }
 
 /** 从方法体文本里逐个提取 catch 块（含 header 行），返回 [{ header, text, lineOffset }]。 */
@@ -227,26 +215,13 @@ for (const dir of TS_DIRS) {
       const trimmed = line.trim();
       if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
 
-      /* --- console.* 传裸 Error 标识符（log-tee 落盘成 "{}"） --- */
+      /* --- console.* 语句级检查（TS-ERR-OBJECT-TO-TEE 已退役，见 RULES 注释） --- */
       const cm = line.match(/console\.(error|warn|log|info)\s*\((.*)/);
       if (cm) {
         // 拼完整语句（可能跨行）
         let stmt = line;
         let j = i;
         while (!/[);]\s*$/.test(stmt.trimEnd()) && j - i < 6 && j + 1 < lines.length) { j++; stmt += " " + lines[j]; }
-        // 实参从 console.xxx( 之后按括号配平截取（不能用整行第一个 "("：同行可能有别的调用）
-        const callStart = stmt.indexOf(cm[0]);
-        const openParen = callStart + cm[0].indexOf("(");
-        const args = extractCallArgs(stmt, openParen);
-        // 逗号分隔的顶层实参里，是否有裸 err 标识符（不是模板串内插）
-        const parts = args.split(/,(?![^`]*`)/);
-        for (const p of parts.slice(1)) {
-          const q = p.trim().replace(/[);,\s]+$/, "");
-          if (ERR_IDENT.test(q) && /^[\w.]+$/.test(q)) {
-            add("TS-ERR-OBJECT-TO-TEE", r, i + 1, stmt.trim().slice(0, 130));
-            break;
-          }
-        }
         /* --- 失败语义打在 console.log --- */
         if (/console\.log\s*\(/.test(line) && FAIL_KEYWORDS.test(stmt)) {
           add("TS-FAIL-AT-LOG-LEVEL", r, i + 1, stmt.trim().slice(0, 130));

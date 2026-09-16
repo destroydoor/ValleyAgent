@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { test, expect, spyOn } from "bun:test";
 import { ProtocolAdapter } from "../src/protocol-adapter";
 import { NpcPromptLoader } from "../src/npc-prompt-loader";
 import { PromptBuilder } from "../src/prompt-builder";
@@ -726,6 +726,70 @@ test("综合：LLM 故障期间 toolResults 队列不蒸发（§4.4 不变量）
     expect(r2.fallback).toBeFalsy();
     expect(registry.drainToolResults("Haley").length).toBe(0);
   } finally {
+    await adapter.flushPendingSaves();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// CH-05：runDialogue 挂起 → 服务端兜底超时（issue #23 / 审计 §3.8）
+// ════════════════════════════════════════════════════════════════════════
+// 故障场景：LLM 调用永不返回（非抛错——重试机制对此无效）→ runDialogue 挂起。
+// 旧行为：handleDialogue 的 finally 永不执行 → 会话锁永不释放 → 该 NPC 之后
+//         所有对话 BUSY，直到重启 TS 服务器。
+// 期望行为：dialogueRunTimeoutMs（默认 90s < C# 120s）到期 → 服务端放弃 →
+//         catch 回 fallback → finally 释放锁 → 同 NPC 下一次对话正常。
+// ════════════════════════════════════════════════════════════════════════
+
+test("CH-05: runDialogue 挂起（LLM 永不返回）→ 兜底超时释放锁并回 fallback，NPC 不永久 BUSY", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "valley-fault-ch05-"));
+  const loader = new NpcPromptLoader(DATA_PATH);
+  const builder = new PromptBuilder(loader);
+  const provider = new VercelAIProvider({
+    provider: "minimax",
+    apiKey: "fake",
+    model: "fake",
+    baseUrl: "http://localhost:9999",
+    maxRetries: 1,
+  });
+  // 永不 resolve 的 LLM 调用：挂起而非抛错，provider 的 retry 兜不住这种故障
+  provider._setCallOverride(() => new Promise(() => {}));
+  const registry = new StardewAgentRegistry({
+    promptBuilder: builder,
+    llmProvider: provider,
+    agentsDir: dir,
+  });
+  const adapter = new ProtocolAdapter(registry, { dialogueRunTimeoutMs: 150 });
+  const errSpy = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const r1 = await adapter.handleDialogue({
+      type: "dialogue", requestId: "ch05-1", npcName: "Abigail",
+      playerInput: "你好", worldSnapshot: baseSnapshot,
+    });
+    expect(r1.type).toBe("dialogue_response");
+    expect(r1.fallback).toBe(true);
+    expect(r1.speech.length).toBeGreaterThan(0);
+    // 不是 BUSY（锁被占/等待超时的降级），而是运行超时的降级
+    expect(r1.fallbackReason).not.toBe("busy");
+    // 超时路径留痕：console.error 含 npcName 与 requestId（tee 落盘可查）
+    const flat = errSpy.mock.calls.map((args) => args.map(String).join(" ")).join("\n");
+    expect(flat).toContain("runDialogue timed out");
+    expect(flat).toContain("Abigail");
+    expect(flat).toContain("ch05-1");
+
+    // 锁已释放：LLM 恢复后同 NPC 第二次对话必须成功（旧行为：永久 BUSY）
+    provider._setCallOverride(async () => ({
+      content: "",
+      toolCalls: [{ id: "tc-1", name: "speak", args: { text: "我回来了。" } }],
+    }));
+    const r2 = await adapter.handleDialogue({
+      type: "dialogue", requestId: "ch05-2", npcName: "Abigail",
+      playerInput: "还在吗", worldSnapshot: baseSnapshot,
+    });
+    expect(r2.fallback ?? false).toBe(false);
+    expect(r2.speech).toContain("我回来了");
+  } finally {
+    errSpy.mockRestore();
     await adapter.flushPendingSaves();
     rmSync(dir, { recursive: true, force: true });
   }

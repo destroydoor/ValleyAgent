@@ -67,7 +67,7 @@ public sealed class ThinClientDialogueApi
         catch (Exception ex)
         {
             _pending.TryRemove(npcName, out _);
-            _monitor?.Log($"[ThinClientDialogueApi] {npcName}: snapshot build failed — {ex.GetType().Name}: {ex.Message}",
+            _monitor?.Log($"[ThinClientDialogueApi] {npcName}: snapshot build failed: {ex}",
                 LogLevel.Error);
             _lastResponses[npcName] = new DialogueResponse(
                 "（场景数据采集失败）", new List<ToolAction>(), "Neutral", string.Empty, string.Empty);
