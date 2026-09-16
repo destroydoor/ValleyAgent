@@ -10,7 +10,7 @@
 ### P0 阻塞类
 
 1. **IT14 从未运行过**：`IT14_MultiplayerAdjust` 写完未注册进 `V3TestRunner.InitializeTests()`（V3TestRunner.cs:694-710 只加 IT01-IT13），目前只能手动触发。playerId 三分支实际只靠 E2E harness 覆盖。
-2. **C 盘容量**（已缓解）：清理后 22G 可用；WSL2 vhdx 增长仍需观察。测试临时文件已立规走 `<REPO_ROOT>\.tmp`。
+2. **C 盘容量**（已缓解）：清理后 22G 可用；WSL2 vhdx 增长仍需观察。测试临时文件已立规走仓库根 `.tmp\`。
 
 ### P1 测试体系缺口（2026-08-17 审计遗留）
 
@@ -100,7 +100,7 @@ C 盘清理（已完成）；Docker Desktop 启动 + WSL2 数据根确认在 D �
 | 文件 | 内容 |
 |---|---|
 | `docs/plan/2026-08-17-docker-test-containerization-plan.md` | 本文档 |
-| `<VALLEYAI_ROOT>\Dockerfile` + `docker-compose.test.yml` | TS 层 |
+| `server/Dockerfile` + `server/docker-compose.test.yml` | TS 层 |
 | `docker/Dockerfile.unittests` + `.dockerignore` + 运行脚本 | C# 单测层 |
 | `docker/Dockerfile.gameit` + `scripts/docker/run-it.{ps1,sh}` | 游戏 IT spike |
 | `src/ValleyAgent.TestMod/Runners/V3TestRunner.cs` 补 IT14 注册 | 修问题 #1 |

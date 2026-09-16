@@ -131,7 +131,7 @@ Passed: 23/32
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STARDW_PATH` | `<REPO_ROOT>\Stardew Valley` | Game installation path |
+| `STARDW_PATH` | 仓库根 `Stardew Valley\`；未设置且未命中时按 `scripts\lib\paths.ps1` 逐候选探测 Program Files 与各盘符 Steam/GOG 常见安装位（以 `Stardew Valley.dll` 存在为准） | Game installation path |
 | `VALLEY_LLM_PROVIDER` | `minimax` | TS server LLM provider (`minimax`/`openai`/`anthropic`/`google`/`deepseek`/`openrouter`/`lmstudio`) |
 | `VALLEY_LLM_BASE_URL` | `https://api.minimax.chat/v1` | OpenAI-compatible base URL |
 | `VALLEY_LLM_API_KEY` | — | LLM API key (set in `secrets.local.ps1`) |
