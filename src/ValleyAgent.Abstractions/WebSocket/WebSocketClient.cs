@@ -216,6 +216,13 @@ namespace ValleyAgent.WebSocket
             {
                 LogCallback?.Invoke($"[WS] ReadLoop error: {ex.Message}");
             }
+            catch (Exception ex)
+            {
+                // issue #24：窄捕（取消/WS 协议错误）之外的意外异常（订阅者 OnUnsolicitedMessage
+                // 抛出、消息处理缺陷等）同样不得逃出读循环——逃出即任务 faulted，unobserved 异常
+                // 只能靠 GC 时机落盘。循环退出后 finally 仍会触发重连（finally 是唯一重连入口）。
+                LogCallback?.Invoke($"[WS] ReadLoop unexpected error (reconnect still kicks in via finally): {ex}");
+            }
             finally
             {
                 // 死锁修复（2026-09-12）：这段 finally 是**唯一的自动重连入口**，
@@ -311,12 +318,24 @@ namespace ValleyAgent.WebSocket
                         _readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                         _readLoopTask = ReadLoopAsync(ws, _readCts.Token);
 
-                        OnConnected?.Invoke();
-                        StartHeartbeat();
+                        // issue #24：连接已建立后的通知链各自兜底——订阅者/心跳/outbox 抛异常
+                        // 不得让"已连接"落入下方 catch 被误判为"连接失败"再次重连
+                        // （重试会新建 ws 顶掉刚建立的这条连接）。
+                        try { OnConnected?.Invoke(); }
+                        catch (Exception ex) { LogCallback?.Invoke($"[WS] OnConnected handler failed: {ex}"); }
+
+                        try { StartHeartbeat(); }
+                        catch (Exception ex) { LogCallback?.Invoke($"[WS] StartHeartbeat failed: {ex}"); }
+
                         // 2026-08-15 步骤 4：补发 outbox 后通知重连（带补发数），
                         // 上层据此发 reconnect_sync 供 TS 对账。
-                        var replayed = await FlushOutboxAsync().ConfigureAwait(false);
-                        OnReconnected?.Invoke(replayed);
+                        var replayed = 0;
+                        try { replayed = await FlushOutboxAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { LogCallback?.Invoke($"[WS] Outbox flush after reconnect failed: {ex}"); }
+
+                        try { OnReconnected?.Invoke(replayed); }
+                        catch (Exception ex) { LogCallback?.Invoke($"[WS] OnReconnected handler failed: {ex}"); }
+
                         return;
                     }
                     catch (OperationCanceledException)
@@ -327,6 +346,13 @@ namespace ValleyAgent.WebSocket
                     {
                         // 重连失败必须留痕（此前静默吞掉，服务器长期不可用时无任何可观测信号）
                         LogCallback?.Invoke($"[WS] Reconnect attempt failed (next retry in {delay}ms): server not reachable at {_uri}");
+                        delay = Math.Min(delay * 2, maxDelay);
+                    }
+                    catch (Exception ex)
+                    {
+                        // issue #24：连接建立阶段的意外异常（hello 序列化/CTS 处置等）按连接失败
+                        // 同语义退避重试；已建连后的通知链异常在上面各自兜底，走不到这里。
+                        LogCallback?.Invoke($"[WS] Reconnect attempt failed (unexpected, next retry in {delay}ms): {ex}");
                         delay = Math.Min(delay * 2, maxDelay);
                     }
                 }
@@ -398,6 +424,14 @@ namespace ValleyAgent.WebSocket
                 {
                     LogCallback?.Invoke($"[WS] Heartbeat failed, triggering reconnect: {ex.Message}");
                     // Abort 当前捕获的 ws，使 ReadLoop 的 ReceiveAsync 抛异常退出，自然触发重连
+                    try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx.Message}"); }
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    // issue #24：send 段的意外异常（与 Dispose 竞态的 ObjectDisposedException 等）
+                    // 与 WS 协议错误同语义——Abort 触发重连，不让心跳任务静默死亡。
+                    LogCallback?.Invoke($"[WS] Heartbeat failed (unexpected), triggering reconnect: {ex}");
                     try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx.Message}"); }
                     return;
                 }
