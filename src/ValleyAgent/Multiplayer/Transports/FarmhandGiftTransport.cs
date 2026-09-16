@@ -84,10 +84,10 @@ public class FarmhandGiftTransport : IGiftTransport
             using var reg = cts.Token.Register(() => tcs.TrySetCanceled());
             return await tcs.Task.ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _pending.TryRemove(requestId, out _);
-            _monitor.Log($"[FarmhandGiftTransport] Request {requestId} timed out", LogLevel.Warn);
+            _monitor.Log($"[FarmhandGiftTransport] Request {requestId} timed out ({ex})", LogLevel.Warn);
             return BuildFallbackResponse("（主机响应超时）");
         }
     }

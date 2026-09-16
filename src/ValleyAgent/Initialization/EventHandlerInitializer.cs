@@ -289,7 +289,7 @@ public class EventHandlerInitializer
                     }
                     catch (InvalidOperationException ex)
                     {
-                        _monitor.Log($"[DecisionTrigger] Force decision failed for {agent.NpcName}: {ex.Message}",
+                        _monitor.Log($"[DecisionTrigger] Force decision failed for {agent.NpcName}: {ex}",
                             LogLevel.Error);
                     }
                 }), $"decision-batch:forced:{agent.NpcName}");
@@ -791,7 +791,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear ChatBarRouter state: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear ChatBarRouter state: {ex}", LogLevel.Warn);
         }
 
         // 4. 清理对话补丁状态（包含 _activeConversations、_preDialogueStates 等）
@@ -804,7 +804,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear dialogue patch state: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear dialogue patch state: {ex}", LogLevel.Warn);
         }
 
         // 5. 清理 ConversationStateManager（对话历史 + 待处理响应 + 放弃标记）
@@ -814,7 +814,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear ConversationStateManager: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear ConversationStateManager: {ex}", LogLevel.Warn);
         }
 
         // 6. 清理 DialogueStateManager（对话冷却）
@@ -824,7 +824,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear DialogueStateManager: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear DialogueStateManager: {ex}", LogLevel.Warn);
         }
 
         // 7. 清理 AgentService 中所有 Agent 实例（含状态机 Reset）
@@ -834,7 +834,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear AgentService: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear AgentService: {ex}", LogLevel.Warn);
         }
 
         // 8. 清理 AllocationManager 分配记录
@@ -844,7 +844,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear AllocationManager: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear AllocationManager: {ex}", LogLevel.Warn);
         }
 
         // 9. 清理 AgentTickLoop 释放状态
@@ -854,7 +854,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear AgentTickLoop: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear AgentTickLoop: {ex}", LogLevel.Warn);
         }
 
         // 10. 清理 FriendshipSystem 历史
@@ -865,7 +865,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to clear FriendshipSystem: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to clear FriendshipSystem: {ex}", LogLevel.Warn);
         }
 
         // 11. 重置 CircuitBreaker，新存档从 CLOSED 状态开始
@@ -875,7 +875,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[Cleanup] Failed to reset CircuitBreaker: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Cleanup] Failed to reset CircuitBreaker: {ex}", LogLevel.Warn);
         }
 
         // 12. 重置 tick 计数器和加速累加器
@@ -1177,7 +1177,7 @@ public class EventHandlerInitializer
 #pragma warning disable CA1031
             catch (Exception sEx)
             {
-                _monitor.Log($"Structured save data load skipped: {sEx.Message}");
+                _monitor.Log($"Structured save data load skipped: {sEx}");
             }
 #pragma warning restore CA1031
 
@@ -1194,7 +1194,7 @@ public class EventHandlerInitializer
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"Failed to load ValleyAgent save data: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"Failed to load ValleyAgent save data: {ex}", LogLevel.Error);
         }
 
         // WebSocket 连接独立于存档加载，即使存档加载失败也要尝试连接
@@ -1219,7 +1219,7 @@ public class EventHandlerInitializer
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _monitor.Log($"Agent Server connection failed: {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"Agent Server connection failed: {ex}", LogLevel.Warn);
                 }
             }), "agent-server-connect");
         }
@@ -1294,7 +1294,7 @@ public class EventHandlerInitializer
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"Failed to save ValleyAgent data: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"Failed to save ValleyAgent data: {ex}", LogLevel.Error);
         }
         catch (Exception ex)
         {
@@ -1451,7 +1451,7 @@ public class EventHandlerInitializer
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[DayStarted] {agent.NpcName} schedule check failed: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[DayStarted] {agent.NpcName} schedule check failed: {ex}", LogLevel.Warn);
             }
 
             // 日程执行后重新接管
@@ -1586,7 +1586,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[ReconnectSync] failed to send: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[ReconnectSync] failed to send: {ex}", LogLevel.Warn);
         }
     }
 
@@ -1631,7 +1631,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[WS] Failed to route unsolicited message: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[WS] Failed to route unsolicited message: {ex}", LogLevel.Warn);
         }
     }
 
@@ -1687,7 +1687,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[AllocateAgent] Failed to handle message: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[AllocateAgent] Failed to handle message: {ex}", LogLevel.Warn);
         }
     }
 
@@ -1717,7 +1717,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[ExecuteAdjust] Failed to handle message: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[ExecuteAdjust] Failed to handle message: {ex}", LogLevel.Warn);
         }
     }
 
@@ -1759,7 +1759,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[DirectorCommand] Failed to handle message: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[DirectorCommand] Failed to handle message: {ex}", LogLevel.Warn);
         }
     }
 
@@ -1800,7 +1800,7 @@ public class EventHandlerInitializer
             }
             catch (Exception ex) when (ex is InvalidOperationException or NullReferenceException)
             {
-                _monitor?.Log($"[GameContextSync] failed: {ex.Message}", LogLevel.Warn);
+                _monitor?.Log($"[GameContextSync] failed: {ex}", LogLevel.Warn);
             }
 
             var msg = new ProtocolV2.DayStartedMessage
@@ -1817,7 +1817,7 @@ public class EventHandlerInitializer
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"[DayStarted] Failed to notify TS: {ex.Message}", LogLevel.Debug);
+            _monitor?.Log($"[DayStarted] Failed to notify TS: {ex}", LogLevel.Debug);
         }
     }
 
@@ -1842,7 +1842,7 @@ public class EventHandlerInitializer
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[DirectorContext] build failed, downgraded to null: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[DirectorContext] build failed, downgraded to null: {ex}", LogLevel.Warn);
             return null;
         }
     }
@@ -2033,7 +2033,7 @@ public class EventHandlerInitializer
             }
             catch (Exception ex)
             {
-                _monitor?.Log($"[WS] Main-thread command ({item.Type}) failed: {ex.Message}", LogLevel.Warn);
+                _monitor?.Log($"[WS] Main-thread command ({item.Type}) failed: {ex}", LogLevel.Warn);
             }
         }
     }
@@ -2078,7 +2078,7 @@ public class EventHandlerInitializer
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[ProtocolV2] MainThread command execution failed for {item.npcName}: {ex.Message}",
+                _monitor.Log($"[ProtocolV2] MainThread command execution failed for {item.npcName}: {ex}",
                     LogLevel.Warn);
             }
         }
@@ -2119,11 +2119,11 @@ public class EventHandlerInitializer
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[PreSpeak] Failed to route for {item.npcName}: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[PreSpeak] Failed to route for {item.npcName}: {ex}", LogLevel.Warn);
             }
             catch (ArgumentException ex)
             {
-                _monitor.Log($"[PreSpeak] Failed to route for {item.npcName}: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[PreSpeak] Failed to route for {item.npcName}: {ex}", LogLevel.Warn);
             }
         }
     }
@@ -3080,7 +3080,7 @@ public class EventHandlerInitializer
                 }
                 catch (Exception ex)
                 {
-                    _monitor.Log($"Decision error for {agent.NpcName}: {ex.Message}", LogLevel.Error);
+                    _monitor.Log($"Decision error for {agent.NpcName}: {ex}", LogLevel.Error);
                     _debugLogger?.LogError(ex, $"Decision for {agent.NpcName}");
                 }
             }
@@ -3516,18 +3516,18 @@ public class EventHandlerInitializer
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex.Message}",
+                _monitor.Log($"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex}",
                     LogLevel.Warn);
             }
             catch (WebSocketException ex)
             {
-                _monitor.Log($"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex.Message}",
+                _monitor.Log($"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex}",
                     LogLevel.Warn);
             }
             catch (AggregateException ex)
             {
                 _monitor.Log(
-                    $"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex.InnerException?.Message ?? ex.Message}",
+                    $"Agent Server WebSocket connection attempt {i + 1}/{maxRetries} failed: {ex}",
                     LogLevel.Warn);
             }
 

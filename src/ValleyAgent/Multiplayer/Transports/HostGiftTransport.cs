@@ -53,7 +53,7 @@ public class HostGiftTransport : IGiftTransport
             }
             catch (Exception ex)
             {
-                _monitor?.Log($"[HostGiftTransport] ItemRegistry.Create failed for '{itemId}': {ex.Message}",
+                _monitor?.Log($"[HostGiftTransport] ItemRegistry.Create failed for '{itemId}': {ex}",
                     LogLevel.Warn);
             }
 

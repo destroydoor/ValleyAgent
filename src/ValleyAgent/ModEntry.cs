@@ -181,13 +181,13 @@ public class ModEntry : Mod
                 }
                 catch (Exception ex)
                 {
-                    Monitor.Log($"[GMCM] OnConfigChanged handler error: {ex.Message}", LogLevel.Warn);
+                    Monitor.Log($"[GMCM] OnConfigChanged handler error: {ex}", LogLevel.Warn);
                 }
             };
         }
         catch (Exception ex)
         {
-            Monitor.Log($"[GameLaunched] GMCM registration error: {ex.Message}", LogLevel.Warn);
+            Monitor.Log($"[GameLaunched] GMCM registration error: {ex}", LogLevel.Warn);
         }
 
         try
@@ -235,13 +235,13 @@ public class ModEntry : Mod
                 }
                 catch (Exception ex)
                 {
-                    Monitor.Log($"[GameLaunched] Agent Server pre-start error: {ex.Message}", LogLevel.Error);
+                    Monitor.Log($"[GameLaunched] Agent Server pre-start error: {ex}", LogLevel.Error);
                 }
             });
         }
         catch (Exception ex)
         {
-            Monitor.Log($"[GameLaunched] Agent Server pre-start setup error: {ex.Message}", LogLevel.Warn);
+            Monitor.Log($"[GameLaunched] Agent Server pre-start setup error: {ex}", LogLevel.Warn);
         }
     }
 
@@ -492,7 +492,7 @@ public class ModEntry : Mod
         }
         catch (Exception ex)
         {
-            Monitor.Log($"[StopEarlyServer] Failed to stop server: {ex.Message}", LogLevel.Warn);
+            Monitor.Log($"[StopEarlyServer] Failed to stop server: {ex}", LogLevel.Warn);
         }
     }
 
@@ -632,7 +632,7 @@ public class ModEntry : Mod
             }
             catch (Exception ex)
             {
-                Monitor.Log($"[OnReturnedToTitle] Cleanup failed: {ex.Message}", LogLevel.Warn);
+                Monitor.Log($"[OnReturnedToTitle] Cleanup failed: {ex}", LogLevel.Warn);
             }
 
             // 服务器生命周期绑定 Mod（而非存档）：返回标题不杀服务器，
@@ -663,7 +663,7 @@ public class ModEntry : Mod
             }
             catch (Exception ex)
             {
-                Monitor.Log($"[Dispose] Cleanup failed: {ex.Message}", LogLevel.Warn);
+                Monitor.Log($"[Dispose] Cleanup failed: {ex}", LogLevel.Warn);
             }
 
             try
@@ -674,7 +674,7 @@ public class ModEntry : Mod
             }
             catch (Exception ex)
             {
-                Monitor.Log($"[Dispose] Failed to unsubscribe GameLoop events: {ex.Message}", LogLevel.Warn);
+                Monitor.Log($"[Dispose] Failed to unsubscribe GameLoop events: {ex}", LogLevel.Warn);
             }
 
             // 服务器生命周期绑定游戏：游戏退出时统一停止（_earlyServerManager 与
@@ -685,7 +685,7 @@ public class ModEntry : Mod
             }
             catch (Exception ex)
             {
-                Monitor.Log($"[Dispose] Failed to stop early server: {ex.Message}", LogLevel.Warn);
+                Monitor.Log($"[Dispose] Failed to stop early server: {ex}", LogLevel.Warn);
             }
 
             _serverProcessManager?.Dispose();

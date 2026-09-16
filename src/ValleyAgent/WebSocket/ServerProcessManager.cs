@@ -425,13 +425,13 @@ public class ServerProcessManager : IDisposable
         }
         catch (Win32Exception ex)
         {
-            _monitor.Log($"Failed to start server process: {ex.Message} (NativeErrorCode={ex.NativeErrorCode})",
+            _monitor.Log($"Failed to start server process: {ex} (NativeErrorCode={ex.NativeErrorCode})",
                 LogLevel.Error);
             return false;
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"Failed to start server process: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"Failed to start server process: {ex}", LogLevel.Error);
             return false;
         }
     }
@@ -463,7 +463,7 @@ public class ServerProcessManager : IDisposable
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _monitor.Log($"Failed to kill server process: {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"Failed to kill server process: {ex}", LogLevel.Warn);
                 }
             }
 

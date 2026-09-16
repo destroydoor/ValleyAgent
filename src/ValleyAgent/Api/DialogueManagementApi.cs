@@ -129,7 +129,7 @@ public class DialogueManagementApi
                             }
                             catch (Exception inner)
                             {
-                                _monitor?.Log($"[DialogueManagementApi] Fallback failed: {inner.Message}",
+                                _monitor?.Log($"[DialogueManagementApi] Fallback failed: {inner}",
                                     LogLevel.Debug);
                             }
                         });
@@ -184,7 +184,7 @@ public class DialogueManagementApi
                                 catch (Exception ex)
                                 {
                                     _monitor?.Log(
-                                        $"[DialogueManagementApi] Memory write failed for {npcName}: {ex.Message}",
+                                        $"[DialogueManagementApi] Memory write failed for {npcName}: {ex}",
                                         LogLevel.Warn);
                                 }
 
@@ -204,7 +204,7 @@ public class DialogueManagementApi
                                     catch (Exception ex)
                                     {
                                         _monitor?.Log(
-                                            $"[DialogueManagementApi] ForceTransition failed for {npcName}: {ex.Message}",
+                                            $"[DialogueManagementApi] ForceTransition failed for {npcName}: {ex}",
                                             LogLevel.Warn);
                                     }
                                 }
@@ -222,7 +222,7 @@ public class DialogueManagementApi
                         catch (Exception ex)
                         {
                             _monitor?.Log(
-                                $"[DialogueManagementApi] MainThread dialogue action failed for {npcName}: {ex.Message}",
+                                $"[DialogueManagementApi] MainThread dialogue action failed for {npcName}: {ex}",
                                 LogLevel.Error);
                         }
                     });
@@ -266,7 +266,7 @@ public class DialogueManagementApi
                                         catch (Exception ex)
                                         {
                                             _monitor?.Log(
-                                                $"[DialogueManagementApi] Friendship apply failed for {npcName}: {ex.Message}",
+                                                $"[DialogueManagementApi] Friendship apply failed for {npcName}: {ex}",
                                                 LogLevel.Debug);
                                         }
                                     });
@@ -281,7 +281,7 @@ public class DialogueManagementApi
                             catch (Exception ex)
                             {
                                 _monitor?.Log(
-                                    $"[Dialogue] {npcName}: friendship eval failed — {ex.GetType().Name}: {ex.Message}",
+                                    $"[Dialogue] {npcName}: friendship eval failed — {ex}",
                                     LogLevel.Debug);
                             }
                         });
@@ -296,7 +296,7 @@ public class DialogueManagementApi
                         _agentService.CircuitBreaker?.RecordFailure("dialogue_error");
                     }
 
-                    _monitor?.Log($"[Dialogue] {npcName}: async failed — {ex.GetType().Name}: {ex.Message}",
+                    _monitor?.Log($"[Dialogue] {npcName}: async failed — {ex}",
                         LogLevel.Error);
                     // P0-4: 对话失败时降级到本地关键词回退，而不是显示错误消息
                     var fallbackText = GetLocalDialogueFallback(playerInput ?? "");
@@ -321,7 +321,7 @@ public class DialogueManagementApi
                         }
                         catch (Exception inner)
                         {
-                            _monitor?.Log($"[DialogueManagementApi] Failed to set fallback response: {inner.Message}",
+                            _monitor?.Log($"[DialogueManagementApi] Failed to set fallback response: {inner}",
                                 LogLevel.Debug);
                         }
                     });
@@ -346,7 +346,7 @@ public class DialogueManagementApi
             // ⇒ 守卫永久泄漏 ⇒ 该 NPC 之后每次对话都被 "request already in flight" 拒绝，
             //    直到返回标题才 ClearAllDialogueState。这是 NPC 级的永久逻辑死锁，
             //    且主机是房客对话的唯一出口，一个 NPC 卡死对所有玩家生效。
-            _monitor?.Log($"[Dialogue] {npcName}: sync exception — {ex.GetType().Name}: {ex.Message}", LogLevel.Error);
+            _monitor?.Log($"[Dialogue] {npcName}: sync exception — {ex}", LogLevel.Error);
             _dialogueState.EndDialogueRequest(npcName);
             return false;
         }

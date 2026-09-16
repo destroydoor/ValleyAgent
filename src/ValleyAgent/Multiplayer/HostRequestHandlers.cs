@@ -102,7 +102,7 @@ public class HostRequestHandlers
                 catch (Exception ex)
                 {
                     _monitor.Log(
-                        $"[HostRequestHandlers] Failed to deserialize WorldSnapshot for {msg.NpcName}, will rebuild on host: {ex.Message}",
+                        $"[HostRequestHandlers] Failed to deserialize WorldSnapshot for {msg.NpcName}, will rebuild on host: {ex}",
                         LogLevel.Warn);
                 }
             }
@@ -202,7 +202,7 @@ public class HostRequestHandlers
             catch (NullReferenceException ex)
             {
                 _monitor.Log(
-                    $"[HostRequestHandlers] game state not initialized for NPC '{msg.NpcName}': {ex.Message}",
+                    $"[HostRequestHandlers] game state not initialized for NPC '{msg.NpcName}': {ex}",
                     LogLevel.Warn);
                 relayNpc = null;
             }
@@ -230,7 +230,7 @@ public class HostRequestHandlers
                 catch (Exception ex)
                 {
                     _monitor.Log(
-                        $"[HostRequestHandlers] Action '{action.Tool}' failed for {msg.NpcName}: {ex.Message}",
+                        $"[HostRequestHandlers] Action '{action.Tool}' failed for {msg.NpcName}: {ex}",
                         LogLevel.Warn);
                 }
             }
@@ -270,7 +270,7 @@ public class HostRequestHandlers
             }
             catch (Exception ex)
             {
-                _monitor.Log($"[HostRequestHandlers] Failed to serialize actions for {msg.NpcName}: {ex.Message}",
+                _monitor.Log($"[HostRequestHandlers] Failed to serialize actions for {msg.NpcName}: {ex}",
                     LogLevel.Warn);
             }
         }

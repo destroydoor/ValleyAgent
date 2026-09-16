@@ -86,12 +86,12 @@ public class ValleyTalkBioLoader
                 catch (IOException ex)
                 {
                     var fileName = Path.GetFileName(filePath);
-                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex}", LogLevel.Warn);
                 }
                 catch (JsonException ex)
                 {
                     var fileName = Path.GetFileName(filePath);
-                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex}", LogLevel.Warn);
                 }
             }
 
@@ -102,15 +102,15 @@ public class ValleyTalkBioLoader
         }
         catch (IOException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
         catch (JsonException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
         catch (UnauthorizedAccessException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
     }
 

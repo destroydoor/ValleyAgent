@@ -95,10 +95,10 @@ public class FarmhandDialogueTransport : IDialogueTransport
             using var reg = cts.Token.Register(() => tcs.TrySetCanceled());
             return await tcs.Task.ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _pending.TryRemove(requestId, out _);
-            _monitor.Log($"[FarmhandDialogueTransport] Request {requestId} timed out", LogLevel.Warn);
+            _monitor.Log($"[FarmhandDialogueTransport] Request {requestId} timed out ({ex})", LogLevel.Warn);
             return BuildFallbackResponse(npcName, "（主机响应超时）");
         }
     }

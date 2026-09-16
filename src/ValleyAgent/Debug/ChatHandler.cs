@@ -127,7 +127,7 @@ public class ChatHandler : CommandHandlerBase
                     circuitBreaker?.RecordFailure("chat_error");
                 }
 
-                _monitor?.Log($"[Chat] {npcName}: LLM call failed — {ex.GetType().Name}: {ex.Message}",
+                _monitor?.Log($"[Chat] {npcName}: LLM call failed — {ex}",
                     SmaLogLevel.Error);
                 return CommandResult.Fail($"{npcName} 暂时无法回应（{ex.Message}）");
             }

@@ -79,7 +79,7 @@ public class AgentActionApi
         catch (InvalidOperationException ex)
         {
             Monitor?.Log(
-                $"[Api] TrySetAgentState EXCEPTION: {npcName} {prev}→{state}: {ex.GetType().Name}: {ex.Message}",
+                $"[Api] TrySetAgentState EXCEPTION: {npcName} {prev}→{state}: {ex}",
                 LogLevel.Error);
             return false;
         }

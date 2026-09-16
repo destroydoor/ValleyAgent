@@ -373,7 +373,7 @@ namespace ValleyAgent.Handlers
             }
             catch (InvalidOperationException ex)
             {
-                _monitor?.Log($"[Fight] EnsureLootDrops failed for {monster.Name}: {ex.Message}", LogLevel.Warn);
+                _monitor?.Log($"[Fight] EnsureLootDrops failed for {monster.Name}: {ex}", LogLevel.Warn);
             }
         }
 

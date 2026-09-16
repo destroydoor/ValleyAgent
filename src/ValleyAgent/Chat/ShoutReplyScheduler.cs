@@ -158,7 +158,7 @@ public sealed class ShoutReplyScheduler
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[Shout] Reply render failed for {reply.NpcName}: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[Shout] Reply render failed for {reply.NpcName}: {ex}", LogLevel.Warn);
         }
     }
 

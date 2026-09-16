@@ -72,15 +72,15 @@ public class GameSummaryLoader
         }
         catch (IOException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
         catch (JsonException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
         catch (UnauthorizedAccessException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
     }
 

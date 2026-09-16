@@ -452,7 +452,7 @@ public class AgentTickLoop
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"{npc.Name}: checkSchedule for target lookup failed: {ex.Message}");
+            _monitor.Log($"{npc.Name}: checkSchedule for target lookup failed: {ex}");
         }
 
         // checkSchedule 成功后 controller 的终点就是日程位置
@@ -523,7 +523,7 @@ public class AgentTickLoop
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"{npcName}: checkSchedule after finalize failed: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"{npcName}: checkSchedule after finalize failed: {ex}", LogLevel.Warn);
         }
 
         _vanillaFinalized.Add(npcName);

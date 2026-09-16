@@ -83,7 +83,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to broadcast agent states: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Multiplayer] Failed to broadcast agent states: {ex}", LogLevel.Warn);
         }
     }
 
@@ -114,7 +114,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to send full sync: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Multiplayer] Failed to send full sync: {ex}", LogLevel.Warn);
         }
     }
 
@@ -155,7 +155,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to send dialogue response: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Multiplayer] Failed to send dialogue response: {ex}", LogLevel.Warn);
         }
     }
 
@@ -188,7 +188,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to send gift response: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Multiplayer] Failed to send gift response: {ex}", LogLevel.Warn);
         }
     }
 
@@ -222,7 +222,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to broadcast immediate state for '{npcName}': {ex.Message}",
+            _monitor.Log($"[Multiplayer] Failed to broadcast immediate state for '{npcName}': {ex}",
                 LogLevel.Error);
         }
     }
@@ -253,7 +253,7 @@ public class AgentSyncBroadcaster
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[Multiplayer] Failed to broadcast NPC action: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[Multiplayer] Failed to broadcast NPC action: {ex}", LogLevel.Warn);
         }
     }
 

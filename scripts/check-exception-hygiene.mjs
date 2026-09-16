@@ -119,6 +119,26 @@ function add(rule, file, line, detail) {
   findings.push({ rule, sev: RULES[rule].sev, file, line, detail });
 }
 
+/**
+ * catch 块是否把"完整异常对象"交给了日志/透传（issue #26 批注：判定按 catch 变量名，
+ * 不再限死 {ex}/{e} 字面名——{inner}/{rollbackEx}/{fallbackEx} 等同样是完整异常对象，
+ * SMAPI 照样打全栈摘要）。识别两种形态：插值 {$var} 与尾参 , $var)。
+ */
+function logsFullException(header, inner) {
+  const m = header.match(/catch\s*(?:\(\s*([^)]*?)\s*\))?/);
+  const decl = (m?.[1] ?? "").trim();
+  // 取声明里最后一个标识符（跳过命名空间限定的类型名与 when 子句）；catch { } 无变量名
+  const tokens = decl.split(/\s+/).filter(Boolean);
+  const vars = new Set(["ex", "e", "exception", "err"]);
+  if (tokens.length >= 2 && /^(\[\w+\(\)\])?\w+$/.test(tokens[tokens.length - 1])) {
+    vars.add(tokens[tokens.length - 1]);
+  }
+  for (const v of vars) {
+    if (new RegExp(`\\{${v}\\}`).test(inner) || new RegExp(`,\\s*${v}\\)`).test(inner)) return true;
+  }
+  return /\.ToString\(\)/.test(inner);
+}
+
 /* ─────────────────────────── C# 扫描 ─────────────────────────── */
 
 for (const dir of CS_DIRS) {
@@ -196,7 +216,7 @@ for (const dir of CS_DIRS) {
         const snippet = inner.replace(/\s+/g, " ").trim().slice(0, 90);
         add("CS-SILENT-CATCH", r, i + 1, `${header.replace(/\s+/g, " ")} → ${snippet || "(空)"}`);
       }
-      if (logsSomething && !/\{ex\}|\{e\}|\{exception\}|\{err\}|\.ToString\(\)|, ex\)|,ex\)|, exception\)/.test(inner)) {
+      if (logsSomething && !logsFullException(header, inner)) {
         add("CS-LOG-NO-STACK", r, i + 1, inner.replace(/\s+/g, " ").trim().slice(0, 110));
       }
     }

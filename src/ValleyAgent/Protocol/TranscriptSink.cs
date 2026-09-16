@@ -120,7 +120,7 @@ public sealed class TranscriptSink : IDisposable
         catch (Exception ex)
         {
             // 留痕失败绝不能影响游戏——记录警告后吞掉
-            _monitor.Log($"[TranscriptSink] Enqueue failed for kind='{kind}': {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[TranscriptSink] Enqueue failed for kind='{kind}': {ex}", LogLevel.Warn);
         }
     }
 
@@ -149,7 +149,7 @@ public sealed class TranscriptSink : IDisposable
             }
             catch (Exception ex)
             {
-                _monitor.Log($"[TranscriptSink] Flush failed: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[TranscriptSink] Flush failed: {ex}", LogLevel.Warn);
             }
         }
     }
@@ -265,7 +265,7 @@ public sealed class TranscriptSink : IDisposable
             }
             catch (Exception ex)
             {
-                _monitor.Log($"[TranscriptSink] Close writer failed for {kvp.Key}: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[TranscriptSink] Close writer failed for {kvp.Key}: {ex}", LogLevel.Warn);
             }
         }
 
@@ -290,7 +290,7 @@ public sealed class TranscriptSink : IDisposable
         }
         catch (Exception ex)
         {
-            _monitor.Log($"[TranscriptSink] WriteLine failed: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[TranscriptSink] WriteLine failed: {ex}", LogLevel.Warn);
         }
     }
 

@@ -315,7 +315,7 @@ public static class ChatBarRouter
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[ChatBar] Route failed: {ex.Message}", LogLevel.Error);
+            _monitor?.Log($"[ChatBar] Route failed: {ex}", LogLevel.Error);
         }
     }
 
@@ -554,17 +554,18 @@ public static class ChatBarRouter
             // 深度告警：主线程泵停摆时聊天回复堆积的早期信号（2026-09-11 生产化仪器）
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
             RecordLocalCircuitFailure(npcName, "chat_timeout");
             // 异步聊天不阻塞玩家：超时记为失败（主线程渲染灰色系统消息）
+            _monitor?.Log($"[ChatBar] {npcName}: dialogue request timed out — fallback gray message queued ({ex})", LogLevel.Debug);
             _pendingReplies.Enqueue(new PendingChatReply(npcName, string.Empty, new List<ToolAction>(), true));
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }
         catch (Exception ex)
         {
             RecordLocalCircuitFailure(npcName, "chat_error");
-            _monitor?.Log($"[ChatBar] Dialogue request failed for {npcName}: {ex.Message}", LogLevel.Error);
+            _monitor?.Log($"[ChatBar] Dialogue request failed for {npcName}: {ex}", LogLevel.Error);
             _pendingReplies.Enqueue(new PendingChatReply(npcName, string.Empty, new List<ToolAction>(), true));
             QueueTelemetry.WarnIfDeep("chat-replies", _pendingReplies.Count, _monitor);
         }

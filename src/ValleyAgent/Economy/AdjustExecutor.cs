@@ -181,7 +181,7 @@ public class AdjustExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"[AdjustExecutor] Failed to send adjust_result via WS: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[AdjustExecutor] Failed to send adjust_result via WS: {ex}", LogLevel.Warn);
         }
     }
 

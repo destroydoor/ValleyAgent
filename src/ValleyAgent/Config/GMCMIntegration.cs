@@ -100,7 +100,7 @@ public static class GMCMIntegration
         }
         catch (Exception ex)
         {
-            ValleyAgentApi.Monitor?.Log($"GMCM API lookup failed: {ex.GetType().Name}: {ex.Message}", LogLevel.Warn);
+            ValleyAgentApi.Monitor?.Log($"GMCM API lookup failed: {ex}", LogLevel.Warn);
             return;
         }
 
@@ -148,7 +148,7 @@ public static class GMCMIntegration
         }
         catch (Exception ex)
         {
-            ValleyAgentApi.Monitor?.Log($"GMCM Register failed: {ex.GetType().Name}: {ex.Message}", LogLevel.Error);
+            ValleyAgentApi.Monitor?.Log($"GMCM Register failed: {ex}", LogLevel.Error);
             return;
         }
 
@@ -165,7 +165,7 @@ public static class GMCMIntegration
         }
         catch (Exception ex)
         {
-            ValleyAgentApi.Monitor?.Log($"GMCM root page failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}",
+            ValleyAgentApi.Monitor?.Log($"GMCM root page failed: {ex}",
                 LogLevel.Error);
         }
 
@@ -180,7 +180,7 @@ public static class GMCMIntegration
         catch (Exception ex)
         {
             ValleyAgentApi.Monitor?.Log(
-                $"GMCM advanced page failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}", LogLevel.Error);
+                $"GMCM advanced page failed: {ex}", LogLevel.Error);
         }
     }
 

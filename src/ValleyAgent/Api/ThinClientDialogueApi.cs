@@ -91,7 +91,7 @@ public sealed class ThinClientDialogueApi
             }
             catch (Exception ex)
             {
-                _monitor?.Log($"[ThinClientDialogueApi] {npcName}: request failed — {ex.GetType().Name}: {ex.Message}",
+                _monitor?.Log($"[ThinClientDialogueApi] {npcName}: request failed — {ex}",
                     LogLevel.Error);
                 _lastResponses[npcName] = new DialogueResponse(
                     "（对话请求失败）",

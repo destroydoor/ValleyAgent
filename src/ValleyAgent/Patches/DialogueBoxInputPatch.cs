@@ -420,14 +420,16 @@ public static class DialogueBoxInputPatch
                 // 深度告警：主线程泵停摆时回复堆积的早期信号（2026-09-11 生产化仪器）
                 QueueTelemetry.WarnIfDeep("dialogue-replies", _pendingReplies.Count, _monitor);
             }
-            catch (TimeoutException)
+            catch (TimeoutException ex)
             {
+                // 异步对话不阻塞玩家：超时降级为"还在思考"占位回复
+                _monitor?.Log($"[Chat] {npcName}: dialogue request timed out — placeholder reply queued ({ex})", LogLevel.Debug);
                 _pendingReplies.Enqueue(new PendingReply(npcName, $"（{npcName} 在思考...）", new List<ToolAction>()));
                 QueueTelemetry.WarnIfDeep("dialogue-replies", _pendingReplies.Count, _monitor);
             }
             catch (Exception ex)
             {
-                _monitor?.Log($"[Chat] Dialogue request failed: {ex.Message}", LogLevel.Error);
+                _monitor?.Log($"[Chat] Dialogue request failed: {ex}", LogLevel.Error);
                 _pendingReplies.Enqueue(new PendingReply(npcName, "......", new List<ToolAction>()));
                 QueueTelemetry.WarnIfDeep("dialogue-replies", _pendingReplies.Count, _monitor);
             }
@@ -590,7 +592,7 @@ public static class DialogueBoxInputPatch
             }
             catch (Exception ex)
             {
-                _monitor?.Log($"[Chat] Action {action.Tool} failed: {ex.Message}", LogLevel.Warn);
+                _monitor?.Log($"[Chat] Action {action.Tool} failed: {ex}", LogLevel.Warn);
             }
         }
     }

@@ -240,7 +240,7 @@ public static class GameContextSyncBuilder
         catch (NullReferenceException ex)
         {
             // 游戏状态未初始化（标题屏/测试启动早期）——导演上下文缺失，不影响主流程
-            monitor?.Log($"[GameContextSync] npcStates build failed: {ex.Message}", LogLevel.Debug);
+            monitor?.Log($"[GameContextSync] npcStates build failed: {ex}", LogLevel.Debug);
         }
 
         return result;
