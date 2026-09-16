@@ -523,7 +523,7 @@ public class GoalExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"[Goal] Failed to send set_goal result via WS: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[Goal] Failed to send set_goal result via WS: {ex}", LogLevel.Warn);
         }
     }
 

@@ -95,10 +95,10 @@ public class FarmhandDialogueTransport : IDialogueTransport
             using var reg = cts.Token.Register(() => tcs.TrySetCanceled());
             return await tcs.Task.ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _pending.TryRemove(requestId, out _);
-            _monitor.Log($"[FarmhandDialogueTransport] Request {requestId} timed out", LogLevel.Warn);
+            _monitor.Log($"[FarmhandDialogueTransport] Request {requestId} timed out ({ex})", LogLevel.Warn);
             return BuildFallbackResponse(npcName, "（主机响应超时）");
         }
     }
@@ -120,7 +120,8 @@ public class FarmhandDialogueTransport : IDialogueTransport
             else
             {
                 _monitor.Log(
-                    $"[FarmhandDialogueTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending (timed out or already served), dropping late response");
+                    $"[FarmhandDialogueTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending (timed out or already served), dropping late response",
+                    LogLevel.Warn);
             }
 
             return;
@@ -131,7 +132,7 @@ public class FarmhandDialogueTransport : IDialogueTransport
             _pending.Keys.FirstOrDefault(k => k.StartsWith(msg.NpcName + "_", StringComparison.OrdinalIgnoreCase));
         if (matchingKey == null)
         {
-            _monitor.Log($"[FarmhandDialogueTransport] No pending request for {msg.NpcName}, dropping response");
+            _monitor.Log($"[FarmhandDialogueTransport] No pending request for {msg.NpcName}, dropping response", LogLevel.Warn);
             return;
         }
 

@@ -425,13 +425,13 @@ public class ServerProcessManager : IDisposable
         }
         catch (Win32Exception ex)
         {
-            _monitor.Log($"Failed to start server process: {ex.Message} (NativeErrorCode={ex.NativeErrorCode})",
+            _monitor.Log($"Failed to start server process: {ex} (NativeErrorCode={ex.NativeErrorCode})",
                 LogLevel.Error);
             return false;
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"Failed to start server process: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"Failed to start server process: {ex}", LogLevel.Error);
             return false;
         }
     }
@@ -463,7 +463,7 @@ public class ServerProcessManager : IDisposable
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _monitor.Log($"Failed to kill server process: {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"Failed to kill server process: {ex}", LogLevel.Warn);
                 }
             }
 
@@ -798,8 +798,10 @@ public class ServerProcessManager : IDisposable
                     killProc?.WaitForExit(3000);
                     _monitor.Log($"Killed existing process on port {ServerPort} (PID={pid})", LogLevel.Debug);
                 }
-                catch (Win32Exception)
+                catch (Win32Exception ex)
                 {
+                    // taskkill 失败留痕：残留进程杀不掉 → 接下来端口占用启动失败，因果要可追溯
+                    _monitor.Log($"Failed to taskkill PID={pid} on port {ServerPort}: {ex}", LogLevel.Warn);
                 }
             }
 
@@ -808,8 +810,9 @@ public class ServerProcessManager : IDisposable
                 Thread.Sleep(1000);
             }
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            _monitor.Log($"Residual-process cleanup (netstat/taskkill) failed on port {ServerPort}: {ex}", LogLevel.Warn);
         }
     }
 

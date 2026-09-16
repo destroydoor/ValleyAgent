@@ -75,7 +75,7 @@ public static class LlmConfigWriter
         }
         catch (Exception ex)
         {
-            monitor?.Log($"Failed to write LLM runtime config: {ex.Message}", LogLevel.Error);
+            monitor?.Log($"Failed to write LLM runtime config: {ex}", LogLevel.Error);
             return null;
         }
     }

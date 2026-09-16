@@ -173,8 +173,8 @@ namespace ValleyAgent.Api
             while (_mainThreadActions.TryDequeue(out var action))
             {
                 try { action(); }
-                catch (InvalidOperationException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex.Message}", LogLevel.Warn); }
-                catch (ArgumentException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex.Message}", LogLevel.Warn); }
+                catch (InvalidOperationException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex}", LogLevel.Warn); }
+                catch (ArgumentException ex) { Monitor?.Log($"[DialogueStateManager] MainThread action failed: {ex}", LogLevel.Warn); }
                 catch (Exception ex)
                 {
                     // 死锁修复（2026-09-12）：原来只吞 InvalidOperationException/ArgumentException。

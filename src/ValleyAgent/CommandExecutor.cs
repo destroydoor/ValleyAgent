@@ -149,7 +149,7 @@ public class CommandExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"ExecuteAction: {tool} failed: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"ExecuteAction: {tool} failed: {ex}", LogLevel.Warn);
             success = false;
             reason = ActionResultReason.InternalError;
             resultMessage = ex.Message;
@@ -213,7 +213,7 @@ public class CommandExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"[CommandExecutor] Failed to send action_result via WS: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"[CommandExecutor] Failed to send action_result via WS: {ex}", LogLevel.Warn);
         }
     }
 
@@ -231,7 +231,7 @@ public class CommandExecutor
         }
         catch (NullReferenceException ex)
         {
-            _monitor.Log($"ExecuteEmote: game state not initialized for NPC '{npcName}': {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"ExecuteEmote: game state not initialized for NPC '{npcName}': {ex}", LogLevel.Warn);
             return (false, ActionResultReason.AgentMissing);
         }
 
@@ -300,7 +300,7 @@ public class CommandExecutor
             }
             catch (NullReferenceException ex)
             {
-                _monitor.Log($"[execute-set-state] cleanup failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[execute-set-state] cleanup failed for {npcName}: {ex}", LogLevel.Warn);
             }
         }
 
@@ -331,7 +331,7 @@ public class CommandExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"ExecuteSetState EXCEPTION: {npcName} {prev}→{state}: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ExecuteSetState EXCEPTION: {npcName} {prev}→{state}: {ex}", LogLevel.Error);
             return (false, ActionResultReason.InternalError);
         }
     }
@@ -371,7 +371,7 @@ public class CommandExecutor
         }
         catch (NullReferenceException ex)
         {
-            _monitor.Log($"ExecuteSetGoal: game state not initialized for NPC '{npcName}': {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"ExecuteSetGoal: game state not initialized for NPC '{npcName}': {ex}", LogLevel.Warn);
             return (false, ActionResultReason.AgentMissing);
         }
 
@@ -400,7 +400,7 @@ public class CommandExecutor
         }
         catch (NullReferenceException ex)
         {
-            _monitor.Log($"ExecuteChopTree: game state not initialized for NPC '{npcName}': {ex.Message}",
+            _monitor.Log($"ExecuteChopTree: game state not initialized for NPC '{npcName}': {ex}",
                 LogLevel.Warn);
             return (false, ActionResultReason.AgentMissing);
         }
@@ -459,7 +459,7 @@ public class CommandExecutor
         }
         catch (InvalidOperationException ex)
         {
-            _monitor.Log($"ExecuteChopTree failed for {npcName}: {ex.Message}", LogLevel.Warn);
+            _monitor.Log($"ExecuteChopTree failed for {npcName}: {ex}", LogLevel.Warn);
             return (false, ActionResultReason.InternalError);
         }
     }
@@ -523,7 +523,7 @@ public class CommandExecutor
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[CommandExecutor] Failed to execute {command.Action}: {ex.Message}", LogLevel.Error);
+                _monitor.Log($"[CommandExecutor] Failed to execute {command.Action}: {ex}", LogLevel.Error);
                 _ = SendActionResultAsync(npcName, command.Action, false,
                     new Dictionary<string, object> { ["error"] = ex.Message });
             }
@@ -651,7 +651,7 @@ public class CommandExecutor
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[CommandExecutor] Failed to send action_result via callback: {ex.Message}",
+                _monitor.Log($"[CommandExecutor] Failed to send action_result via callback: {ex}",
                     LogLevel.Warn);
             }
 
@@ -675,7 +675,7 @@ public class CommandExecutor
             }
             catch (InvalidOperationException ex)
             {
-                _monitor.Log($"[CommandExecutor] Failed to send action_result via WS: {ex.Message}", LogLevel.Warn);
+                _monitor.Log($"[CommandExecutor] Failed to send action_result via WS: {ex}", LogLevel.Warn);
             }
         }
     }

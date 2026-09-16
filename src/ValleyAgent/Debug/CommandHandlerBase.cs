@@ -56,12 +56,12 @@ public abstract class CommandHandlerBase
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"{operationName} failed: {ex.Message}", SmaLogLevel.Error);
+            _monitor?.Log($"{operationName} failed: {ex}", SmaLogLevel.Error);
             return CommandResult.Fail($"{operationName} failed: {ex.Message}");
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"{operationName} failed unexpectedly: {ex.Message}", SmaLogLevel.Error);
+            _monitor?.Log($"{operationName} failed unexpectedly: {ex}", SmaLogLevel.Error);
             return CommandResult.Fail($"{operationName} failed unexpectedly.");
         }
     }
@@ -78,12 +78,12 @@ public abstract class CommandHandlerBase
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"{operationName} failed: {ex.Message}", SmaLogLevel.Error);
+            _monitor?.Log($"{operationName} failed: {ex}", SmaLogLevel.Error);
             return CommandResult.Fail($"{operationName} failed: {ex.Message}");
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"{operationName} failed unexpectedly: {ex.Message}", SmaLogLevel.Error);
+            _monitor?.Log($"{operationName} failed unexpectedly: {ex}", SmaLogLevel.Error);
             return CommandResult.Fail($"{operationName} failed unexpectedly.");
         }
     }

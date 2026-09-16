@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using StardewModdingAPI;
+using ValleyAgent.Infrastructure;
 
 namespace ValleyAgent.Chat;
 
@@ -93,7 +95,8 @@ public static class ChatRouteResolver
         string? sessionNpc,
         IReadOnlyList<ChatPresence> present,
         ChatRouteOptions? options = null,
-        DateTime? nowUtc = null)
+        DateTime? nowUtc = null,
+        IMonitor? monitor = null)
     {
         if (string.IsNullOrWhiteSpace(text) || present == null || present.Count == 0)
         {
@@ -119,7 +122,7 @@ public static class ChatRouteResolver
         {
             var responders = present
                 .Where(p => p.DistanceTiles <= opts.NearbyTiles)
-                .OrderByDescending(p => SafeTalkativeness(opts.Talkativeness, p.Name))
+                .OrderByDescending(p => SafeTalkativeness(opts.Talkativeness, p.Name, monitor))
                 .ThenBy(p => p.DistanceTiles)
                 .Take(opts.GroupResponseMax)
                 .Select(p => p.Name)
@@ -269,14 +272,20 @@ public static class ChatRouteResolver
     private static bool IsLatinLetter(char c)
         => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 
-    private static double SafeTalkativeness(Func<string, double> talkativeness, string npcName)
+    private static double SafeTalkativeness(Func<string, double> talkativeness, string npcName, IMonitor? monitor)
     {
         try
         {
             return Math.Clamp(talkativeness(npcName), 0.0, 1.0);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // issue #26 批③：话痨度查询失败 → 回退中性 0.5，路由继续但排序质量降级；节流防刷屏
+            if (QueueTelemetry.ShouldWarn("chat-route:talkativeness"))
+            {
+                monitor?.Log($"[ChatRouteResolver] talkativeness lookup failed for '{npcName}' — falling back to neutral 0.5: {ex}", LogLevel.Warn);
+            }
+
             return 0.5;
         }
     }

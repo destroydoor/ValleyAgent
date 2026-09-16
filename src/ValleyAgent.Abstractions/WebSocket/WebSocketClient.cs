@@ -214,7 +214,7 @@ namespace ValleyAgent.WebSocket
             }
             catch (WebSocketException ex)
             {
-                LogCallback?.Invoke($"[WS] ReadLoop error: {ex.Message}");
+                LogCallback?.Invoke($"[WS] ReadLoop error: {ex}");
             }
             catch (Exception ex)
             {
@@ -231,22 +231,22 @@ namespace ValleyAgent.WebSocket
                 //（所有对话抛 "WebSocket is not connected"，AI 静默死亡，无告警）。
                 // 每一步独立兜底，重连必须走到。
                 try { StopHeartbeat(); }
-                catch (Exception ex) { LogCallback?.Invoke($"[WS] StopHeartbeat failed in read-loop teardown: {ex.Message}"); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] StopHeartbeat failed in read-loop teardown: {ex}"); }
 
                 // 断连时立即 fail 所有 pending 请求，避免调用方等 30 秒超时
                 try { _tracker.FailAll(new InvalidOperationException("WebSocket disconnected")); }
-                catch (Exception ex) { LogCallback?.Invoke($"[WS] FailAll failed in read-loop teardown: {ex.Message}"); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] FailAll failed in read-loop teardown: {ex}"); }
 
                 // 订阅者抛异常同样不得吃掉重连（OnDisconnected 的订阅方在 EventHandlerInitializer 侧发 WS 消息）
                 try { OnDisconnected?.Invoke(); }
-                catch (Exception ex) { LogCallback?.Invoke($"[WS] OnDisconnected handler failed: {ex.Message}"); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] OnDisconnected handler failed: {ex}"); }
 
                 // 释放旧 ws 实例
                 try { ws?.Dispose(); } catch (Exception) { /* ws 可能已被 Abort/Dispose */ }
 
                 // 使用独立 CTS 重连，不依赖 ReadLoop 的 ct（可能已被取消）
                 try { _ = ReconnectIndependentAsync(); }
-                catch (Exception ex) { LogCallback?.Invoke($"[WS] Reconnect kick-off failed: {ex.Message}"); }
+                catch (Exception ex) { LogCallback?.Invoke($"[WS] Reconnect kick-off failed: {ex}"); }
             }
         }
 
@@ -274,11 +274,11 @@ namespace ValleyAgent.WebSocket
                 // 未匹配 pending request → unsolicited 消息，交给订阅者按 type 路由
                 OnUnsolicitedMessage?.Invoke(message);
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
-                // 畸形消息无法解析，记录原始内容前100字符用于诊断
+                // 畸形消息无法解析，记录原始内容前100字符 + 解析器报错位置用于诊断
                 var preview = message?.Length > 100 ? message[..100] + "..." : message;
-                LogCallback?.Invoke($"[WS] Malformed message ignored: {preview}");
+                LogCallback?.Invoke($"[WS] Malformed message ignored: {preview} ({ex})");
             }
         }
 
@@ -342,10 +342,10 @@ namespace ValleyAgent.WebSocket
                     {
                         break;
                     }
-                    catch (WebSocketException)
+                    catch (WebSocketException ex)
                     {
                         // 重连失败必须留痕（此前静默吞掉，服务器长期不可用时无任何可观测信号）
-                        LogCallback?.Invoke($"[WS] Reconnect attempt failed (next retry in {delay}ms): server not reachable at {_uri}");
+                        LogCallback?.Invoke($"[WS] Reconnect attempt failed (next retry in {delay}ms): server not reachable at {_uri} — {ex}");
                         delay = Math.Min(delay * 2, maxDelay);
                     }
                     catch (Exception ex)
@@ -422,9 +422,9 @@ namespace ValleyAgent.WebSocket
                 }
                 catch (WebSocketException ex)
                 {
-                    LogCallback?.Invoke($"[WS] Heartbeat failed, triggering reconnect: {ex.Message}");
+                    LogCallback?.Invoke($"[WS] Heartbeat failed, triggering reconnect: {ex}");
                     // Abort 当前捕获的 ws，使 ReadLoop 的 ReceiveAsync 抛异常退出，自然触发重连
-                    try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx.Message}"); }
+                    try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx}"); }
                     return;
                 }
                 catch (Exception ex)
@@ -432,7 +432,7 @@ namespace ValleyAgent.WebSocket
                     // issue #24：send 段的意外异常（与 Dispose 竞态的 ObjectDisposedException 等）
                     // 与 WS 协议错误同语义——Abort 触发重连，不让心跳任务静默死亡。
                     LogCallback?.Invoke($"[WS] Heartbeat failed (unexpected), triggering reconnect: {ex}");
-                    try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx.Message}"); }
+                    try { capturedWs?.Abort(); } catch (InvalidOperationException abortEx) { LogCallback?.Invoke($"[WS] Abort failed during heartbeat: {abortEx}"); }
                     return;
                 }
             }
@@ -531,7 +531,7 @@ namespace ValleyAgent.WebSocket
                 }
                 catch (WebSocketException ex)
                 {
-                    LogCallback?.Invoke($"[WS] Outbox flush send failed, dropping remaining: {ex.Message}");
+                    LogCallback?.Invoke($"[WS] Outbox flush send failed, dropping remaining: {ex}");
                     // 连接又断了，剩余消息清空（下次重连会重新积累）
                     while (_outbox.TryDequeue(out _)) { }
                     return replayed;
@@ -569,7 +569,7 @@ namespace ValleyAgent.WebSocket
                 // 等待 ReadLoop 退出（最多 2 秒），避免 ObjectDisposedException
                 if (_readLoopTask != null)
                 {
-                    try { _ = _readLoopTask.Wait(TimeSpan.FromSeconds(2)); } catch (InvalidOperationException ex) { LogCallback?.Invoke($"[WS] ReadLoop shutdown wait error: {ex.Message}"); }
+                    try { _ = _readLoopTask.Wait(TimeSpan.FromSeconds(2)); } catch (InvalidOperationException ex) { LogCallback?.Invoke($"[WS] ReadLoop shutdown wait error: {ex}"); }
                 }
 
                 _readCts?.Dispose();

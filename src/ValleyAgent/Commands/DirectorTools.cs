@@ -122,7 +122,7 @@ public class DirectorTools
         }
         catch (InvalidOperationException ex)
         {
-            _monitor?.Log($"[DirectorTools] {tool} failed: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[DirectorTools] {tool} failed: {ex}", LogLevel.Warn);
             return (false, ActionResultReason.InternalError, ex.Message);
         }
     }
@@ -170,7 +170,7 @@ public class DirectorTools
         }
         catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
         {
-            _monitor?.Log($"set_npc_position: game state not initialized for '{npcName}': {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"set_npc_position: game state not initialized for '{npcName}': {ex}", LogLevel.Warn);
             return (false, ActionResultReason.AgentMissing, "set_npc_position: game state not initialized");
         }
 

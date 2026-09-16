@@ -235,7 +235,7 @@
           "name": "fallbackReason",
           "type": "string",
           "required": false,
-          "description": "2026-09-13 R2：fallback=true 时的机器可读降级原因：busy（per-NPC 会话锁超时）/ llm_error（LLM 生成失败）/ billing（LLM 计费失败）/ unavailable（LLM 不可用）。可选，缺省=旧客户端兼容。"
+          "description": "fallback=true 时的机器可读降级原因。2026-09-13 R2 立档：busy（per-NPC 会话锁超时，正常并发拒绝）/ llm_error（LLM 生成失败：输出异常/解析失败）/ billing（LLM 计费失败 402/429，含 401/403 鉴权快速失败）/ unavailable（LLM 重试耗尽不可用：网络/5xx）。2026-09-16 issue #26 扩档（审计 §4.5）：config（LLM 配置问题：token 预算耗尽）/ bad_request（请求缺关键载荷：worldSnapshot 整体缺失）/ validation_failed（请求结构不合规：worldSnapshot 缺必填字段）/ internal_error（TS 代码缺陷：TypeError/ReferenceError/RangeError）。诊断约定：llm_error/billing/unavailable/config 查 LLM 侧（key/配额/网络/预算）；bad_request/validation_failed/internal_error 查代码与协议侧，不要动 LLM 配置。可选，缺省=旧客户端兼容。"
         }
       ]
     },

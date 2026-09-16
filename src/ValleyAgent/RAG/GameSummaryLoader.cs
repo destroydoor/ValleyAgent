@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using StardewModdingAPI;
+using ValleyAgent.Infrastructure;
 
 namespace ValleyAgent.RAG;
 
@@ -59,7 +60,7 @@ public class GameSummaryLoader
             }
 
             var json = File.ReadAllText(summaryPath);
-            _data = ParseGameSummary(json);
+            _data = ParseGameSummary(summaryPath, json);
 
             if (_data != null)
             {
@@ -72,15 +73,15 @@ public class GameSummaryLoader
         }
         catch (IOException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
         catch (JsonException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
         catch (UnauthorizedAccessException ex)
         {
-            _monitor.Log($"GameSummaryLoader: failed to load: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"GameSummaryLoader: failed to load: {ex}", LogLevel.Error);
         }
     }
 
@@ -243,7 +244,7 @@ public class GameSummaryLoader
         return basePath;
     }
 
-    private static GameSummaryData? ParseGameSummary(string json)
+    private GameSummaryData? ParseGameSummary(string filePath, string json)
     {
         try
         {
@@ -356,8 +357,13 @@ public class GameSummaryLoader
 
             return data;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // issue #26 批③：解析失败 = 文件损坏 → 隔离改名 + Error 留痕；本次降级为无 RAG 数据
+            var quarantined = CorruptFileQuarantine.TryQuarantine(filePath);
+            _monitor.Log(
+                $"GameSummaryLoader: GameSummary.json corrupt — quarantined: '{filePath}' → '{quarantined ?? "(rename failed, file left in place)"}': {ex}",
+                LogLevel.Error);
             return null;
         }
     }
@@ -366,7 +372,7 @@ public class GameSummaryLoader
     ///     Parses a single section entry. Each entry is like:
     ///     { "id": "...", "Name": "...", "Description": "...", ...other fields... }
     /// </summary>
-    private static SectionEntry? ParseSectionEntry(JsonElement element)
+    private SectionEntry? ParseSectionEntry(JsonElement element)
     {
         try
         {
@@ -392,8 +398,11 @@ public class GameSummaryLoader
 
             return entry;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // 防御：文档已成功 Parse 后理论上不会再抛 JsonException（TryGetProperty 抛的是
+            // InvalidOperationException）；真发生时留痕并跳过该条目，不拖垮其余条目。
+            _monitor.Log($"GameSummaryLoader: section entry parse failed — entry skipped: {ex}", LogLevel.Trace);
             return null;
         }
     }

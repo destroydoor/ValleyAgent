@@ -57,11 +57,11 @@ public static class SocialPagePatch
         }
         catch (InvalidOperationException ex)
         {
-            Monitor?.Log($"[SocialPagePatch] Draw error: {ex.Message}", LogLevel.Warn);
+            Monitor?.Log($"[SocialPagePatch] Draw error: {ex}", LogLevel.Warn);
         }
         catch (ArgumentException ex)
         {
-            Monitor?.Log($"[SocialPagePatch] Draw error: {ex.Message}", LogLevel.Warn);
+            Monitor?.Log($"[SocialPagePatch] Draw error: {ex}", LogLevel.Warn);
         }
     }
 
@@ -88,11 +88,11 @@ public static class SocialPagePatch
         }
         catch (InvalidOperationException ex)
         {
-            Monitor?.Log($"[SocialPagePatch] Click error: {ex.Message}", LogLevel.Warn);
+            Monitor?.Log($"[SocialPagePatch] Click error: {ex}", LogLevel.Warn);
         }
         catch (ArgumentException ex)
         {
-            Monitor?.Log($"[SocialPagePatch] Click error: {ex.Message}", LogLevel.Warn);
+            Monitor?.Log($"[SocialPagePatch] Click error: {ex}", LogLevel.Warn);
         }
     }
 

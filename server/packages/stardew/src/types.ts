@@ -92,9 +92,19 @@ export interface DialogueResponse {
   memorySideEffect?: "recorded";
   // C# 端据此用灰色系统提示渲染（"正在和别人交流"），不弹打字机对话框。
   fallback?: boolean;
-  // 2026-09-13 R2：fallback=true 时的机器可读降级原因（busy/llm_error/billing/unavailable），
-  // 随协议透传 C#→房客，供灰字诊断留痕与 S3 文案改造区分"忙"与"故障"。
-  fallbackReason?: "busy" | "llm_error" | "billing" | "unavailable";
+  // 2026-09-13 R2：fallback=true 时的机器可读降级原因，随协议透传 C#→房客，供灰字
+  // 诊断留痕与 S3 文案改造区分"忙"与"故障"。issue #26 批⑤扩档（审计 §4.5）：
+  // config/bad_request/validation_failed/internal_error——代码与协议缺陷不再误标 llm_error。
+  // 取值约定（谁产生、排障查什么）见 server/protocol/messages.json 同名字段。
+  fallbackReason?:
+    | "busy"
+    | "llm_error"
+    | "billing"
+    | "unavailable"
+    | "config"
+    | "bad_request"
+    | "validation_failed"
+    | "internal_error";
   // 2026-08-16 联机：发起对话的玩家 ID 原样 echo，C# 端据此记录 LastDialoguePlayerId
   // （FOLLOW 等行为的目标玩家解析）。可选，旧客户端不携带。
   playerId?: string;

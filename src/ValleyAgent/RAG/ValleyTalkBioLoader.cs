@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using StardewModdingAPI;
+using ValleyAgent.Infrastructure;
 using ValleyAgent.Brain;
 using ValleyAgent.RAG.Models;
 
@@ -86,12 +87,16 @@ public class ValleyTalkBioLoader
                 catch (IOException ex)
                 {
                     var fileName = Path.GetFileName(filePath);
-                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex.Message}", LogLevel.Warn);
+                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex}", LogLevel.Warn);
                 }
                 catch (JsonException ex)
                 {
+                    // 解析失败 = 文件损坏：隔离改名（可取回原始字节），避免每次启动反复撞同一个坏文件
+                    var quarantined = CorruptFileQuarantine.TryQuarantine(filePath);
                     var fileName = Path.GetFileName(filePath);
-                    _monitor.Log($"ValleyTalkBioLoader: failed to load '{fileName}': {ex.Message}", LogLevel.Warn);
+                    _monitor.Log(
+                        $"ValleyTalkBioLoader: bio file corrupt — quarantined '{fileName}' → '{(quarantined != null ? Path.GetFileName(quarantined) : "(rename failed, file left in place)")}': {ex}",
+                        LogLevel.Error);
                 }
             }
 
@@ -102,15 +107,15 @@ public class ValleyTalkBioLoader
         }
         catch (IOException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
         catch (JsonException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
         catch (UnauthorizedAccessException ex)
         {
-            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex.Message}", LogLevel.Error);
+            _monitor.Log($"ValleyTalkBioLoader: failed to load bios: {ex}", LogLevel.Error);
         }
     }
 
@@ -211,7 +216,7 @@ public class ValleyTalkBioLoader
     ///     CP format: {Changes:[{Entries:{Biography,Relationships,Traits,...}}]}
     ///     Flat format: {Biography,Relationships,Traits,...}
     /// </summary>
-    private static ValleyTalkBioData? LoadBioFile(string filePath)
+    private ValleyTalkBioData? LoadBioFile(string filePath)
     {
         var json = File.ReadAllText(filePath);
 
@@ -367,7 +372,9 @@ public class ValleyTalkBioLoader
         }
         catch (JsonException)
         {
-            return null;
+            // issue #26 批③：解析异常上抛给调用方循环统一隔离+留痕（那里才有 filePath 与 monitor）；
+            // 本方法只负责识别 CP 格式，静默吞掉会让坏文件永远查不到原因。
+            throw;
         }
     }
 

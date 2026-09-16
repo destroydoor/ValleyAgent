@@ -30,7 +30,8 @@ public sealed record NpcConfig(
 /// <summary>
 ///     NPC 人设配置装载器（阶段 3，3.2.1）。镜像 NpcEconomyProfileLoader 的容错契约：
 ///     - 从 mod 目录读 JSON（每 NPC 一个文件：npc-configs/{npc_name}.json），
-///       IOException/JsonException → 单文件跳过不抛（配置损坏不能拖垮 mod 启动）；
+///       IOException/JsonException → 单文件跳过不抛（配置损坏不能拖垮 mod 启动），
+///       跳过时 Warn 留痕解释"该 NPC 为何无人设"（issue #26 批③）；
 ///     - 按 NPC 名缓存（StringComparer.OrdinalIgnoreCase），未知 NPC 返回 null；
 ///     - 数值钳制（InitialMoney ≥ 0）。
 ///     设计文档：docs/ideas/phase3-director-l2-default-思路.md §2.4。
@@ -44,6 +45,13 @@ public sealed class NpcConfigLoader
 
     private readonly Dictionary<string, NpcConfig> _configs =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IMonitor? _monitor;
+
+    public NpcConfigLoader(IMonitor? monitor = null)
+    {
+        _monitor = monitor;
+    }
 
     /// <summary>已装载的配置数（未知 NPC 时 GetProfile 返回 null）。</summary>
     public int Count
@@ -108,13 +116,15 @@ public sealed class NpcConfigLoader
 
             _configs[entry.Name] = Map(entry);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            // 单文件读写失败 → 跳过该 NPC，不影响其余配置
+            // 单文件读写失败 → 跳过该 NPC（单文件隔离），留痕解释"该 NPC 为何无人设"
+            _monitor?.Log($"[NpcConfigLoader] npc config unreadable — skipped: {jsonPath}: {ex}", LogLevel.Warn);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            // 单文件 JSON 非法 → 跳过该 NPC，不影响其余配置
+            // 单文件 JSON 非法 → 跳过该 NPC（单文件隔离），留痕解释"该 NPC 为何无人设"
+            _monitor?.Log($"[NpcConfigLoader] npc config JSON invalid — skipped: {jsonPath}: {ex}", LogLevel.Warn);
         }
     }
 

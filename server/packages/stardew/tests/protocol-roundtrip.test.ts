@@ -193,6 +193,34 @@ test("dialogue_response with fallback=true round-trips correctly", () => {
   expect(rt.emotion).toBe("Confused");
 });
 
+test("dialogue_response fallbackReason 八档取值 round-trip（issue #26 批⑤）", () => {
+  const reasons = [
+    "busy",
+    "llm_error",
+    "billing",
+    "unavailable",
+    "config",
+    "bad_request",
+    "validation_failed",
+    "internal_error",
+  ] as const;
+  for (const reason of reasons) {
+    const resp: DialogueResponse = {
+      type: "dialogue_response",
+      requestId: `req-fr-${reason}`,
+      npcName: "Abigail",
+      speech: "......",
+      actions: [],
+      emotion: "Neutral",
+      fallback: true,
+      fallbackReason: reason,
+    };
+    const rt = roundtrip(resp);
+    expect(rt.fallback).toBe(true);
+    expect(rt.fallbackReason).toBe(reason);
+  }
+});
+
 test("dialogue_response friendshipDelta can be negative (减好感)", () => {
   const resp: DialogueResponse = {
     type: "dialogue_response",

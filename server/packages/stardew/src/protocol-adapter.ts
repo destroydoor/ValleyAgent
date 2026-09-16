@@ -221,7 +221,7 @@ export class ProtocolAdapter {
   async handleGameContextSync(req: GameContextSyncMessage): Promise<{ type: "ack"; requestId: string }> {
     const ctx = this.options?.gameCtxMgr;
     if (!ctx) {
-      console.log(`[${timestamp()}] [game_context_sync] dropped: gameCtxMgr not wired`);
+      console.error(`[${timestamp()}] [game_context_sync] dropped: gameCtxMgr not wired`);
       return { type: "ack", requestId: req.requestId };
     }
     ctx.update(req.context);
@@ -239,7 +239,7 @@ export class ProtocolAdapter {
   async handleDirectorCommand(req: DirectorCommandMessage): Promise<{ type: "ack"; requestId: string }> {
     const sendToCsharp = this.options?.sendToCsharp;
     if (!sendToCsharp) {
-      console.log(`[${timestamp()}] [director_command] dropped: sendToCsharp 未配置 tool=${req.tool}`);
+      console.error(`[${timestamp()}] [director_command] dropped: sendToCsharp 未配置 tool=${req.tool}`);
       return { type: "ack", requestId: req.requestId };
     }
     console.log(`[${timestamp()}] [send] director_command tool=${req.tool} requestId=${req.requestId} args=${truncate(JSON.stringify(req.args ?? {}), 120)}`);
@@ -257,7 +257,7 @@ export class ProtocolAdapter {
     console.log(`[${timestamp()}] [recv] reconnect_sync replayed=${req.replayedOutbox} agents=${req.agents.length} date=${req.gameDate ?? "?"}`);
     const ledger = this.options?.ledger;
     if (!ledger) {
-      console.log(`[${timestamp()}] [reconnect_sync] dropped: ledger not wired`);
+      console.error(`[${timestamp()}] [reconnect_sync] dropped: ledger not wired`);
       return { type: "ack", requestId: req.requestId };
     }
 
@@ -299,7 +299,7 @@ export class ProtocolAdapter {
   async handleExecuteAdjust(req: ExecuteAdjustMessage): Promise<{ type: "ack"; requestId: string }> {
     const sendToCsharp = this.options?.sendToCsharp;
     if (!sendToCsharp) {
-      console.log(`[${timestamp()}] [execute_adjust] dropped: sendToCsharp 未配置 instruction=${req.instructionId} ops=${req.ops.length}`);
+      console.error(`[${timestamp()}] [execute_adjust] dropped: sendToCsharp 未配置 instruction=${req.instructionId} ops=${req.ops.length}`);
       return { type: "ack", requestId: req.requestId };
     }
     console.log(`[${timestamp()}] [send] execute_adjust instruction=${req.instructionId} npc=${req.npcName} ops=${req.ops.length}`);
@@ -322,7 +322,7 @@ export class ProtocolAdapter {
       await ledger.load(npcName);
       const begin = ledger.beginPending(npcName, instructionId, requestId, ops, playerId);
       if (!begin.ok) {
-        console.log(`[${timestamp()}] [execute_adjust] ${instructionId} business-check failed: ${begin.reason}`);
+        console.error(`[${timestamp()}] [execute_adjust] ${instructionId} business-check failed: ${begin.reason}`);
         return {
           type: "adjust_result",
           requestId,
@@ -375,7 +375,7 @@ export class ProtocolAdapter {
 
     const ledger = this.options?.ledger;
     const fail = (reason: string): AdjustResultMessage => {
-      console.log(`[${timestamp()}] [execute_adjust] ${msg.instructionId} failed: ${reason}`);
+      console.error(`[${timestamp()}] [execute_adjust] ${msg.instructionId} failed: ${reason}`);
       if (ledger) {
         ledger.rollback(msg.npcName, msg.instructionId, reason);
         this.pendingSaves.push(
@@ -477,7 +477,7 @@ export class ProtocolAdapter {
     const retryMs = this.options?.adjustReconcileRetryMs ?? ADJUST_RECONCILE_RETRY_MS;
     const timer = setTimeout(() => {
       this.pendingReconciles.delete(msg.instructionId);
-      console.log(
+      console.warn(
         `[${timestamp()}] [execute_adjust] ${msg.instructionId} reconciling after timeout `
         + `(attempt ${attempts}/${MAX_RECONCILE_ATTEMPTS}; C# idempotent cache should return original receipt)`,
       );
@@ -494,7 +494,7 @@ export class ProtocolAdapter {
    */
   async handleAdjustResult(req: AdjustResultMessage): Promise<{ type: "ack"; requestId: string }> {
     const pending = this.pendingAdjusts.get(req.instructionId);
-    console.log(`[${timestamp()}] [recv] adjust_result instruction=${req.instructionId} ok=${req.success}${req.failureCode ? ` code=${req.failureCode}` : ""} steps=${req.steps.length}`);
+    console[req.success ? "log" : "error"](`[${timestamp()}] [recv] adjust_result instruction=${req.instructionId} ok=${req.success}${req.failureCode ? ` code=${req.failureCode}` : ""} steps=${req.steps.length}`);
     if (pending) {
       clearTimeout(pending.timer);
       this.pendingAdjusts.delete(req.instructionId);
@@ -503,7 +503,7 @@ export class ProtocolAdapter {
       // 2026-08-17 对账闭环：超时不再回滚（pending 保留待 reconcile 重发）——
       // 此处无 waiter 只可能是"重复回执"或"对账重发后回执到达但 waiter 已超时清除"，
       // 幂等由 C# 指令结果缓存保证，账本由 handleAdjustResult 的 pending 状态判断驱动。
-      console.log(`[${timestamp()}] [adjust_result] no pending waiter for ${req.instructionId} (重复回执/waiter 已超时，幂等跳过)`);
+      console.warn(`[${timestamp()}] [adjust_result] no pending waiter for ${req.instructionId} (重复回执/waiter 已超时，幂等跳过)`);
     }
 
     // issue #27：回执到达即取消对账重发（迟到回执 + 定时器已排程 → 不再空转重发），
@@ -618,13 +618,24 @@ export class ProtocolAdapter {
     );
     if (!locked) {
       // 等了多久一并落日志——区分"秒拒"（配置为 0/锁真死等）与"等满超时"。
-      console.log(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked, waited ${Date.now() - lockWaitStart}ms)`);
+      console.warn(`[${timestamp()}] [dialogue] ${req.npcName} BUSY (locked, waited ${Date.now() - lockWaitStart}ms)`);
       return this.buildBusyResponse(req);
     }
 
     console.log(`[${timestamp()}] [recv] dialogue npc=${req.npcName} player="${truncate(req.playerInput, 80)}"`);
 
     try {
+      // issue #26 批⑤（审计 §4.5 误诊修复）：缺 worldSnapshot 是坏请求——此前会在
+      // decodeWorldSnapshot 上抛 TypeError 被统一 catch 标成 llm_error，排障被误导去查
+      // LLM key/配额。现在显式分类 bad_request（整体缺失=载荷没带；个别必填字段缺失由
+      // SnapshotValidationError 分类为 validation_failed）。本请求未做任何处理，不写记忆。
+      if (!req.worldSnapshot) {
+        console.error(
+          `[${timestamp()}] [dialogue] ${req.npcName}: request missing worldSnapshot — bad_request fallback (check C# WorldSnapshotBuilder side, not LLM)`,
+        );
+        return this.ruleEngine.buildFallbackResponse(req, new Error("missing worldSnapshot"), "bad_request");
+      }
+
       const agent = this.registry.getOrCreate(req.npcName);
 
       // Load memory if not yet loaded (lazy load on first dialogue)
@@ -789,7 +800,7 @@ export class ProtocolAdapter {
       } catch (saveErr) {
         console.error(`[dialogue] fallback memory save skipped for ${req.npcName}:`, saveErr);
       }
-      console.log(`[${timestamp()}] [send] dialogue npc=${req.npcName} FALLBACK`);
+      console.warn(`[${timestamp()}] [send] dialogue npc=${req.npcName} FALLBACK`);
       return fallback;
     } finally {
       this.registry.releaseLock(req.npcName);

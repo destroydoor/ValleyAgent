@@ -84,10 +84,10 @@ public class FarmhandGiftTransport : IGiftTransport
             using var reg = cts.Token.Register(() => tcs.TrySetCanceled());
             return await tcs.Task.ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             _pending.TryRemove(requestId, out _);
-            _monitor.Log($"[FarmhandGiftTransport] Request {requestId} timed out", LogLevel.Warn);
+            _monitor.Log($"[FarmhandGiftTransport] Request {requestId} timed out ({ex})", LogLevel.Warn);
             return BuildFallbackResponse("（主机响应超时）");
         }
     }
@@ -109,7 +109,8 @@ public class FarmhandGiftTransport : IGiftTransport
             else
             {
                 _monitor.Log(
-                    $"[FarmhandGiftTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending, dropping late response");
+                    $"[FarmhandGiftTransport] Response requestId {msg.RequestId} for {msg.NpcName} has no pending, dropping late response",
+                    LogLevel.Warn);
             }
 
             return;
@@ -119,7 +120,7 @@ public class FarmhandGiftTransport : IGiftTransport
             _pending.Keys.FirstOrDefault(k => k.StartsWith(msg.NpcName + "_", StringComparison.OrdinalIgnoreCase));
         if (matchingKey == null)
         {
-            _monitor.Log($"[FarmhandGiftTransport] No pending request for {msg.NpcName}, dropping response");
+            _monitor.Log($"[FarmhandGiftTransport] No pending request for {msg.NpcName}, dropping response", LogLevel.Warn);
             return;
         }
 

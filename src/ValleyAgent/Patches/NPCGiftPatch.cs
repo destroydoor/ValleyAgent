@@ -72,7 +72,7 @@ public static class NPCGiftPatch
             }
             catch (InvalidOperationException ex)
             {
-                Monitor?.Log($"[Gift] MainThread action failed: {ex.Message}", LogLevel.Warn);
+                Monitor?.Log($"[Gift] MainThread action failed: {ex}", LogLevel.Warn);
             }
             catch (Exception ex)
             {
@@ -189,7 +189,7 @@ public static class NPCGiftPatch
                             }
                             catch (Exception ex)
                             {
-                                Monitor?.Log($"[Gift] Transport main-thread display failed for {npcName}: {ex.Message}",
+                                Monitor?.Log($"[Gift] Transport main-thread display failed for {npcName}: {ex}",
                                     LogLevel.Warn);
                             }
                         });
@@ -198,7 +198,7 @@ public static class NPCGiftPatch
                     }
                     catch (Exception ex)
                     {
-                        Monitor?.Log($"[Gift] Transport SendAsync failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                        Monitor?.Log($"[Gift] Transport SendAsync failed for {npcName}: {ex}", LogLevel.Warn);
                     }
                 });
 
@@ -222,8 +222,10 @@ public static class NPCGiftPatch
                 {
                     giftTasteOnly = __instance.getGiftTasteForThisItem(item);
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException ex)
                 {
+                    // 好感口味查询失败 → 默认中性 4，只消耗物品不变好感度的流程继续
+                    Monitor?.Log($"[Gift] gift taste lookup failed — defaulting to neutral(4): {ex}", LogLevel.Debug);
                     giftTasteOnly = 4;
                 }
 
@@ -248,7 +250,7 @@ public static class NPCGiftPatch
             catch (InvalidOperationException ex)
             {
                 giftTaste = 4;
-                Monitor?.Log($"[Gift] getGiftTasteForThisItem failed for {item.Name}: {ex.Message}", LogLevel.Debug);
+                Monitor?.Log($"[Gift] getGiftTasteForThisItem failed for {item.Name}: {ex}", LogLevel.Debug);
             }
 
             _cachedGifts[who.UniqueMultiplayerID.ToString()] = new CachedGiftInfo
@@ -480,7 +482,7 @@ public static class NPCGiftPatch
                 }
                 catch (Exception ex)
                 {
-                    Monitor?.Log($"[Gift] Consecutive-failure fallback display failed for {npcName}: {ex.Message}",
+                    Monitor?.Log($"[Gift] Consecutive-failure fallback display failed for {npcName}: {ex}",
                         LogLevel.Warn);
                 }
             });
@@ -523,7 +525,7 @@ public static class NPCGiftPatch
                         }
                         catch (Exception ex)
                         {
-                            Monitor?.Log($"[Gift] Fallback display failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                            Monitor?.Log($"[Gift] Fallback display failed for {npcName}: {ex}", LogLevel.Warn);
                         }
                     });
                     QueueTelemetry.WarnIfDeep("gift-actions", _mainThreadActions.Count, Monitor);
@@ -600,7 +602,7 @@ public static class NPCGiftPatch
                         {
                             var currentFails = _consecutiveFailures.AddOrUpdate(npcName, 1, (_, count) => count + 1);
                             Monitor?.Log(
-                                $"[Gift] Main-thread action failed for {npcName}: {ex.Message} (consecutive failures: {currentFails})",
+                                $"[Gift] Main-thread action failed for {npcName}: {ex} (consecutive failures: {currentFails})",
                                 LogLevel.Warn);
                         }
                     });
@@ -611,7 +613,7 @@ public static class NPCGiftPatch
             {
                 // P0-3: 礼物对话失败，记录熔断器失败
                 AgentService?.CircuitBreaker?.RecordFailure("gift_error");
-                Monitor?.Log($"[Gift] Feedback generation failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                Monitor?.Log($"[Gift] Feedback generation failed for {npcName}: {ex}", LogLevel.Warn);
             }
         });
     }

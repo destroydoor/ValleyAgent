@@ -244,10 +244,10 @@ namespace ValleyAgent.Navigation
                             // 保险兜底：若 NPC 因外部原因被移走，恢复到出发位置
                             Game1.warpCharacter(npc, departureLoc, new Vector2(travel.DepartureNpcTile.X, travel.DepartureNpcTile.Y));
                         }
-                        catch (InvalidOperationException)
+                        catch (InvalidOperationException ex)
                         {
                             // 出发地图已不可用（极少见），交给 DayStarted 复活逻辑兜底
-                            _monitor?.Log($"[AgentNavigator] {npcName}: CancelTravel failed to restore to {travel.DepartureLocation} — location unavailable", LogLevel.Warn);
+                            _monitor?.Log($"[AgentNavigator] {npcName}: CancelTravel failed to restore to {travel.DepartureLocation} — location unavailable ({ex})", LogLevel.Warn);
                         }
                     }
                 }
@@ -833,7 +833,7 @@ namespace ValleyAgent.Navigation
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _monitor?.Log($"Travel warp failed for {npc.Name}: {ex.Message}", LogLevel.Error);
+                    _monitor?.Log($"Travel warp failed for {npc.Name}: {ex}", LogLevel.Error);
                     // F3 修复：旅行失败回滚到出发位置 + 转 IDLE + 发 state_changed
                     // CancelTravel 内部已 warpCharacter 回 DepartureNpcTile 并 ShowNpc
                     RecordTravelFailure(npc.Name);

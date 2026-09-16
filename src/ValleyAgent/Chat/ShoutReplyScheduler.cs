@@ -74,7 +74,7 @@ public sealed class ShoutReplyScheduler
         var reply = new ScheduledReply(npcName, playerShout, now.AddMilliseconds(delayMs));
 
         _pending[npcName] = reply;
-        _monitor?.Log($"[Shout] {npcName}: reply scheduled in {delayMs}ms");
+        _monitor?.Log($"[Shout] {npcName}: reply scheduled in {delayMs}ms", LogLevel.Debug);
     }
 
     /// <summary>FNV-1a 哈希 → 3~8 秒毫秒数（确定性，进程内稳定）。</summary>
@@ -158,7 +158,7 @@ public sealed class ShoutReplyScheduler
         }
         catch (Exception ex)
         {
-            _monitor?.Log($"[Shout] Reply render failed for {reply.NpcName}: {ex.Message}", LogLevel.Warn);
+            _monitor?.Log($"[Shout] Reply render failed for {reply.NpcName}: {ex}", LogLevel.Warn);
         }
     }
 

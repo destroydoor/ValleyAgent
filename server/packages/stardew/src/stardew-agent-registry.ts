@@ -138,7 +138,7 @@ export class StardewAgentRegistry {
       return true;
     }
     if (timeoutMs <= 0) return false;
-    console.log(`[${timestamp()}] [lock] ${npcName} busy, waiting up to ${timeoutMs}ms`);
+    console.warn(`[${timestamp()}] [lock] ${npcName} busy, waiting up to ${timeoutMs}ms`);
     // 单调算 deadline：先查后睡、醒来先查——锁一释放立即占锁返回；
     // 末轮睡剩余时间，不会睡过 deadline，且 deadline 边界仍做最后一次锁检查。
     const deadline = Date.now() + timeoutMs;
@@ -151,7 +151,7 @@ export class StardewAgentRegistry {
       if (remaining <= 0) break;
       await new Promise((r) => setTimeout(r, Math.min(LOCK_POLL_INTERVAL_MS, remaining)));
     }
-    console.log(`[${timestamp()}] [lock] ${npcName} still busy after ${timeoutMs}ms wait, giving up`);
+    console.error(`[${timestamp()}] [lock] ${npcName} still busy after ${timeoutMs}ms wait, giving up`);
     return false;
   }
 

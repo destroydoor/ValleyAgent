@@ -47,6 +47,46 @@ const SILENT_CATCH_ALLOW = [
   "src/ValleyAgent/Infrastructure/MainThreadWatchdog.cs", // 取证仪器不得把进程带崩
 ];
 
+/**
+ * issue #26 批③：CS-SILENT-CATCH 显式豁免登记（文件级 SILENT_CATCH_ALLOW 之上的细粒度层）。
+ * 按文件 + catch 异常类型 + 上限登记（行号会漂移，类型签名稳定）。每条必须带理由——
+ * 豁免不等于遗忘：这些都是"静默是契约的一部分"或"结果经返回值可观测"的点位。
+ * 语法：[file, catchType, maxCount, reason]；catchType 精确匹配 catch 声明的类型名。
+ */
+const SILENT_CATCH_WAIVED = [
+  // 标题屏 / 测试环境守卫（原版数据缺省 = 预期路径，注释即契约）
+  ["src/ValleyAgent/AI/DirectorContextBuilder.cs", "NullReferenceException", 2, "标题屏/测试环境无游戏状态守卫（预期路径）"],
+  ["src/ValleyAgent/AI/GameContextSyncBuilder.cs", "NullReferenceException", 7, "原版数据缺省守卫（天气/节日/存档/好感/玩家状态，标题屏/测试环境）"],
+  ["src/ValleyAgent/Economy/AdjustExecutor.cs", "NullReferenceException", 1, "标题屏/测试环境 GetPlayer 守卫"],
+  ["src/ValleyAgent/Services/AgentService.cs", "NullReferenceException", 1, "标题屏/测试环境物品数据未初始化守卫"],
+  ["src/ValleyAgent/Protocol/TranscriptSink.cs", "Exception", 1, "SafeGameDate 标题屏守卫（pre-game 占位，逐写盘调用须零开销）"],
+  ["src/ValleyAgent/Chat/ChatBarRouter.cs", "Exception", 1, "GameDateIso 标题屏守卫（try 仅包 Game1 日期读取，不吞聊天路由异常；审计 §4.3 表述与代码不符）"],
+  // 失败经返回值可观测（工具结果 / 探针语义），非静默降级
+  ["src/ValleyAgent/Api/AgentActionApi.cs", "InvalidOperationException", 1, "消耗物品失败经返回值 false 可观测（TS 工具结果）"],
+  ["src/ValleyAgent/Api/AgentManagementApi.cs", "InvalidOperationException", 2, "TryAllocate/TryDeallocate 失败经返回值 false 可观测"],
+  ["src/ValleyAgent/Chat/ShoutReplyScheduler.cs", "InvalidOperationException", 1, "IsInGameWorld 探针：false=不在游戏世界，语义即结果"],
+  ["src/ValleyAgent/Commands/DirectorTools.cs", "Exception", 1, "get-npc 失败 → npc=null → 返回 ItemNotFound 结果（工具返回值可观测）"],
+  ["src/ValleyAgent/Commands/DirectorTools.cs", "NullReferenceException", 1, "物品未知 → 返回 ItemNotFound 结果（工具返回值可观测）"],
+  ["src/ValleyAgent/Performance/CacheManager.cs", "ArgumentException", 1, "非法 key 视为缓存 miss，语义即返回值"],
+  ["src/ValleyAgent/WebSocket/ServerProcessManager.cs", "SocketException", 1, "端口占用探测：连接失败=端口空闲，语义即返回值"],
+  // 取消 / 断连（正常路径）
+  ["src/ValleyAgent/WebSocket/ServerProcessManager.cs", "OperationCanceledException", 2, "停止/取消信号，正常路径"],
+  ["src/ValleyAgent.Abstractions/WebSocket/WebSocketClient.cs", "OperationCanceledException", 4, "断连/取消，正常路径（读循环/重连/心跳/outbox 排水）"],
+  // 测试基建 / 无日志器的订阅者隔离
+  ["src/ValleyAgent.Abstractions/Testing/ComplexInfrastructure.cs", "IOException", 2, "测试基建：事件流写入失败不中断测试"],
+  ["src/ValleyAgent.Abstractions/Inventory/AgentInventory.cs", "Exception", 1, "订阅者隔离：TranscriptSink 写盘失败不阻断钱包操作（订阅者自身留痕，本类无日志器）"],
+  // 刻意摘要回退（结果本身可见）
+  ["src/ValleyAgent/i18n/TranslationProvider.cs", "FormatException", 1, "格式化失败回退原始模板（模板文本直接可见）"],
+  ["src/ValleyAgent/RAG/GameSummaryLoader.cs", "IOException", 1, "可选目录探测，失败回退 basePath 由调用方兜底"],
+  ["src/ValleyAgent/RAG/ValleyTalkBioLoader.cs", "IOException", 1, "可选目录探测，失败回退空目录路径"],
+  // CorruptFileQuarantine 自身（issue #26 批③新增）：隔离失败由调用方日志明确记录
+  ["src/ValleyAgent/Infrastructure/CorruptFileQuarantine.cs", "IOException", 1, "隔离改名失败（文件锁）由调用方日志写明 rename failed，原文件保留"],
+  ["src/ValleyAgent/Infrastructure/CorruptFileQuarantine.cs", "UnauthorizedAccessException", 1, "隔离改名失败（权限）由调用方日志写明 rename failed，原文件保留"],
+  // game-agnostic 类经宿主注入回调留痕（catch 体无直接 Log( 调用，扫描器识别不了委托，登记说明）
+  ["src/ValleyAgent/Save/SaveDataManager.cs", "JsonException", 1, "损坏存档经 onCorruptSave 回调由宿主 Error 留痕（本类 game-agnostic 不依赖 SMAPI）"],
+  ["src/ValleyAgent/i18n/TranslationProvider.cs", "JsonException", 1, "损坏翻译资源经 onCorruptResource 回调由宿主 Error 留痕（本类 game-agnostic）"],
+];
+
 /** TS：failure 语义关键词（用于识别"错误被打成 console.log"）。 */
 const FAIL_KEYWORDS = /(fail(ed|ure)?|error|unavailable|timeout|timed out|dropped|drop\b|rollback|rolled_back|BUSY|FALLBACK|invalid|corrupt|no pending|not wired|未配置|异常|失败|丢弃)/i;
 
@@ -119,7 +159,46 @@ function add(rule, file, line, detail) {
   findings.push({ rule, sev: RULES[rule].sev, file, line, detail });
 }
 
+/**
+ * catch 块是否把"完整异常对象"交给了日志/透传（issue #26 批注：判定按 catch 变量名，
+ * 不再限死 {ex}/{e} 字面名——{inner}/{rollbackEx}/{fallbackEx} 等同样是完整异常对象，
+ * SMAPI 照样打全栈摘要）。识别两种形态：插值 {$var} 与尾参 , $var)。
+ */
+function logsFullException(header, inner) {
+  const m = header.match(/catch\s*(?:\(\s*([^)]*?)\s*\))?/);
+  const decl = (m?.[1] ?? "").trim();
+  // 取声明里最后一个标识符（跳过命名空间限定的类型名与 when 子句）；catch { } 无变量名
+  const tokens = decl.split(/\s+/).filter(Boolean);
+  const vars = new Set(["ex", "e", "exception", "err"]);
+  if (tokens.length >= 2 && /^(\[\w+\(\)\])?\w+$/.test(tokens[tokens.length - 1])) {
+    vars.add(tokens[tokens.length - 1]);
+  }
+  for (const v of vars) {
+    if (new RegExp(`\\{${v}\\}`).test(inner) || new RegExp(`,\\s*${v}\\)`).test(inner)) return true;
+  }
+  return /\.ToString\(\)/.test(inner);
+}
+
 /* ─────────────────────────── C# 扫描 ─────────────────────────── */
+
+let waivedCount = 0;
+const waiverUseCount = new Map(); // "file|type" → 已消耗的豁免名额
+
+/** 按 [文件+catch 类型+上限] 匹配豁免登记；同文件同类型按序消耗名额，超出上限视为新违规。 */
+function matchSilentCatchWaiver(file, header) {
+  const m = header.match(/catch\s*\(\s*([\w.]+?)(?:\s+\w+)?\s*\)/);
+  const type = m?.[1]?.split(".").pop() ?? "";
+  for (const [waivedFile, waivedType, max] of SILENT_CATCH_WAIVED) {
+    if (waivedFile !== file || waivedType !== type) continue;
+    const key = `${file}|${type}`;
+    const used = waiverUseCount.get(key) ?? 0;
+    if (used < max) {
+      waiverUseCount.set(key, used + 1);
+      return true;
+    }
+  }
+  return false;
+}
 
 for (const dir of CS_DIRS) {
   for (const file of walk(join(ROOT, dir), [".cs"])) {
@@ -193,10 +272,14 @@ for (const dir of CS_DIRS) {
       const logsSomething = /Monitor|\bLog\(|LogCallback|ModErrorLog|QueueTelemetry|DebugLogger/.test(inner);
       const rethrows = /\bthrow\b/.test(inner);
       if (!logsSomething && !rethrows && !SILENT_CATCH_ALLOW.includes(r)) {
+        if (matchSilentCatchWaiver(r, header)) {
+          waivedCount++;
+          continue;
+        }
         const snippet = inner.replace(/\s+/g, " ").trim().slice(0, 90);
         add("CS-SILENT-CATCH", r, i + 1, `${header.replace(/\s+/g, " ")} → ${snippet || "(空)"}`);
       }
-      if (logsSomething && !/\{ex\}|\{e\}|\{exception\}|\{err\}|\.ToString\(\)|, ex\)|,ex\)|, exception\)/.test(inner)) {
+      if (logsSomething && !logsFullException(header, inner)) {
         add("CS-LOG-NO-STACK", r, i + 1, inner.replace(/\s+/g, " ").trim().slice(0, 110));
       }
     }
@@ -335,7 +418,7 @@ const unbaselined = Object.keys(baseline).filter((k) => !counts.has(k));
 
 const total = findings.length;
 const p0 = findings.filter((f) => f.sev === "P0").length;
-console.log(`合计 ${total} 处（P0 ${p0} / P1 ${findings.filter((f) => f.sev === "P1").length} / P2 ${findings.filter((f) => f.sev === "P2").length}）`);
+console.log(`合计 ${total} 处（P0 ${p0} / P1 ${findings.filter((f) => f.sev === "P1").length} / P2 ${findings.filter((f) => f.sev === "P2").length}）；另 CS-SILENT-CATCH 显式豁免 ${waivedCount} 处（登记见本文件 SILENT_CATCH_WAIVED，逐条带理由）`);
 
 if (failAll) {
   if (total > 0) {
@@ -343,6 +426,13 @@ if (failAll) {
     process.exit(1);
   }
   console.log("\n✅ --all 模式：零违规。");
+  process.exit(0);
+}
+
+// issue #26 收口：存量全部修完后 counts 为空、基线也是空 {}——零违规是合法终态，
+// 不应触发"基线为空"守卫（该守卫的语义是"有违规但没建基线"，不是"没有违规"）。
+if (total === 0) {
+  console.log(`\n✅ 零违规（存量已全部收敛；另 CS-SILENT-CATCH 显式豁免 ${waivedCount} 处，登记见 SILENT_CATCH_WAIVED）。`);
   process.exit(0);
 }
 

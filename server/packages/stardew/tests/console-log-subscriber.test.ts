@@ -87,7 +87,8 @@ test("emits tool call start/end with full args and result", async () => {
 });
 
 test("emits error event with message", async () => {
-  const logSpy = spyOn(console, "log").mockImplementation(() => {});
+  // issue #26 批④：agent 的 error 事件落在 console.error（可按 ERROR grep）
+  const logSpy = spyOn(console, "error").mockImplementation(() => {});
   const events: AgentEvent[] = [
     { type: "error", timestamp: 5000, message: "LLM API down" },
   ];
