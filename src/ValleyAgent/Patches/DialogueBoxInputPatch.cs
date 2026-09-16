@@ -171,29 +171,44 @@ public static class DialogueBoxInputPatch
     [HarmonyPatch(nameof(DialogueBox.draw))]
     public static void DrawPostfix(DialogueBox __instance, SpriteBatch b)
     {
-        if (string.IsNullOrEmpty(_activeAgentNpc))
+        // issue #24：Harmony 入口在游戏原生 draw 调用栈里，SMAPI 事件级兜底覆盖不到，
+        // 一次 NRE 就把异常注入原版渲染。外层守卫 + 回落 = 本帧不画输入框，原版绘制不受影响。
+        try
         {
-            return;
-        }
+            if (string.IsNullOrEmpty(_activeAgentNpc))
+            {
+                return;
+            }
 
-        if (Game1.activeClickableMenu != __instance)
+            if (Game1.activeClickableMenu != __instance)
+            {
+                return;
+            }
+
+            // 对话框打开/关闭的缩放过渡期间不画输入框：原版在 transitioning 时
+            // 同样只画过渡中的框体、不画文字内容。输入框与对话框内容同步出现/消失，
+            // 二者在视觉上是完全绑定的一体。
+            if (__instance.transitioning)
+            {
+                return;
+            }
+
+            DrawInputBox(b, __instance);
+
+            // DialogueBox.draw 末尾自带 drawMouse（光标先于本 Postfix 绘制），
+            // 输入框会盖住光标。重绘光标使其保持在输入框上层。
+            __instance.drawMouse(b);
+        }
+        catch (Exception ex)
         {
-            return;
+            // 回落语义（Postfix 返回 void）：跳过输入框绘制即回落原版——原版 draw 已完成，
+            // 本帧损失仅"输入条不可见"，不影响原版对话框本身。
+            if (QueueTelemetry.ShouldWarn("harmony:DialogueBoxInputPatch.DrawPostfix"))
+            {
+                _monitor?.Log($"[Harmony] DrawPostfix failed — skip input box this frame: {ex}", LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "DialogueBoxInputPatch.DrawPostfix failed (skip input box)", ex);
+            }
         }
-
-        // 对话框打开/关闭的缩放过渡期间不画输入框：原版在 transitioning 时
-        // 同样只画过渡中的框体、不画文字内容。输入框与对话框内容同步出现/消失，
-        // 二者在视觉上是完全绑定的一体。
-        if (__instance.transitioning)
-        {
-            return;
-        }
-
-        DrawInputBox(b, __instance);
-
-        // DialogueBox.draw 末尾自带 drawMouse（光标先于本 Postfix 绘制），
-        // 输入框会盖住光标。重绘光标使其保持在输入框上层。
-        __instance.drawMouse(b);
     }
 
     // 必须是 Prefix 而不是 Postfix：原版 DialogueBox.receiveKeyPress 会把
@@ -208,64 +223,82 @@ public static class DialogueBoxInputPatch
     [HarmonyPatch(nameof(DialogueBox.receiveKeyPress))]
     public static bool ReceiveKeyPressPrefix(DialogueBox __instance, Keys key)
     {
-        if (string.IsNullOrEmpty(_activeAgentNpc))
+        // issue #24：本前缀接管对话期间的 Enter/ESC/其余按键（返回 false 吞键）。
+        // 异常回落 = return true 放行原版：守卫失败时若继续吞键，玩家输入全废、
+        // 对话框无法推进/关闭（比丢一轮 AI 接管恶性得多）。
+        try
         {
-            return true;
-        }
-
-        if (Game1.activeClickableMenu != __instance)
-        {
-            return true;
-        }
-
-        // ESC：结束对话并关闭
-        if (key == Keys.Escape)
-        {
-            EndConversation();
-            // 不能依赖原版 receiveKeyPress 关闭：SnappyMenus 关闭时 ESC 在原版路径里
-            // 对角色对话框什么都不做。marker 已清除，receiveLeftClick 前缀会放行，
-            // 直接用它走原版关闭流程。
-            // 注意要循环点击：打字机未播完时第一次点击只是“补完文字”，
-            // 多页回复每次点击也只翻一页——单次点击会导致对话框残留
-            // （“ESC 只退出了输入框”）。
-            for (var i = 0; i < MaxEscCloseClicks; i++)
+            if (string.IsNullOrEmpty(_activeAgentNpc))
             {
-                if (Game1.activeClickableMenu != __instance || !Game1.dialogueUp)
+                return true;
+            }
+
+            if (Game1.activeClickableMenu != __instance)
+            {
+                return true;
+            }
+
+            // ESC：结束对话并关闭
+            if (key == Keys.Escape)
+            {
+                EndConversation();
+                // 不能依赖原版 receiveKeyPress 关闭：SnappyMenus 关闭时 ESC 在原版路径里
+                // 对角色对话框什么都不做。marker 已清除，receiveLeftClick 前缀会放行，
+                // 直接用它走原版关闭流程。
+                // 注意要循环点击：打字机未播完时第一次点击只是"补完文字"，
+                // 多页回复每次点击也只翻一页——单次点击会导致对话框残留
+                // （"ESC 只退出了输入框"）。
+                for (var i = 0; i < MaxEscCloseClicks; i++)
                 {
-                    break;
+                    if (Game1.activeClickableMenu != __instance || !Game1.dialogueUp)
+                    {
+                        break;
+                    }
+
+                    __instance.receiveLeftClick(0, 0, false);
+                }
+
+                return false;
+            }
+
+            // Enter：有输入则发送；空输入则作为"跳过打字/继续/关闭"（原版左键语义）
+            if (key == Keys.Enter)
+            {
+                if (_isWaitingForResponse)
+                {
+                    return false;
+                }
+
+                if (_inputText.Length > 0)
+                {
+                    SubmitInput();
+                    return false;
                 }
 
                 __instance.receiveLeftClick(0, 0, false);
+                if (!Game1.dialogueUp || Game1.activeClickableMenu != __instance)
+                {
+                    EndConversation();
+                }
+
+                return false;
             }
 
+            // 其余按键全部吞掉（阻断原版推进/关闭逻辑），文本由 IME subscriber 注入
             return false;
         }
-
-        // Enter：有输入则发送；空输入则作为“跳过打字/继续/关闭”（原版左键语义）
-        if (key == Keys.Enter)
+        catch (Exception ex)
         {
-            if (_isWaitingForResponse)
+            if (QueueTelemetry.ShouldWarn("harmony:DialogueBoxInputPatch.ReceiveKeyPressPrefix"))
             {
-                return false;
+                _monitor?.Log($"[Harmony] ReceiveKeyPressPrefix failed — fall back to vanilla key handling: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony",
+                    "DialogueBoxInputPatch.ReceiveKeyPressPrefix failed (fall back to vanilla key handling)", ex);
             }
 
-            if (_inputText.Length > 0)
-            {
-                SubmitInput();
-                return false;
-            }
-
-            __instance.receiveLeftClick(0, 0, false);
-            if (!Game1.dialogueUp || Game1.activeClickableMenu != __instance)
-            {
-                EndConversation();
-            }
-
-            return false;
+            return true;
         }
-
-        // 其余按键全部吞掉（阻断原版推进/关闭逻辑），文本由 IME subscriber 注入
-        return false;
     }
 
     // 对话期间左键点击会触发原版 receiveLeftClick → 提前关闭对话框（误触）。
@@ -274,17 +307,34 @@ public static class DialogueBoxInputPatch
     [HarmonyPatch(nameof(DialogueBox.receiveLeftClick))]
     public static bool ReceiveLeftClickPrefix(DialogueBox __instance)
     {
-        if (string.IsNullOrEmpty(_activeAgentNpc))
+        // issue #24：Agent 对话激活时吞左键（防误点提前关闭对话框），翻页/关闭走 Enter/ESC。
+        // 异常回落 = return true 放行原版：守卫失败时继续吞点击会让对话框完全点不动。
+        try
         {
+            if (string.IsNullOrEmpty(_activeAgentNpc))
+            {
+                return true;
+            }
+
+            if (Game1.activeClickableMenu != __instance)
+            {
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            if (QueueTelemetry.ShouldWarn("harmony:DialogueBoxInputPatch.ReceiveLeftClickPrefix"))
+            {
+                _monitor?.Log($"[Harmony] ReceiveLeftClickPrefix failed — fall back to vanilla click: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony",
+                    "DialogueBoxInputPatch.ReceiveLeftClickPrefix failed (fall back to vanilla click)", ex);
+            }
+
             return true;
         }
-
-        if (Game1.activeClickableMenu != __instance)
-        {
-            return true;
-        }
-
-        return false;
     }
 
     /// <summary>

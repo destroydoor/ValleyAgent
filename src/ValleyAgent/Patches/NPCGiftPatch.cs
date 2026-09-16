@@ -94,241 +94,260 @@ public static class NPCGiftPatch
     /// </summary>
     private static bool Prefix(NPC __instance, Farmer who)
     {
-        var item = who.ActiveObject;
-        if (item == null || !__instance.IsVillager)
+        // issue #24：本前缀注入 NPC.tryToReceiveActiveObject 原生调用栈。
+        // 异常回落 = return true 放行原版送礼——物品由原版消耗、好感由原版结算。
+        // 绝不能 return false：那等于宣称"已接管"却什么都没做，礼物凭空消失且零反馈。
+        // （已知边界：若异常发生在本前缀已消耗物品之后（transport 分支 who.ActiveObject=null
+        //   与 return false 之间），原版拿到 null 物品自然 no-op，无双重结算。）
+        try
         {
-            return true;
-        }
-
-        // isAgent 判定：Host 走 AgentService，ThinClient 走 RemoteRenderer 远程名单。
-        // 修复 C2：原代码用 AgentService == null 早退，导致 ThinClient 端 _giftTransport 分支永远到不了。
-        // ThinClient 模式下 AgentService 为 null，必须依赖主机广播的 Agent 名单。
-        var isThinClient = RemoteRenderer != null && AgentService == null;
-        if (isThinClient)
-        {
-            if (RemoteRenderer!.GetRemoteState(__instance.Name) == null)
-            {
-                return true; // 非 Agent NPC，交原版
-            }
-        }
-        else
-        {
-            // 非 Agent NPC 交给原版处理
-            if (AgentService == null || !AgentService.TryGetAgent(__instance.Name, out _))
+            var item = who.ActiveObject;
+            if (item == null || !__instance.IsVillager)
             {
                 return true;
             }
 
-            // 任务4.1：EnableGifts 开关 — 关闭时走原版逻辑
-            if (AgentService.Config?.EnableGifts == false)
+            // isAgent 判定：Host 走 AgentService，ThinClient 走 RemoteRenderer 远程名单。
+            // 修复 C2：原代码用 AgentService == null 早退，导致 ThinClient 端 _giftTransport 分支永远到不了。
+            // ThinClient 模式下 AgentService 为 null，必须依赖主机广播的 Agent 名单。
+            var isThinClient = RemoteRenderer != null && AgentService == null;
+            if (isThinClient)
             {
-                return true;
+                if (RemoteRenderer!.GetRemoteState(__instance.Name) == null)
+                {
+                    return true; // 非 Agent NPC，交原版
+                }
+            }
+            else
+            {
+                // 非 Agent NPC 交给原版处理
+                if (AgentService == null || !AgentService.TryGetAgent(__instance.Name, out _))
+                {
+                    return true;
+                }
+
+                // 任务4.1：EnableGifts 开关 — 关闭时走原版逻辑
+                if (AgentService.Config?.EnableGifts == false)
+                {
+                    return true;
+                }
+
+                // E3-5（2026-08-15 步骤 2）：玩家献出的物品命中求购单时，拒绝本次送礼交接
+                // （物品留在玩家手里，经济结算走对话流 trade 工具 → execute_adjust），
+                // 未命中返回 false → 回落正常送礼流程。
+                if (TryHandlePurchaseRequest(__instance, item))
+                {
+                    return false;
+                }
             }
 
-            // E3-5（2026-08-15 步骤 2）：玩家献出的物品命中求购单时，拒绝本次送礼交接
-            // （物品留在玩家手里，经济结算走对话流 trade 工具 → execute_adjust），
-            // 未命中返回 false → 回落正常送礼流程。
-            if (TryHandlePurchaseRequest(__instance, item))
+            // Task 8：联机 Farmhand 模式下通过 IGiftTransport 代理到主机。
+            // 主机端不会设置 _giftTransport（保持 null），仍走下方本地评估路径。
+            if (_giftTransport != null)
             {
+                var qualifiedItemId = item.QualifiedItemId ?? item.ItemId ?? "";
+                var npcName = __instance.Name;
+
+                // 消耗物品（与原版 Prefix 一致）
+                who.ActiveObject = null;
+
+                // 异步发起 transport 请求，回包通过 _mainThreadActions 在主线程显示对话。
+                // 不填充 _cachedGifts，因此 Postfix 会直接 return，不重复显示。
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var response = await _giftTransport.SendAsync(npcName, qualifiedItemId, 1).ConfigureAwait(false);
+                        var reactionText = response.Reaction;
+                        if (string.IsNullOrWhiteSpace(reactionText))
+                        {
+                            reactionText = "……";
+                        }
+
+                        // 2026-08-23 审计 P0：friendshipData 是 NetField，写操作随对话显示一起入主线程队列，
+                        // 不得留在 Task.Run 续体里直写（与 execute_adjust 主线程纪律同一问题类）。
+                        _mainThreadActions.Enqueue(() =>
+                        {
+                            try
+                            {
+                                // 在 farmhand 本地应用主机计算的 FriendshipDelta（同步自身 friendshipData）
+                                if (response.FriendshipDelta != 0 && Game1.player.friendshipData.TryGetValue(npcName, out var fd))
+                                {
+                                    fd.Points = Math.Clamp(fd.Points + response.FriendshipDelta, 0, 2500);
+                                }
+
+                                var npc = Game1.getCharacterFromName(npcName);
+                                if (npc != null)
+                                {
+                                    var dialogue = new StardewValley.Dialogue(npc, null, reactionText);
+                                    npc.setNewDialogue(dialogue);
+                                    Game1.drawDialogue(npc);
+                                }
+
+                                Monitor?.Log($"[Gift] {npcName} received gift via transport: {reactionText}",
+                                    LogLevel.Debug);
+                            }
+                            catch (Exception ex)
+                            {
+                                Monitor?.Log($"[Gift] Transport main-thread display failed for {npcName}: {ex.Message}",
+                                    LogLevel.Warn);
+                            }
+                        });
+                        // 深度告警：主线程泵停摆时送礼动作堆积的早期信号（2026-09-11 生产化仪器）
+                        QueueTelemetry.WarnIfDeep("gift-actions", _mainThreadActions.Count, Monitor);
+                    }
+                    catch (Exception ex)
+                    {
+                        Monitor?.Log($"[Gift] Transport SendAsync failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                    }
+                });
+
                 return false;
             }
-        }
 
-        // Task 8：联机 Farmhand 模式下通过 IGiftTransport 代理到主机。
-        // 主机端不会设置 _giftTransport（保持 null），仍走下方本地评估路径。
-        if (_giftTransport != null)
-        {
-            var qualifiedItemId = item.QualifiedItemId ?? item.ItemId ?? "";
-            var npcName = __instance.Name;
-
-            // 消耗物品（与原版 Prefix 一致）
-            who.ActiveObject = null;
-
-            // 异步发起 transport 请求，回包通过 _mainThreadActions 在主线程显示对话。
-            // 不填充 _cachedGifts，因此 Postfix 会直接 return，不重复显示。
-            _ = Task.Run(async () =>
+            // 健壮性守卫：ThinClient 模式下若 _giftTransport 未注入（不应发生，仅 OnReturnedToTitle 期间短暂为 null），
+            // 此时 AgentService 为 null 无法走本地评估，安全降级交回原版处理。
+            if (AgentService == null)
             {
+                Monitor?.Log($"[Gift] {__instance.Name}: ThinClient with null _giftTransport, falling back to vanilla",
+                    LogLevel.Warn);
+                return true;
+            }
+
+            // 任务4.2：EnableFriendshipChanges 关闭时只消耗物品，不变更好感度
+            if (AgentService.Config?.EnableFriendshipChanges == false)
+            {
+                int giftTasteOnly;
                 try
                 {
-                    var response = await _giftTransport.SendAsync(npcName, qualifiedItemId, 1).ConfigureAwait(false);
-                    var reactionText = response.Reaction;
-                    if (string.IsNullOrWhiteSpace(reactionText))
-                    {
-                        reactionText = "……";
-                    }
-
-                    // 2026-08-23 审计 P0：friendshipData 是 NetField，写操作随对话显示一起入主线程队列，
-                    // 不得留在 Task.Run 续体里直写（与 execute_adjust 主线程纪律同一问题类）。
-                    _mainThreadActions.Enqueue(() =>
-                    {
-                        try
-                        {
-                            // 在 farmhand 本地应用主机计算的 FriendshipDelta（同步自身 friendshipData）
-                            if (response.FriendshipDelta != 0 && Game1.player.friendshipData.TryGetValue(npcName, out var fd))
-                            {
-                                fd.Points = Math.Clamp(fd.Points + response.FriendshipDelta, 0, 2500);
-                            }
-
-                            var npc = Game1.getCharacterFromName(npcName);
-                            if (npc != null)
-                            {
-                                var dialogue = new StardewValley.Dialogue(npc, null, reactionText);
-                                npc.setNewDialogue(dialogue);
-                                Game1.drawDialogue(npc);
-                            }
-
-                            Monitor?.Log($"[Gift] {npcName} received gift via transport: {reactionText}",
-                                LogLevel.Debug);
-                        }
-                        catch (Exception ex)
-                        {
-                            Monitor?.Log($"[Gift] Transport main-thread display failed for {npcName}: {ex.Message}",
-                                LogLevel.Warn);
-                        }
-                    });
-                    // 深度告警：主线程泵停摆时送礼动作堆积的早期信号（2026-09-11 生产化仪器）
-                    QueueTelemetry.WarnIfDeep("gift-actions", _mainThreadActions.Count, Monitor);
+                    giftTasteOnly = __instance.getGiftTasteForThisItem(item);
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException)
                 {
-                    Monitor?.Log($"[Gift] Transport SendAsync failed for {npcName}: {ex.Message}", LogLevel.Warn);
+                    giftTasteOnly = 4;
                 }
-            });
 
-            return false;
-        }
+                _cachedGifts[who.UniqueMultiplayerID.ToString()] = new CachedGiftInfo
+                {
+                    ItemDisplayName = item.DisplayName ?? item.Name ?? "???",
+                    ItemName = item.Name ?? "",
+                    GiftTaste = giftTasteOnly,
+                    NpcName = __instance.Name
+                };
+                who.ActiveObject = null;
+                Monitor?.Log($"[Gift] {__instance.Name}: EnableFriendshipChanges=false, only consuming item",
+                    LogLevel.Debug);
+                return false;
+            }
 
-        // 健壮性守卫：ThinClient 模式下若 _giftTransport 未注入（不应发生，仅 OnReturnedToTitle 期间短暂为 null），
-        // 此时 AgentService 为 null 无法走本地评估，安全降级交回原版处理。
-        if (AgentService == null)
-        {
-            Monitor?.Log($"[Gift] {__instance.Name}: ThinClient with null _giftTransport, falling back to vanilla",
-                LogLevel.Warn);
-            return true;
-        }
-
-        // 任务4.2：EnableFriendshipChanges 关闭时只消耗物品，不变更好感度
-        if (AgentService.Config?.EnableFriendshipChanges == false)
-        {
-            int giftTasteOnly;
+            int giftTaste;
             try
             {
-                giftTasteOnly = __instance.getGiftTasteForThisItem(item);
+                giftTaste = __instance.getGiftTasteForThisItem(item);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
-                giftTasteOnly = 4;
+                giftTaste = 4;
+                Monitor?.Log($"[Gift] getGiftTasteForThisItem failed for {item.Name}: {ex.Message}", LogLevel.Debug);
             }
 
             _cachedGifts[who.UniqueMultiplayerID.ToString()] = new CachedGiftInfo
             {
                 ItemDisplayName = item.DisplayName ?? item.Name ?? "???",
                 ItemName = item.Name ?? "",
-                GiftTaste = giftTasteOnly,
+                GiftTaste = giftTaste,
                 NpcName = __instance.Name
             };
+
+            // ValleyAgent 接管：通过 FriendshipSystem 应用好感度变化（递减收益）+ 消耗物品
+            var delta = giftTaste switch
+            {
+                0 => 80, // Love
+                2 => 45, // Like
+                4 => 20, // Neutral
+                6 => -20, // Dislike
+                8 => -40, // Hate
+                _ => 0
+            };
+
+            var tasteLabel = giftTaste switch
+            {
+                0 => "最爱", 2 => "喜欢", 4 => "一般", 6 => "不喜欢", 8 => "讨厌", _ => "未知"
+            };
+
+            if (Game1.player.friendshipData.TryGetValue(__instance.Name, out var fd))
+            {
+                // Issue 12: 通过 FriendshipSystem 路由好感度变化，应用递减收益
+                if (FriendshipSystem != null)
+                {
+                    var dateKey = $"{Game1.year}_{Game1.season}_{Game1.dayOfMonth}";
+
+                    // 任务3.3：设置 SpecialEvents，恢复生日/节日倍率
+                    var specialEvents = SpecialEventModifiers.None;
+                    if (__instance.isBirthday())
+                    {
+                        specialEvents |= SpecialEventModifiers.Birthday;
+                    }
+
+                    if (Game1.isFestival())
+                    {
+                        specialEvents |= SpecialEventModifiers.Festival;
+                    }
+
+                    var context = new FriendshipChangeContext
+                    {
+                        NpcName = __instance.Name,
+                        CurrentFriendshipPoints = fd.Points,
+                        MaxFriendshipPoints = 2500,
+                        InteractionContent = $"Gift: {item.DisplayName} ({tasteLabel})",
+                        InteractionType = InteractionType.Gift,
+                        CurrentDateKey = dateKey,
+                        SpecialEvents = specialEvents
+                    };
+                    var result =
+                        FriendshipSystem.ApplyDirectChange(context, delta, $"Gift: {item.DisplayName} ({tasteLabel})");
+                    fd.Points = Math.Clamp(result.NewPoints, 0, 2500);
+                    Monitor?.Log(
+                        $"[Gift] {__instance.Name}: {item.DisplayName} taste={giftTaste} raw_delta={delta} → actual={result.AppliedChange} (diminishing, special={specialEvents}) → {fd.Points}",
+                        LogLevel.Debug);
+                }
+                else
+                {
+                    // Fallback: 无 FriendshipSystem 时直接应用（无递减收益）
+                    fd.Points = Math.Clamp(fd.Points + delta, 0, 2500);
+                    Monitor?.Log(
+                        $"[Gift] {__instance.Name}: {item.DisplayName} taste={giftTaste} delta={delta} → {fd.Points}",
+                        LogLevel.Debug);
+                }
+            }
+
+            // 直接记录礼物记忆（不依赖AI响应），确保 TS Agent Server 断连时仍有记忆
+            if (AgentService.TryGetAgent(__instance.Name, out var giftAgent))
+            {
+                giftAgent!.Brain.AddMemory($"玩家送给我{item.DisplayName}，我的感受是：{tasteLabel}。", 3.0, MemoryEntryType.Event);
+
+                // 2026-08-15 步骤 3：情绪推导已迁 TS 情绪引擎（确定性事件→情绪）；
+                // C# 不再机械推导（EmotionAnalyzer 删除），送礼情绪回 baseline。
+                Monitor?.Log($"[Gift] {__instance.Name}: gift received (taste={giftTaste})", LogLevel.Debug);
+            }
+
+            // 消耗物品（原版也会做，但我们阻止了原版执行）
             who.ActiveObject = null;
-            Monitor?.Log($"[Gift] {__instance.Name}: EnableFriendshipChanges=false, only consuming item",
-                LogLevel.Debug);
+
+            // 阻止原版执行
             return false;
         }
-
-        int giftTaste;
-        try
+        catch (Exception ex)
         {
-            giftTaste = __instance.getGiftTasteForThisItem(item);
-        }
-        catch (InvalidOperationException ex)
-        {
-            giftTaste = 4;
-            Monitor?.Log($"[Gift] getGiftTasteForThisItem failed for {item.Name}: {ex.Message}", LogLevel.Debug);
-        }
-
-        _cachedGifts[who.UniqueMultiplayerID.ToString()] = new CachedGiftInfo
-        {
-            ItemDisplayName = item.DisplayName ?? item.Name ?? "???",
-            ItemName = item.Name ?? "",
-            GiftTaste = giftTaste,
-            NpcName = __instance.Name
-        };
-
-        // ValleyAgent 接管：通过 FriendshipSystem 应用好感度变化（递减收益）+ 消耗物品
-        var delta = giftTaste switch
-        {
-            0 => 80, // Love
-            2 => 45, // Like
-            4 => 20, // Neutral
-            6 => -20, // Dislike
-            8 => -40, // Hate
-            _ => 0
-        };
-
-        var tasteLabel = giftTaste switch
-        {
-            0 => "最爱", 2 => "喜欢", 4 => "一般", 6 => "不喜欢", 8 => "讨厌", _ => "未知"
-        };
-
-        if (Game1.player.friendshipData.TryGetValue(__instance.Name, out var fd))
-        {
-            // Issue 12: 通过 FriendshipSystem 路由好感度变化，应用递减收益
-            if (FriendshipSystem != null)
+            if (QueueTelemetry.ShouldWarn("harmony:NPCGiftPatch.Prefix"))
             {
-                var dateKey = $"{Game1.year}_{Game1.season}_{Game1.dayOfMonth}";
-
-                // 任务3.3：设置 SpecialEvents，恢复生日/节日倍率
-                var specialEvents = SpecialEventModifiers.None;
-                if (__instance.isBirthday())
-                {
-                    specialEvents |= SpecialEventModifiers.Birthday;
-                }
-
-                if (Game1.isFestival())
-                {
-                    specialEvents |= SpecialEventModifiers.Festival;
-                }
-
-                var context = new FriendshipChangeContext
-                {
-                    NpcName = __instance.Name,
-                    CurrentFriendshipPoints = fd.Points,
-                    MaxFriendshipPoints = 2500,
-                    InteractionContent = $"Gift: {item.DisplayName} ({tasteLabel})",
-                    InteractionType = InteractionType.Gift,
-                    CurrentDateKey = dateKey,
-                    SpecialEvents = specialEvents
-                };
-                var result =
-                    FriendshipSystem.ApplyDirectChange(context, delta, $"Gift: {item.DisplayName} ({tasteLabel})");
-                fd.Points = Math.Clamp(result.NewPoints, 0, 2500);
-                Monitor?.Log(
-                    $"[Gift] {__instance.Name}: {item.DisplayName} taste={giftTaste} raw_delta={delta} → actual={result.AppliedChange} (diminishing, special={specialEvents}) → {fd.Points}",
-                    LogLevel.Debug);
+                Monitor?.Log($"[Harmony] tryToReceiveActiveObject prefix failed — fall back to vanilla gift: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "NPCGiftPatch.Prefix failed (fall back to vanilla gift)", ex);
             }
-            else
-            {
-                // Fallback: 无 FriendshipSystem 时直接应用（无递减收益）
-                fd.Points = Math.Clamp(fd.Points + delta, 0, 2500);
-                Monitor?.Log(
-                    $"[Gift] {__instance.Name}: {item.DisplayName} taste={giftTaste} delta={delta} → {fd.Points}",
-                    LogLevel.Debug);
-            }
+
+            return true;
         }
-
-        // 直接记录礼物记忆（不依赖AI响应），确保 TS Agent Server 断连时仍有记忆
-        if (AgentService.TryGetAgent(__instance.Name, out var giftAgent))
-        {
-            giftAgent!.Brain.AddMemory($"玩家送给我{item.DisplayName}，我的感受是：{tasteLabel}。", 3.0, MemoryEntryType.Event);
-
-            // 2026-08-15 步骤 3：情绪推导已迁 TS 情绪引擎（确定性事件→情绪）；
-            // C# 不再机械推导（EmotionAnalyzer 删除），送礼情绪回 baseline。
-            Monitor?.Log($"[Gift] {__instance.Name}: gift received (taste={giftTaste})", LogLevel.Debug);
-        }
-
-        // 消耗物品（原版也会做，但我们阻止了原版执行）
-        who.ActiveObject = null;
-
-        // 阻止原版执行
-        return false;
     }
 
     /// <summary>
@@ -376,14 +395,35 @@ public static class NPCGiftPatch
 
     private static void Postfix(NPC __instance, Farmer who)
     {
-        // Prefix 返回 false 时 __result 为 false，但缓存仍有效
-        // 通过缓存是否存在判断是否需要处理
-        var farmerKey = who.UniqueMultiplayerID.ToString();
-        if (!_cachedGifts.TryRemove(farmerKey, out var cached))
+        // issue #24：原版 tryToReceiveActiveObject 调用栈上的 Postfix（负责触发异步 LLM 反馈）。
+        // 异常回落 = 跳过本次反馈触发——本地好感度结算已在 Prefix 完成，
+        // 损失仅为"这次送礼没有 AI 反应台词"。
+        try
         {
-            return;
-        }
+            // Prefix 返回 false 时 __result 为 false，但缓存仍有效
+            // 通过缓存是否存在判断是否需要处理
+            var farmerKey = who.UniqueMultiplayerID.ToString();
+            if (!_cachedGifts.TryRemove(farmerKey, out var cached))
+            {
+                return;
+            }
 
+            PostfixCore(__instance, cached);
+        }
+        catch (Exception ex)
+        {
+            if (QueueTelemetry.ShouldWarn("harmony:NPCGiftPatch.Postfix"))
+            {
+                Monitor?.Log($"[Harmony] tryToReceiveActiveObject postfix failed — skip gift feedback: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "NPCGiftPatch.Postfix failed (skip gift feedback)", ex);
+            }
+        }
+    }
+
+    /// <summary>Postfix 主体（缓存命中后的异步反馈编排；逻辑逐行保留，issue #24 抽方法便于外层守卫）。</summary>
+    private static void PostfixCore(NPC __instance, CachedGiftInfo cached)
+    {
         if (AgentService == null || AgentServerProvider == null)
         {
             return;

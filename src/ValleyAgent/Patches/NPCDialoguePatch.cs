@@ -7,6 +7,7 @@ using StardewValley;
 using StardewValley.Menus;
 using ValleyAgent.Api;
 using ValleyAgent.Config;
+using ValleyAgent.Infrastructure;
 using ValleyAgent.i18n;
 using ValleyAgent.Multiplayer;
 using ValleyAgent.Services;
@@ -58,116 +59,131 @@ public static class NPCDialoguePatch
         get => RemoteRenderer != null && AgentServerProvider == null ? "ThinClient" : "Host";
     }
 
-#pragma warning disable IDE0060 // Harmony Patch 参数必须按位置匹配，不可删除
     private static bool Prefix(NPC __instance, Farmer who, GameLocation l, ref bool __result)
-#pragma warning restore IDE0060
     {
-        if (Game1.eventUp || Game1.CurrentEvent != null)
+        // issue #24：本前缀注入 NPC.checkAction 原生调用栈（SMAPI 事件兜底覆盖不到）。
+        // 异常回落 = return true 放行原版 checkAction——原版对话/送礼路径原样工作；
+        // 若 return false 则既没开 AI 对话、原版又不执行，右键 NPC 变成"什么都没发生"。
+        try
         {
-            return true;
-        }
+            if (Game1.eventUp || Game1.CurrentEvent != null)
+            {
+                return true;
+            }
 
-        if (Game1.isFestival())
-        {
-            return true;
-        }
+            if (Game1.isFestival())
+            {
+                return true;
+            }
 
-        // 守卫：Host 模式需 AgentServerProvider，ThinClient 模式需 RemoteRenderer。
-        // 两者皆 null（未初始化或 Inert 模式）则放行原版。
-        var isThinClient = RemoteRenderer != null && AgentServerProvider == null;
-        if (!isThinClient && AgentServerProvider == null)
-        {
-            return true;
-        }
+            // 守卫：Host 模式需 AgentServerProvider，ThinClient 模式需 RemoteRenderer。
+            // 两者皆 null（未初始化或 Inert 模式）则放行原版。
+            var isThinClient = RemoteRenderer != null && AgentServerProvider == null;
+            if (!isThinClient && AgentServerProvider == null)
+            {
+                return true;
+            }
 
-        if (!__instance.IsVillager)
-        {
-            return true;
-        }
+            if (!__instance.IsVillager)
+            {
+                return true;
+            }
 
-        // IsDead 判定：Host 走 AgentService，ThinClient 走 RemoteRenderer 的远程状态
-        if (isThinClient)
-        {
-            var remoteState = RemoteRenderer!.GetRemoteState(__instance.Name);
-            if (remoteState?.IsDead ?? false)
+            // IsDead 判定：Host 走 AgentService，ThinClient 走 RemoteRenderer 的远程状态
+            if (isThinClient)
+            {
+                var remoteState = RemoteRenderer!.GetRemoteState(__instance.Name);
+                if (remoteState?.IsDead ?? false)
+                {
+                    __result = true;
+                    Game1.drawObjectDialogue(Translation?.GetString("DIALOG_Greet_Final") ?? "...");
+                    return false;
+                }
+            }
+            else if (AgentService != null && AgentService.TryGetAgent(__instance.Name, out var agent) && agent != null &&
+                     agent.Health.IsDead)
             {
                 __result = true;
                 Game1.drawObjectDialogue(Translation?.GetString("DIALOG_Greet_Final") ?? "...");
                 return false;
             }
-        }
-        else if (AgentService != null && AgentService.TryGetAgent(__instance.Name, out var agent) && agent != null &&
-                 agent.Health.IsDead)
-        {
-            __result = true;
-            Game1.drawObjectDialogue(Translation?.GetString("DIALOG_Greet_Final") ?? "...");
-            return false;
-        }
 
-        // 手持可赠送物品右键 NPC → 弹 送礼/交易 选择菜单（前移到 isAgent 检查之前）。
-        // 修复：原代码将此检查放在 isAgent 之后，导致非 Agent NPC 手持物品右键时
-        // 直接走原版送礼（消耗物品），不弹菜单。现在所有村民（Agent 和非 Agent）都能弹菜单。
-        // 武器/工具等不可赠送手持物视为空手，继续走下方对话流程。
-        if (GiftTradeMenuLogic.ShouldOfferGiftTradeMenu(
-                GiftTradeMenuLogic.IsGiftableHeldItem(who.ActiveObject)))
-        {
-            // M3：房客与主机同菜单（送礼走 gift transport、交易走 dialogue transport，两条管道房客侧都已接通）。
-            ShowGiftTradeMenu(__instance, who, l, isThinClient);
-            __result = true;
-            InterceptCount++;
-            return false;
-        }
-
-        // isAgent 判定：Host 走 AgentService.HasAgent，ThinClient 走 RemoteRenderer 远程名单
-        var isAgent = isThinClient
-            ? RemoteRenderer!.GetRemoteState(__instance.Name) != null
-            : AgentService?.HasAgent(__instance.Name) ?? false;
-        if (!isAgent)
-        {
-            // Spark 激活：玩家与非 Agent 村民对话时低概率激活为 Agent（设计文档 §4.2.3）。
-            // 仅 Host 模式触发（ThinClient 不分配 Agent）。命中后 isAgent 重新判定为 true，
-            // 继续走下方 Agent 对话流程（OpenAgentDialogue）。
-            if (!isThinClient && OnSparkCandidate?.Invoke(__instance.Name) == true)
+            // 手持可赠送物品右键 NPC → 弹 送礼/交易 选择菜单（前移到 isAgent 检查之前）。
+            // 修复：原代码将此检查放在 isAgent 之后，导致非 Agent NPC 手持物品右键时
+            // 直接走原版送礼（消耗物品），不弹菜单。现在所有村民（Agent 和非 Agent）都能弹菜单。
+            // 武器/工具等不可赠送手持物视为空手，继续走下方对话流程。
+            if (GiftTradeMenuLogic.ShouldOfferGiftTradeMenu(
+                    GiftTradeMenuLogic.IsGiftableHeldItem(who.ActiveObject)))
             {
-                isAgent = AgentService?.HasAgent(__instance.Name) ?? false;
+                // M3：房客与主机同菜单（送礼走 gift transport、交易走 dialogue transport，两条管道房客侧都已接通）。
+                ShowGiftTradeMenu(__instance, who, l, isThinClient);
+                __result = true;
+                InterceptCount++;
+                return false;
             }
 
+            // isAgent 判定：Host 走 AgentService.HasAgent，ThinClient 走 RemoteRenderer 远程名单
+            var isAgent = isThinClient
+                ? RemoteRenderer!.GetRemoteState(__instance.Name) != null
+                : AgentService?.HasAgent(__instance.Name) ?? false;
             if (!isAgent)
             {
-                // 非 Agent 村民对话路径（房客与主机同节奏：对话不需要身体，房客侧请求走 dialogue transport）：
-                // - EnableFirstClickVanilla=false → 直接进入 AI 对话（跳过原版台词），支持无限对话
-                // - EnableFirstClickVanilla=true  → 放行原版，关闭后追加 AI 对话（原行为）
-                // EnableInfiniteDialogue（新开关）与 NonAgentAIChatEnabled（旧开关）同时控制，
-                // 任一关闭即不追加 AI 对话——保留旧开关兼容已有存档配置。
-                if ((Config?.EnableInfiniteDialogue ?? true)
-                    && (Config?.NonAgentAIChatEnabled ?? true)
-                    && !(Config?.EnableFirstClickVanilla ?? true))
+                // Spark 激活：玩家与非 Agent 村民对话时低概率激活为 Agent（设计文档 §4.2.3）。
+                // 仅 Host 模式触发（ThinClient 不分配 Agent）。命中后 isAgent 重新判定为 true，
+                // 继续走下方 Agent 对话流程（OpenAgentDialogue）。
+                if (!isThinClient && OnSparkCandidate?.Invoke(__instance.Name) == true)
                 {
-                    OpenAgentDialogue(__instance, isThinClient);
-                    __result = true;
-                    InterceptCount++;
-                    Monitor?.Log($"[Dialogue] Non-agent {__instance.Name}: direct AI dialogue (skip vanilla)",
-                        LogLevel.Debug);
-                    return false;
+                    isAgent = AgentService?.HasAgent(__instance.Name) ?? false;
                 }
 
-                if ((Config?.EnableInfiniteDialogue ?? true)
-                    && (Config?.NonAgentAIChatEnabled ?? true))
+                if (!isAgent)
                 {
-                    _pendingVanillaDialogueNpc = __instance.Name;
-                }
+                    // 非 Agent 村民对话路径（房客与主机同节奏：对话不需要身体，房客侧请求走 dialogue transport）：
+                    // - EnableFirstClickVanilla=false → 直接进入 AI 对话（跳过原版台词），支持无限对话
+                    // - EnableFirstClickVanilla=true  → 放行原版，关闭后追加 AI 对话（原行为）
+                    // EnableInfiniteDialogue（新开关）与 NonAgentAIChatEnabled（旧开关）同时控制，
+                    // 任一关闭即不追加 AI 对话——保留旧开关兼容已有存档配置。
+                    if ((Config?.EnableInfiniteDialogue ?? true)
+                        && (Config?.NonAgentAIChatEnabled ?? true)
+                        && !(Config?.EnableFirstClickVanilla ?? true))
+                    {
+                        OpenAgentDialogue(__instance, isThinClient);
+                        __result = true;
+                        InterceptCount++;
+                        Monitor?.Log($"[Dialogue] Non-agent {__instance.Name}: direct AI dialogue (skip vanilla)",
+                            LogLevel.Debug);
+                        return false;
+                    }
 
-                return true;
+                    if ((Config?.EnableInfiniteDialogue ?? true)
+                        && (Config?.NonAgentAIChatEnabled ?? true))
+                    {
+                        _pendingVanillaDialogueNpc = __instance.Name;
+                    }
+
+                    return true;
+                }
+                // spark 命中，isAgent 现在为 true，继续走下方 Agent 对话流程
             }
-            // spark 命中，isAgent 现在为 true，继续走下方 Agent 对话流程
+
+            OpenAgentDialogue(__instance, isThinClient);
+
+            __result = true;
+            InterceptCount++;
+            Monitor?.Log($"[Dialogue] Agent {__instance.Name}: opened native DialogueBox (mode={ModeTag})", LogLevel.Debug);
+            return false;
         }
+        catch (Exception ex)
+        {
+            if (QueueTelemetry.ShouldWarn("harmony:NPCDialoguePatch.Prefix"))
+            {
+                Monitor?.Log($"[Harmony] NPC.checkAction prefix failed — fall back to vanilla checkAction: {ex}",
+                    LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "NPCDialoguePatch.Prefix failed (fall back to vanilla)", ex);
+            }
 
-        OpenAgentDialogue(__instance, isThinClient);
-
-        __result = true;
-        InterceptCount++;
-        Monitor?.Log($"[Dialogue] Agent {__instance.Name}: opened native DialogueBox (mode={ModeTag})", LogLevel.Debug);
-        return false;
+            return true;
+        }
     }
 
     /// <summary>
@@ -276,43 +292,56 @@ public static class NPCDialoguePatch
     [HarmonyPatch(typeof(DialogueBox), nameof(DialogueBox.closeDialogue))]
     public static void CloseDialoguePostfix(DialogueBox __instance)
     {
-        var pending = _pendingVanillaDialogueNpc;
-        _pendingVanillaDialogueNpc = null; // 任何对话框关闭都消费一次，避免陈旧标记误触发
-        if (pending == null)
+        // issue #24：原版 closeDialogue 调用栈上的 Postfix。异常回落 = 跳过本次 AI 输入框追加
+        // ——原版对话已正常关闭，损失仅为"原版台词播完没接 AI 聊天"，下次对话再试。
+        try
         {
-            return;
-        }
+            var pending = _pendingVanillaDialogueNpc;
+            _pendingVanillaDialogueNpc = null; // 任何对话框关闭都消费一次，避免陈旧标记误触发
+            if (pending == null)
+            {
+                return;
+            }
 
-        // AI 对话已在进行中（Agent 对话/上一次追加）→ 不重复打开
-        if (DialogueBoxInputPatch.GetActiveAgentNpc() != null)
+            // AI 对话已在进行中（Agent 对话/上一次追加）→ 不重复打开
+            if (DialogueBoxInputPatch.GetActiveAgentNpc() != null)
+            {
+                return;
+            }
+
+            // 校验关闭的确实是该 NPC 的角色对话（防陈旧标记）
+            var speaker = __instance.characterDialogue?.speaker;
+            if (speaker == null || !speaker.Name.Equals(pending, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (Game1.eventUp || Game1.CurrentEvent != null || Game1.isFestival())
+            {
+                return;
+            }
+
+            // 房客侧 AgentServerProvider 恒为 null，对话通道存在性由 transport 判定：
+            // 不按 transport 放行的话，房客播完原版台词后 AI 输入框永不弹出。
+            if (AgentServerProvider == null && !DialogueBoxInputPatch.HasDialogueTransport)
+            {
+                return;
+            }
+
+            var aiDialogue = new StardewValley.Dialogue(speaker, null, "...");
+            speaker.setNewDialogue(aiDialogue);
+            Game1.drawDialogue(speaker);
+            DialogueBoxInputPatch.SetActiveAgentNpc(speaker.Name);
+            Monitor?.Log($"[Dialogue] Non-agent {speaker.Name}: vanilla dialogue ended, AI chat opened", LogLevel.Debug);
+        }
+        catch (Exception ex)
         {
-            return;
+            if (QueueTelemetry.ShouldWarn("harmony:NPCDialoguePatch.CloseDialoguePostfix"))
+            {
+                Monitor?.Log($"[Harmony] CloseDialoguePostfix failed — skip AI chat follow-up: {ex}", LogLevel.Error);
+                ModErrorLog.LogError("Harmony", "NPCDialoguePatch.CloseDialoguePostfix failed (skip AI follow-up)", ex);
+            }
         }
-
-        // 校验关闭的确实是该 NPC 的角色对话（防陈旧标记）
-        var speaker = __instance.characterDialogue?.speaker;
-        if (speaker == null || !speaker.Name.Equals(pending, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        if (Game1.eventUp || Game1.CurrentEvent != null || Game1.isFestival())
-        {
-            return;
-        }
-
-        // 房客侧 AgentServerProvider 恒为 null，对话通道存在性由 transport 判定：
-        // 不按 transport 放行的话，房客播完原版台词后 AI 输入框永不弹出。
-        if (AgentServerProvider == null && !DialogueBoxInputPatch.HasDialogueTransport)
-        {
-            return;
-        }
-
-        var aiDialogue = new StardewValley.Dialogue(speaker, null, "...");
-        speaker.setNewDialogue(aiDialogue);
-        Game1.drawDialogue(speaker);
-        DialogueBoxInputPatch.SetActiveAgentNpc(speaker.Name);
-        Monitor?.Log($"[Dialogue] Non-agent {speaker.Name}: vanilla dialogue ended, AI chat opened", LogLevel.Debug);
     }
 
     /// <summary>
