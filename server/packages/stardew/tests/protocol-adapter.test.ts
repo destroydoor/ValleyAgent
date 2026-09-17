@@ -83,6 +83,32 @@ test("handleActionResult returns ack", async () => {
   }
 });
 
+// 2026-09-17 实机 IT12 复现的盲区：旧用例不带 npcName/tool，走不到 routeToolResult 的
+// 记忆分支；C# 实发 result 为对象（{ok:true}）时 truncate(对象) 抛 TypeError，整个
+// routeMessage 以 internal_error 收场（error 帧 + set_goal 记忆丢失）。
+test("handleActionResult with npcName+tool=set_goal and object result does not throw (IT12 regression)", async () => {
+  const { adapter, dir } = makeAdapter();
+  try {
+    const resp = await adapter.handleActionResult({
+      type: "action_result",
+      requestId: "req-it12",
+      callId: "it12-call-1",
+      npcName: "Haley",
+      tool: "set_goal",
+      success: true,
+      result: { ok: true } as unknown as string,
+    } as never);
+    expect(resp.type).toBe("ack");
+    expect(resp.requestId).toBe("req-it12");
+    // set_goal 成功记忆已写入（routeToolResult 完整走到 memory 分支而非中途抛出）
+    const agent = (adapter as unknown as { registry: { getOrCreate(n: string): { "memory": { shortTermMemories: { text: string }[] } } } }).registry.getOrCreate("Haley");
+    const texts = agent["memory"].shortTermMemories.map((m) => m.text).join("\n");
+    expect(texts).toContain("目标");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("handleDialogue returns dialogue response with speech", async () => {
   const { adapter, dir } = makeAdapter();
   try {

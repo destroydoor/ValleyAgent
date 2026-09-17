@@ -164,7 +164,8 @@ export interface ActionResultMessage {
   requestId: string;
   callId: string;
   success: boolean;
-  result?: string;
+  // C# 侧实际发过对象（IT12 实测 {ok:true}）——协议宽松，TS 入口经 normalizeResultForLog 归一为字符串
+  result?: unknown;
   // C3 feedback routing: which NPC's action produced this result.
   // Optional for backward compat with older C# clients (silently dropped if missing).
   npcName?: string;

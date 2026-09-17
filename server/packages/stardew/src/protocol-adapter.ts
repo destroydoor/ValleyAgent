@@ -44,6 +44,21 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max) + "...";
 }
 
+/**
+ * 日志与 ToolResultRecord 的 result 归一：C# 的 action_result.result 协议上宽松
+ * （IT12 实测发过对象 {ok:true}），对象直拼模板串得 "[object Object]"、进 truncate
+ * 直接 TypeError（2026-09-17 实机 IT12 复现）。对象 → JSON.stringify，其余 → String()。
+ */
+function normalizeResultForLog(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v === null || v === undefined) return "";
+  try {
+    return JSON.stringify(v) ?? String(v);
+  } catch {
+    return String(v);
+  }
+}
+
 /** ops 金额/物品摘要（issue #27：dead_letter ERROR 日志里人能一眼看懂账目内容）。 */
 function describeOps(ops: AdjustOp[]): string {
   return ops
@@ -162,7 +177,8 @@ export class ProtocolAdapter {
       );
     }
     const reason = (req as { reason?: string }).reason;
-    console.log(`[${timestamp()}] [recv] action_result callId=${req.callId} ok=${req.success}${reason ? ` reason=${reason}` : ""}${req.result ? ` result="${req.result}"` : ""}`);
+    const resultText = normalizeResultForLog(req.result);
+    console.log(`[${timestamp()}] [recv] action_result callId=${req.callId} ok=${req.success}${reason ? ` reason=${reason}` : ""}${resultText ? ` result="${resultText}"` : ""}`);
     this.routeToolResult(req);
     return { type: "ack", requestId: req.requestId };
   }
@@ -552,19 +568,20 @@ export class ProtocolAdapter {
     callId: string;
     tool?: string;
     success: boolean;
-    result?: string;
+    result?: unknown;
     reason?: string;
   }): void {
     if (!req.npcName) {
       // Legacy C# client without npcName — cannot route, drop silently.
       return;
     }
-    console.log(`[${timestamp()}] [tool] ${req.npcName} ← ${req.tool ?? "unknown"} success=${req.success}${req.result ? ` result="${truncate(req.result, 80)}"` : ""}${req.reason ? ` reason=${req.reason}` : ""}`);
+    const resultText = normalizeResultForLog(req.result);
+    console.log(`[${timestamp()}] [tool] ${req.npcName} ← ${req.tool ?? "unknown"} success=${req.success}${resultText ? ` result="${truncate(resultText, 80)}"` : ""}${req.reason ? ` reason=${req.reason}` : ""}`);
     const record: ToolResultRecord = {
       callId: req.callId,
       tool: req.tool ?? "unknown",
       success: req.success,
-      ...(req.result !== undefined ? { result: req.result } : {}),
+      ...(resultText !== "" ? { result: resultText } : {}),
       ...(req.reason !== undefined ? { reason: req.reason } : {}),
     };
     this.registry.enqueueToolResult(req.npcName, record);
