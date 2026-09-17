@@ -33,7 +33,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ── Paths ───────────────────────────────────────────────────────────
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 仓库根 = scripts\build 的上两级（$PSScriptRoot 是本脚本所在目录）
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . "$PSScriptRoot\..\lib\paths.ps1"
 $GamePath    = Get-GamePath
 $SMAPIExe    = Join-Path $GamePath "StardewModdingAPI.exe"
